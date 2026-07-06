@@ -122,7 +122,6 @@ function clearResults() {
 // ========================
 
 function applySelection(r) {
-
   const values = {
     SIRET: r.siege?.siret,
     RaisonSociale: r.nom_complet,
@@ -132,7 +131,6 @@ function applySelection(r) {
   };
 
   grist.docApi.applyUserActions([
-    ["UpdateRecord", currentRecord.id, values]
+    ["UpdateRecord", currentRecord.tableId, currentRecord.id, values]
   ]);
-
 }
