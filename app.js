@@ -123,7 +123,7 @@ function clearResults() {
 
 function applySelection(r) {
 
-  const tableId = grist.selectedTable?.tableId;
+  const tableId = currentRecord.table_id;
 
   grist.docApi.applyUserActions([
     ["UpdateRecord", tableId, currentRecord.id, {
