@@ -128,7 +128,6 @@ function applySelection(r) {
   }
 
   const table = grist.getTable();
-  
   const values = {
     SIRET: r.siege?.siret,
     RaisonSociale: r.nom_complet,
