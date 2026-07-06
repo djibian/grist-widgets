@@ -122,8 +122,6 @@ function clearResults() {
 // ========================
 
 function applySelection(r) {
-  console.log("CLICK Choisir détecté", r);
-  console.log("currentRecord =", currentRecord);
 
   grist.docApi.applyUserActions([
     ["UpdateRecord", "_THIS_TABLE_", currentRecord.id, {
