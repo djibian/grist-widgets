@@ -122,11 +122,9 @@ function clearResults() {
 // ========================
 
 function applySelection(r) {
-
   if (!currentRecord) {
     return;
   }
-
   const values = {
     SIRET: r.siege?.siret,
     RaisonSociale: r.nom_complet,
@@ -134,7 +132,6 @@ function applySelection(r) {
     Latitude: r.siege?.latitude,
     Longitude: r.siege?.longitude
   };
-
   grist.docApi.applyUserActions([
     ["UpdateRecord", currentRecord.id, values]
   ]);
