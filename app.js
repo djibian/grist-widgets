@@ -122,19 +122,23 @@ function clearResults() {
 // ========================
 
 function applySelection(r) {
+
   if (!currentRecord) {
     return;
   }
-  
-  // DEBUG - À VOIR DANS LA CONSOLE NAVIGATEUR
-  window.debug = {
-    currentRecord: currentRecord,
-    id: currentRecord.id,
-    id_type: typeof currentRecord.id,
-    id_isArray: Array.isArray(currentRecord.id),
-    keys: Object.keys(currentRecord)
+
+  const values = {
+    SIRET: r.siege?.siret,
+    RaisonSociale: r.nom_complet,
+    AdresseNormalisee: r.siege?.adresse,
+    Latitude: r.siege?.latitude,
+    Longitude: r.siege?.longitude
   };
-  
-  console.log("DEBUG:", window.debug);
-  
+
+  grist.getTable().then(table => {
+    table.update({
+      id: currentRecord.id,
+      fields: values
+    });
+  });
 }
