@@ -16,6 +16,7 @@ grist.ready({
 });
 
 let currentRecord = null;
+let currentMappings = null;
 let mapped = null;
 
 
@@ -23,8 +24,9 @@ let mapped = null;
 // 2. RÉCEPTION DONNÉES
 // ========================
 
-grist.onRecord((record) => {
+grist.onRecord((record, mappings) => {
   currentRecord = record;
+  currentMappings = mappings;
   mapped = grist.mapColumnNames(record);
 
   clearResults();
@@ -135,9 +137,10 @@ function applySelection(r) {
     Latitude: r.siege?.latitude,
     Longitude: r.siege?.longitude
   };
+  const realValues = grist.mapColumnNamesBack(values);
 
   table.update({
       id: currentRecord.id,
-      fields: values
+      fields: realValues
     });
 }
