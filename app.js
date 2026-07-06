@@ -27,6 +27,7 @@ grist.onRecord((record) => {
   currentRecord = record;
   mapped = grist.mapColumnNames(record);
 
+  clearResults();
   renderRecord();
 });
 
@@ -111,6 +112,9 @@ function renderResults(results) {
   });
 }
 
+function clearResults() {
+  document.getElementById("results").innerHTML = "";
+}
 
 // ========================
 // 7. ÉCRITURE DANS GRIST
