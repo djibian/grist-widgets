@@ -137,5 +137,4 @@ function applySelection(r) {
   
   console.log("DEBUG:", window.debug);
   
-  // NE PAS APPELER applyUserActions TANT QUE VOUS N'AVEZ PAS VU LE DEBUG
 }
