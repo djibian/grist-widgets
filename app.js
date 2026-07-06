@@ -99,9 +99,9 @@ function renderResults(results) {
     div.className = "result";
 
     div.innerHTML = `
-      <b>Raison sociale : ${r.nom_complet}</b><br>
-      SIRET : ${r.siege?.siret}<br>
-      Adresse : ${r.siege?.adresse || ""}
+      <b>${r.nom_complet}</b><br>
+      ${r.siege?.siret || ""}<br>
+      ${r.siege?.adresse || ""}
       <button>Choisir</button>
     `;
 
