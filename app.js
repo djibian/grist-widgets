@@ -23,6 +23,7 @@ let mapped = null;
 // ========================
 
 grist.onRecord((record, mappings) => {
+  console.log(mappings);
   currentRecord = record;
   currentMappings = mappings;
   mapped = grist.mapColumnNames(record);
@@ -128,13 +129,13 @@ function applySelection(r) {
   }
 
   const values = {
-    Numero_d_immatriculation_trouve: r.siege?.siret,
-    Raison_sociale: r.nom_complet,
-    Adresse_normalisee: r.siege?.adresse
+    [currentMappings.SIRET]: r.siege?.siret,
+    [currentMappings.RaisonSociale]: r.nom_complet,
+    [currentMappings.AdresseNormalisee]: r.siege?.adresse
   };
 
   grist.selectedTable.update({
       id: currentRecord.id,
-      fields: realValues
+      fields: values
     });
 }
