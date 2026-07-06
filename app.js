@@ -122,6 +122,11 @@ function clearResults() {
 // ========================
 
 function applySelection(r) {
+
+  if (!currentRecord) {
+    return;
+  }
+
   const values = {
     SIRET: r.siege?.siret,
     RaisonSociale: r.nom_complet,
@@ -130,9 +135,7 @@ function applySelection(r) {
     Longitude: r.siege?.longitude
   };
 
-  grist.getSelectedTable().then(table => {
-    grist.docApi.applyUserActions([
-      ["UpdateRecord", table.tableId, currentRecord.id, values]
-    ]);
-  });
+  grist.docApi.applyUserActions([
+    ["UpdateRecord", currentRecord.id, values]
+  ]);
 }
