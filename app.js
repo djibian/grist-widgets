@@ -9,9 +9,7 @@ grist.ready({
     "Adresse",
     "SIRET",
     "RaisonSociale",
-    "AdresseNormalisee",
-    "Latitude",
-    "Longitude"
+    "AdresseNormalisee"
   ]
 });
 
@@ -129,17 +127,13 @@ function applySelection(r) {
     return;
   }
 
-  const table = grist.getTable();
   const values = {
-    SIRET: r.siege?.siret,
-    RaisonSociale: r.nom_complet,
-    AdresseNormalisee: r.siege?.adresse,
-    Latitude: r.siege?.latitude,
-    Longitude: r.siege?.longitude
+    Numero_d_immatriculation_trouve: r.siege?.siret,
+    Raison_sociale: r.nom_complet,
+    Adresse_normalisee: r.siege?.adresse
   };
-  const realValues = grist.mapColumnNamesBack(values);
 
-  table.update({
+  grist.selectedTable.update({
       id: currentRecord.id,
       fields: realValues
     });
