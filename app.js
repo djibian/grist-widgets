@@ -27,6 +27,11 @@ grist.onRecord((record) => {
   currentRecord = record;
   mapped = grist.mapColumnNames(record);
 
+  // 👇 CAPTURE TABLE ID RÉEL
+  if (!tableId) {
+    tableId = record.tableId || record.table_id;
+  }
+  
   clearResults();
   renderRecord();
 });
