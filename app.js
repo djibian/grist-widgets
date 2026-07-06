@@ -130,7 +130,9 @@ function applySelection(r) {
     Longitude: r.siege?.longitude
   };
 
-  grist.docApi.applyUserActions([
-    ["UpdateRecord", currentRecord.tableId, currentRecord.id, values]
-  ]);
+  grist.getSelectedTable().then(table => {
+    grist.docApi.applyUserActions([
+      ["UpdateRecord", table.tableId, currentRecord.id, values]
+    ]);
+  });
 }
