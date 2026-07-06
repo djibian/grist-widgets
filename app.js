@@ -123,13 +123,14 @@ function clearResults() {
 
 function applySelection(r) {
 
+  const tableId = grist.selectedTable?.tableId;
+
   grist.docApi.applyUserActions([
-    ["UpdateRecord", "_THIS_TABLE_", currentRecord.id, {
+    ["UpdateRecord", tableId, currentRecord.id, {
 
       SIRET: r.siege?.siret,
       RaisonSociale: r.nom_complet,
       AdresseNormalisee: r.siege?.adresse,
-
       Latitude: r.siege?.latitude,
       Longitude: r.siege?.longitude
 
