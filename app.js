@@ -23,7 +23,7 @@ let mapped = null;
 // ========================
 
 grist.onRecord((record, mappings) => {
-  console.log(mappings);
+
   currentRecord = record;
   currentMappings = mappings;
   mapped = grist.mapColumnNames(record);
