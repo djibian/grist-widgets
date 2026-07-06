@@ -126,18 +126,16 @@ function applySelection(r) {
     return;
   }
   
-  const tableId = currentRecord.id[0];  // ← Le tableId en string !
-  const recordId = currentRecord.id[1]; // ← Le recordId numérique
-  
-  const values = {
-    SIRET: r.siege?.siret,
-    RaisonSociale: r.nom_complet,
-    AdresseNormalisee: r.siege?.adresse,
-    Latitude: r.siege?.latitude,
-    Longitude: r.siege?.longitude
+  // DEBUG - À VOIR DANS LA CONSOLE NAVIGATEUR
+  window.debug = {
+    currentRecord: currentRecord,
+    id: currentRecord.id,
+    id_type: typeof currentRecord.id,
+    id_isArray: Array.isArray(currentRecord.id),
+    keys: Object.keys(currentRecord)
   };
-
-  grist.docApi.applyUserActions([
-    ["UpdateRecord", tableId, recordId, values]
-  ]);
+  
+  console.log("DEBUG:", window.debug);
+  
+  // NE PAS APPELER applyUserActions TANT QUE VOUS N'AVEZ PAS VU LE DEBUG
 }
