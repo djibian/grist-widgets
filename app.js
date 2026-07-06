@@ -122,7 +122,6 @@ function clearResults() {
 // ========================
 
 function applySelection(r) {
-
   grist.docApi.applyUserActions([
     ["UpdateRecord", null, currentRecord.id, {
 
