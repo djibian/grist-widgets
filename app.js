@@ -27,7 +27,6 @@ grist.onRecord((record) => {
   currentRecord = record;
   mapped = grist.mapColumnNames(record);
 
-  consol.log(currentRecord);
   clearResults();
   renderRecord();
 });
@@ -124,15 +123,16 @@ function clearResults() {
 
 function applySelection(r) {
 
+  const values = {
+    SIRET: r.siege?.siret,
+    RaisonSociale: r.nom_complet,
+    AdresseNormalisee: r.siege?.adresse,
+    Latitude: r.siege?.latitude,
+    Longitude: r.siege?.longitude
+  };
+
   grist.docApi.applyUserActions([
-    ["UpdateRecord", tableId, currentRecord.id, {
-
-      SIRET: r.siege?.siret,
-      RaisonSociale: r.nom_complet,
-      AdresseNormalisee: r.siege?.adresse,
-      Latitude: r.siege?.latitude,
-      Longitude: r.siege?.longitude
-
-    }]
+    ["UpdateRecord", currentRecord.id, values]
   ]);
+
 }
