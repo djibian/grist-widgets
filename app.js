@@ -129,7 +129,7 @@ function clearResults() {
 function applySelection(r) {
 
   grist.docApi.applyUserActions([
-    ["UpdateRecord", null, currentRecord.id, {
+    ["UpdateRecord", tableId, currentRecord.id, {
 
       SIRET: r.siege?.siret,
       RaisonSociale: r.nom_complet,
