@@ -127,6 +127,8 @@ function applySelection(r) {
     return;
   }
 
+  const table = grist.getTable();
+  
   const values = {
     SIRET: r.siege?.siret,
     RaisonSociale: r.nom_complet,
@@ -135,10 +137,8 @@ function applySelection(r) {
     Longitude: r.siege?.longitude
   };
 
-  grist.getTable().then(table => {
-    table.update({
+  table.update({
       id: currentRecord.id,
       fields: values
     });
-  });
 }
