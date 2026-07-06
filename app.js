@@ -125,6 +125,10 @@ function applySelection(r) {
   if (!currentRecord) {
     return;
   }
+  
+  const tableId = currentRecord.id[0];  // ← Le tableId en string !
+  const recordId = currentRecord.id[1]; // ← Le recordId numérique
+  
   const values = {
     SIRET: r.siege?.siret,
     RaisonSociale: r.nom_complet,
@@ -132,7 +136,8 @@ function applySelection(r) {
     Latitude: r.siege?.latitude,
     Longitude: r.siege?.longitude
   };
+
   grist.docApi.applyUserActions([
-    ["UpdateRecord", currentRecord.id, values]
+    ["UpdateRecord", tableId, recordId, values]
   ]);
 }
