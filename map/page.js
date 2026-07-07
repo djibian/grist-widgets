@@ -326,7 +326,7 @@ function clearPopupMarker() {
   }
 }
 
-async function selectMaker(id) {
+function selectMaker(id) {
    // Reset the options from the previously selected marker.
    const previouslyClicked = popups[selectedRowId];
    if (previouslyClicked) {
@@ -346,15 +346,12 @@ async function selectMaker(id) {
    // Rerender markers in this cluster
    markers.refreshClusters();
 
-   // Update the selected row in Grist with proper error handling
+  // Update the selected row in Grist - Assurez-vous que c'est toujours appelé
   console.warn("RowId", id);
-   try {
-     if (grist.setCursorPos) {
-       await grist.setCursorPos({rowId: id});
-     }
-   } catch (err) {
-     console.warn("Could not set cursor position to row", id, err);
-   }
+   
+  grist.setCursorPos?.({rowId: id}).catch(() => {
+    console.warn("Could not set cursor position to row", id);
+  });
 
    return marker;
 }
