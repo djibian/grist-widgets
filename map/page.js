@@ -265,6 +265,10 @@ function updateMap(data) {
   markers.on('click', (e) => {
     const id = e.layer.options.id;
     selectMaker(id);
+    // Zommer pour afficher le marqueur sélectionné
+    if (markers) {
+      markers.zoomToShowLayer(e.layer);
+    }
   });
 
   for (const rec of data) {
@@ -346,8 +350,10 @@ function selectMaker(id) {
    // Rerender markers in this cluster
    markers.refreshClusters();
 
-   // Update the selected row in Grist.
-   grist.setCursorPos?.({rowId: id}).catch(() => {});
+   // Update the selected row in Grist - Assurez-vous que c'est toujours appelé
+   grist.setCursorPos?.({rowId: id}).catch(() => {
+     console.warn("Could not set cursor position to row", id);
+   });
 
    return marker;
 }
