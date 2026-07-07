@@ -326,7 +326,7 @@ function clearPopupMarker() {
   }
 }
 
-function selectMaker(id) {
+async function selectMaker(id) {
    // Reset the options from the previously selected marker.
    const previouslyClicked = popups[selectedRowId];
    if (previouslyClicked) {
