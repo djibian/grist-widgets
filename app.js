@@ -20,7 +20,6 @@ class Result {
         this.origine = origine;
         this.source = source;
     }
-}
 
   /**
    * Crée un Result depuis un enregistrement Grist (ligne locale)
