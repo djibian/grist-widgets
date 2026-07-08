@@ -93,7 +93,37 @@ async function searchLocal(query) {
 
     const table = await grist.docApi.fetchTable(tableId);
 
-    return [];
+    const data = prepareLocalData(table);
+
+    const fuse = new Fuse(data, {
+
+        includeScore: true,
+
+        threshold: 0.35,
+
+        ignoreLocation: false,
+
+        keys: [
+
+            {
+                name: "nom",
+                weight: 0.7
+            },
+
+            {
+                name: "adresse",
+                weight: 0.3
+            }
+
+        ]
+
+    });
+
+    const results = fuse.search(normalize(query));
+
+    return results
+        .slice(0,5)
+        .map(r => r.item.record);
 
 }
 
@@ -108,6 +138,29 @@ async function searchEntreprise(query) {
   return data.results || [];
 }
 
+function normalize(text) {
+
+    return (text || "")
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .toLowerCase()
+        .trim();
+
+}
+
+function prepareLocalData(table) {
+
+    return table.map(row => ({
+
+        record: row,
+
+        nom: normalize(row[currentMappings.Nom]),
+
+        adresse: normalize(row[currentMappings.Adresse])
+
+    }));
+
+}
 
 // ========================
 // 6. AFFICHAGE RESULTATS
