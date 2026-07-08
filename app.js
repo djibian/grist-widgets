@@ -34,7 +34,7 @@ class Result {
     const adresse = (row && mappings && row[mappings.Adresse]) || 
                     (row && row.Adresse) || 
                     "";
-    return new Result(nom, siret, adresse, row);
+    return new Result({ nom, siret, adresse, origine: row, source: row });
   }
 
   /**
@@ -44,7 +44,7 @@ class Result {
     const nom = apiResult?.nom_complet || "";
     const siret = apiResult?.siege?.siret || "";
     const adresse = apiResult?.siege?.adresse || "";
-    return new Result(nom, siret, adresse, apiResult);
+    return new Result({ nom, siret, adresse, origine: apiResult, source: apiResult });
   }
 }
 
@@ -226,12 +226,13 @@ async function searchEntreprise(query) {
 async function searchGoogle(query) {
 
     return [
-        new Result(
-            "Résultat Google de test",
-            "",
-            "Adresse de test",
-            null
-        )
+        new Result({
+            nom: "Résultat Google de test",
+            siret: "",
+            adresse: "Adresse de test",
+            latitude: null,
+            longitude: null
+        })
     ];
 
 }
