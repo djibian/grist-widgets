@@ -91,9 +91,14 @@ async function searchLocal(query) {
 
     const tableId = await grist.selectedTable.getTableId();
 
+    // fetchTable retourne un GristData.RowRecords :
+    // un objet { colId: [valRow0, valRow1, ...], ... }
     const table = await grist.docApi.fetchTable(tableId);
 
-    const data = prepareLocalData(table);
+    // Convertir RowRecords en tableau de lignes [{colId: val, ...}, ...]
+    const rows = rowRecordsToRows(table);
+
+    const data = prepareLocalData(rows);
 
     const fuse = new Fuse(data, {
 
@@ -121,10 +126,44 @@ async function searchLocal(query) {
 
     const results = fuse.search(normalize(query));
 
+    // On renvoie l'objet "record" original (chaque item est {record, nom, adresse})
     return results
         .slice(0,5)
         .map(r => r.item.record);
 
+}
+
+// Convertit Grist RowRecords en tableau de lignes.
+// Ne modifie pas les arrays originaux (lecture seule).
+function rowRecordsToRows(rowRecords) {
+  if (!rowRecords || typeof rowRecords !== "object") {
+    return [];
+  }
+  // Si on a déjà un tableau -> le renvoyer directement
+  if (Array.isArray(rowRecords)) {
+    return rowRecords;
+  }
+  const colIds = Object.keys(rowRecords);
+  if (colIds.length === 0) {
+    return [];
+  }
+  // Utiliser la colonne 'id' si présente pour déterminer le nombre de lignes,
+  // sinon prendre la longueur du premier tableau.
+  const length = (Array.isArray(rowRecords.id) && rowRecords.id.length) ||
+                 (Array.isArray(rowRecords[colIds[0]]) && rowRecords[colIds[0]].length) ||
+                 0;
+
+  const rows = new Array(length);
+  for (let i = 0; i < length; i++) {
+    const row = {};
+    for (const col of colIds) {
+      // On lit la valeur à l'index i ; si le tableau est plus court, on aura undefined
+      const colArr = rowRecords[col];
+      row[col] = Array.isArray(colArr) ? colArr[i] : undefined;
+    }
+    rows[i] = row;
+  }
+  return rows;
 }
 
 async function searchEntreprise(query) {
@@ -148,15 +187,18 @@ function normalize(text) {
 
 }
 
-function prepareLocalData(table) {
+// prepareLocalData accepte maintenant un tableau de lignes (rows)
+function prepareLocalData(rows) {
 
-    return table.map(row => ({
+    rows = Array.isArray(rows) ? rows : [];
+
+    return rows.map(row => ({
 
         record: row,
 
-        nom: normalize(row[currentMappings.Nom]),
+        nom: normalize(row && currentMappings ? row[currentMappings.Nom] : (row && row.Nom) ),
 
-        adresse: normalize(row[currentMappings.Adresse])
+        adresse: normalize(row && currentMappings ? row[currentMappings.Adresse] : (row && row.Adresse) )
 
     }));
 
@@ -177,10 +219,33 @@ function renderResults(results) {
     const div = document.createElement("div");
     div.className = "result";
 
+    // Supporter deux formes de résultats :
+    // - résultat "entreprise" depuis l'API : r.nom_complet, r.siege.{siret,adresse}
+    // - résultat local (ligne) : r is a record/object with columns accessed via currentMappings
+    let displayName = "";
+    let siret = "";
+    let adresse = "";
+
+    if (r && (r.nom_complet || r.siege)) {
+      // forme API entreprise
+      displayName = r.nom_complet || "";
+      siret = r.siege?.siret || "";
+      adresse = r.siege?.adresse || "";
+    } else {
+      // forme locale (ligne)
+      displayName = (r && currentMappings && r[currentMappings.RaisonSociale]) ||
+                    (r && currentMappings && r[currentMappings.Nom]) ||
+                    (r && r.Nom) ||
+                    (r && r.name) ||
+                    "";
+      siret = (r && currentMappings && r[currentMappings.SIRET]) || (r && r.SIRET) || "";
+      adresse = (r && currentMappings && r[currentMappings.Adresse]) || (r && r.Adresse) || "";
+    }
+
     div.innerHTML = `
-      <b>${r.nom_complet}</b><br>
-      ${r.siege?.siret || ""}<br>
-      ${r.siege?.adresse || ""}
+      <b>${displayName}</b><br>
+      ${siret || ""}<br>
+      ${adresse || ""}
       <button>Choisir</button>
     `;
 
@@ -202,14 +267,19 @@ function clearResults() {
 
 function applySelection(r) {
 
-  if (!currentRecord) {
+  if (!currentRecord || !currentMappings) {
     return;
   }
 
+  // Supporter sélection de résultat entreprise ou sélection d'une ligne locale.
+  const siret = r?.siege?.siret || r[currentMappings.SIRET] || r.SIRET || null;
+  const raison = r?.nom_complet || r[currentMappings.RaisonSociale] || r[currentMappings.Nom] || r.Nom || null;
+  const adresse = r?.siege?.adresse || r[currentMappings.AdresseNormalisee] || r[currentMappings.Adresse] || r.Adresse || null;
+
   const values = {
-    [currentMappings.SIRET]: r.siege?.siret,
-    [currentMappings.RaisonSociale]: r.nom_complet,
-    [currentMappings.AdresseNormalisee]: r.siege?.adresse
+    [currentMappings.SIRET]: siret,
+    [currentMappings.RaisonSociale]: raison,
+    [currentMappings.AdresseNormalisee]: adresse
   };
 
   grist.selectedTable.update({
