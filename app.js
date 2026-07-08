@@ -58,9 +58,12 @@ function renderRecord() {
 
 document.getElementById("btn-search").addEventListener("click", async () => {
 
-  if (!mapped) return;
+  const query = document.getElementById("search").value.trim();
 
-  const query = `${mapped.Nom || ""} ${mapped.Adresse || ""}`.trim();
+  if (!query) {
+    clearResults();
+    return;
+  }
 
   const results = await searchEntreprise(query);
 
