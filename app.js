@@ -96,18 +96,30 @@ function renderRecord() {
 // 4. ACTION UTILISATEUR
 // ========================
 
-document.getElementById("btn-search").addEventListener("click", async () => {
+const searchInput = document.getElementById("search");
 
-  const query = document.getElementById("search").value.trim();
+let searchTimer;
 
-  if (!query) {
-    clearResults();
-    return;
-  }
+searchInput.addEventListener("input", () => {
 
-  const results = await search(query);
+    clearTimeout(searchTimer);
 
-  renderResults(results);
+    const query = searchInput.value.trim();
+
+    if (query.length < 3) {
+
+        clearResults();
+
+        return;
+
+    }
+
+    searchTimer = setTimeout(() => {
+
+        search(query);
+
+    },300);
+
 });
 
 
@@ -117,13 +129,14 @@ document.getElementById("btn-search").addEventListener("click", async () => {
 
 async function search(query) {
 
-    const local = await searchLocal(query);
+    const [localResults, googleResults] = await Promise.all([
+        searchLocal(query),
+        searchGoogle(query)
+    ]);
 
-    if (local.length > 0) {
-        return local;
-    }
+    renderLocalResults(localResults);
 
-    return await searchEntreprise(query);
+    renderGoogleResults(googleResults);
 
 }
 
@@ -218,6 +231,19 @@ async function searchEntreprise(query) {
   return (data.results || []).map(item => Result.fromEntrepriseAPI(item));
 }
 
+async function searchGoogle(query) {
+
+    return [
+        new Result(
+            "Résultat Google de test",
+            "",
+            "Adresse de test",
+            null
+        )
+    ];
+
+}
+
 function normalize(text) {
 
     return (text || "")
@@ -254,22 +280,27 @@ function prepareLocalData(rows) {
 // 6. AFFICHAGE RESULTATS
 // ========================
 
-function renderResults(results) {
+function renderLocalResults(results) {
 
-  const container = document.getElementById("results");
+  const container = document.getElementById("local-results");
 
   container.innerHTML = "";
 
-  results.slice(0, 5).forEach(result => {
+  if (results.length === 0) {
+    return;
+  }
+
+  container.innerHTML = "<h3>📁 Structures déjà enregistrées</h3>";
+
+  results.slice(0,5).forEach(result => {
 
     const div = document.createElement("div");
     div.className = "result";
 
-    // result est maintenant toujours un Result DTO
     div.innerHTML = `
       <b>${result.nom}</b><br>
       ${result.siret || ""}<br>
-      ${result.adresse || ""}
+      ${result.adresse || ""}<br>
       <button>Choisir</button>
     `;
 
@@ -278,11 +309,52 @@ function renderResults(results) {
     });
 
     container.appendChild(div);
+
   });
+
+}
+
+function renderGoogleResults(results) {
+
+  const container = document.getElementById("google-results");
+
+  container.innerHTML = "";
+
+  if (results.length === 0) {
+    return;
+  }
+
+  container.innerHTML = "<h3>🌍 Nouvelles structures trouvées</h3>";
+
+  results.slice(0,5).forEach(result => {
+
+    const div = document.createElement("div");
+    div.className = "result";
+
+    div.innerHTML = `
+      <b>${result.nom}</b><br>
+      ${result.adresse || ""}<br>
+      <button>Ajouter</button>
+    `;
+
+    div.querySelector("button").addEventListener("click", () => {
+
+      console.log(result);
+
+    });
+
+    container.appendChild(div);
+
+  });
+
 }
 
 function clearResults() {
-  document.getElementById("results").innerHTML = "";
+
+  document.getElementById("local-results").innerHTML = "";
+
+  document.getElementById("google-results").innerHTML = "";
+
 }
 
 // ========================
