@@ -1,4 +1,44 @@
 // ========================
+// 0. DTO - MODÈLE UNIFIÉ
+// ========================
+
+class Result {
+  constructor(nom, siret, adresse, source = null) {
+    this.nom = nom;
+    this.siret = siret;
+    this.adresse = adresse;
+    this.source = source; // objet brut d'origine (pour traçabilité si besoin)
+  }
+
+  /**
+   * Crée un Result depuis un enregistrement Grist (ligne locale)
+   */
+  static fromGristRow(row, mappings) {
+    const nom = (row && mappings && row[mappings.Nom]) || 
+                (row && row.Nom) || 
+                "";
+    const siret = (row && mappings && row[mappings.SIRET]) || 
+                  (row && row.SIRET) || 
+                  "";
+    const adresse = (row && mappings && row[mappings.Adresse]) || 
+                    (row && row.Adresse) || 
+                    "";
+    return new Result(nom, siret, adresse, row);
+  }
+
+  /**
+   * Crée un Result depuis une réponse API Recherche Entreprises
+   */
+  static fromEntrepriseAPI(apiResult) {
+    const nom = apiResult?.nom_complet || "";
+    const siret = apiResult?.siege?.siret || "";
+    const adresse = apiResult?.siege?.adresse || "";
+    return new Result(nom, siret, adresse, apiResult);
+  }
+}
+
+
+// ========================
 // 1. CONFIG GRIST
 // ========================
 
@@ -111,12 +151,12 @@ async function searchLocal(query) {
         keys: [
 
             {
-                name: "nom",
+                name: "searchableNom",
                 weight: 0.7
             },
 
             {
-                name: "adresse",
+                name: "searchableAdresse",
                 weight: 0.3
             }
 
@@ -126,10 +166,10 @@ async function searchLocal(query) {
 
     const results = fuse.search(normalize(query));
 
-    // On renvoie l'objet "record" original (chaque item est {record, nom, adresse})
+    // On retourne un tableau de Result DTO
     return results
-        .slice(0,5)
-        .map(r => r.item.record);
+        .slice(0, 5)
+        .map(r => r.item.result);
 
 }
 
@@ -174,7 +214,8 @@ async function searchEntreprise(query) {
   const res = await fetch(url);
   const data = await res.json();
 
-  return data.results || [];
+  // Convertir chaque résultat API en Result DTO
+  return (data.results || []).map(item => Result.fromEntrepriseAPI(item));
 }
 
 function normalize(text) {
@@ -187,20 +228,25 @@ function normalize(text) {
 
 }
 
-// prepareLocalData accepte maintenant un tableau de lignes (rows)
+/**
+ * Prépare les données locales pour la recherche Fuse.
+ * Chaque item contient :
+ *   - result : le Result DTO
+ *   - searchableNom : texte normalisé pour Fuse
+ *   - searchableAdresse : texte normalisé pour Fuse
+ */
 function prepareLocalData(rows) {
 
     rows = Array.isArray(rows) ? rows : [];
 
-    return rows.map(row => ({
-
-        record: row,
-
-        nom: normalize(row && currentMappings ? row[currentMappings.Nom] : (row && row.Nom) ),
-
-        adresse: normalize(row && currentMappings ? row[currentMappings.Adresse] : (row && row.Adresse) )
-
-    }));
+    return rows.map(row => {
+      const result = Result.fromGristRow(row, currentMappings);
+      return {
+        result: result,
+        searchableNom: normalize(result.nom),
+        searchableAdresse: normalize(result.adresse)
+      };
+    });
 
 }
 
@@ -214,43 +260,21 @@ function renderResults(results) {
 
   container.innerHTML = "";
 
-  results.slice(0, 5).forEach(r => {
+  results.slice(0, 5).forEach(result => {
 
     const div = document.createElement("div");
     div.className = "result";
 
-    // Supporter deux formes de résultats :
-    // - résultat "entreprise" depuis l'API : r.nom_complet, r.siege.{siret,adresse}
-    // - résultat local (ligne) : r is a record/object with columns accessed via currentMappings
-    let displayName = "";
-    let siret = "";
-    let adresse = "";
-
-    if (r && (r.nom_complet || r.siege)) {
-      // forme API entreprise
-      displayName = r.nom_complet || "";
-      siret = r.siege?.siret || "";
-      adresse = r.siege?.adresse || "";
-    } else {
-      // forme locale (ligne)
-      displayName = (r && currentMappings && r[currentMappings.RaisonSociale]) ||
-                    (r && currentMappings && r[currentMappings.Nom]) ||
-                    (r && r.Nom) ||
-                    (r && r.name) ||
-                    "";
-      siret = (r && currentMappings && r[currentMappings.SIRET]) || (r && r.SIRET) || "";
-      adresse = (r && currentMappings && r[currentMappings.Adresse]) || (r && r.Adresse) || "";
-    }
-
+    // result est maintenant toujours un Result DTO
     div.innerHTML = `
-      <b>${displayName}</b><br>
-      ${siret || ""}<br>
-      ${adresse || ""}
+      <b>${result.nom}</b><br>
+      ${result.siret || ""}<br>
+      ${result.adresse || ""}
       <button>Choisir</button>
     `;
 
     div.querySelector("button").addEventListener("click", () => {
-      applySelection(r);
+      applySelection(result);
     });
 
     container.appendChild(div);
@@ -265,21 +289,17 @@ function clearResults() {
 // 7. ÉCRITURE DANS GRIST
 // ========================
 
-function applySelection(r) {
+function applySelection(result) {
 
   if (!currentRecord || !currentMappings) {
     return;
   }
 
-  // Supporter sélection de résultat entreprise ou sélection d'une ligne locale.
-  const siret = r?.siege?.siret || r[currentMappings.SIRET] || r.SIRET || null;
-  const raison = r?.nom_complet || r[currentMappings.RaisonSociale] || r[currentMappings.Nom] || r.Nom || null;
-  const adresse = r?.siege?.adresse || r[currentMappings.AdresseNormalisee] || r[currentMappings.Adresse] || r.Adresse || null;
-
+  // result est un Result DTO : les propriétés sont toujours au même endroit
   const values = {
-    [currentMappings.SIRET]: siret,
-    [currentMappings.RaisonSociale]: raison,
-    [currentMappings.AdresseNormalisee]: adresse
+    [currentMappings.SIRET]: result.siret,
+    [currentMappings.RaisonSociale]: result.nom,
+    [currentMappings.AdresseNormalisee]: result.adresse
   };
 
   grist.selectedTable.update({
