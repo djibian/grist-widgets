@@ -3,12 +3,24 @@
 // ========================
 
 class Result {
-  constructor(nom, siret, adresse, source = null) {
-    this.nom = nom;
-    this.siret = siret;
-    this.adresse = adresse;
-    this.source = source; // objet brut d'origine (pour traçabilité si besoin)
-  }
+    constructor({
+        nom,
+        adresse,
+        siret = "",
+        latitude = null,
+        longitude = null,
+        origine,
+        source
+    }) {
+        this.nom = nom;
+        this.adresse = adresse;
+        this.siret = siret;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.origine = origine;
+        this.source = source;
+    }
+}
 
   /**
    * Crée un Result depuis un enregistrement Grist (ligne locale)
@@ -69,27 +81,7 @@ grist.onRecord((record, mappings) => {
   mapped = grist.mapColumnNames(record);
 
   clearResults();
-  renderRecord();
 });
-
-
-// ========================
-// 3. RENDER SIMPLE
-// ========================
-
-function renderRecord() {
-  const el = document.getElementById("record");
-
-  if (!mapped) {
-    el.innerHTML = "⚠ Colonnes non configurées";
-    return;
-  }
-
-  el.innerHTML = `
-    <p><b>Nom :</b> ${mapped.Nom || ""}</p>
-    <p><b>Adresse :</b> ${mapped.Adresse || ""}</p>
-  `;
-}
 
 
 // ========================
@@ -219,6 +211,7 @@ function rowRecordsToRows(rowRecords) {
   return rows;
 }
 
+// Utilisée plus tard lors de l'ajout d'une structure Google.
 async function searchEntreprise(query) {
 
   // API INSEE / SIRENE (simplifiée ici)
