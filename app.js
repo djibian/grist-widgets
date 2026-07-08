@@ -65,7 +65,7 @@ document.getElementById("btn-search").addEventListener("click", async () => {
     return;
   }
 
-  const results = await searchEntreprise(query);
+  const results = await search(query);
 
   renderResults(results);
 });
@@ -74,6 +74,18 @@ document.getElementById("btn-search").addEventListener("click", async () => {
 // ========================
 // 5. API ENTREPRISE (placeholder propre)
 // ========================
+
+async function search(query) {
+
+    const local = await searchLocal(query);
+
+    if (local.length > 0) {
+        return local;
+    }
+
+    return await searchEntreprise(query);
+
+}
 
 async function searchEntreprise(query) {
 
