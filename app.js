@@ -87,6 +87,16 @@ async function search(query) {
 
 }
 
+async function searchLocal(query) {
+
+    const tableId = await grist.selectedTable.getTableId();
+
+    const table = await grist.docApi.fetchTable(tableId);
+
+    return [];
+
+}
+
 async function searchEntreprise(query) {
 
   // API INSEE / SIRENE (simplifiée ici)
