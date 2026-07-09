@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Widget Entreprise</title>
+
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div id="app">
+
+    <h2>Recherche entreprise</h2>
+
+    <input
+    id="search"
+    placeholder="Rechercher une structure..."
+    >
+
+    <div id="local-results"></div>
+
+    <div id="google-results"></div>
+
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.1.0"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>
