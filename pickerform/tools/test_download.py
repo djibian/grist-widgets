@@ -1,3 +1,3 @@
-from download import download_latest
+from sirene.client import download_latest_dataset
 
-download_latest()
+download_latest_dataset()
