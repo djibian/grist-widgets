@@ -8,6 +8,8 @@ DATA_DIR.mkdir(exist_ok=True)
 DOWNLOAD_DIR = BASE_DIR / "downloads"
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 
-DEPARTEMENTS = ["44", "85"]
+INPUT_FILE = DOWNLOAD_DIR / "StockEtablissement_utf8.csv"
 
 OUTPUT_JSON = DATA_DIR / "entreprises.json"
+
+DEPARTEMENTS = ("44", "85")
