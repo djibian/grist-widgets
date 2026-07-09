@@ -1,74 +1,89 @@
 from pathlib import Path
 import requests
 
-from config import DATASET_ID, PARQUET_FILE
+from config import DOWNLOAD_DIR
+
+API_URL = "https://www.data.gouv.fr/api/1/datasets/"
 
 
-API_URL = f"https://www.data.gouv.fr/api/1/datasets/{DATASET_ID}/"
+def find_dataset():
+    """
+    Recherche le dataset officiel SIRENE.
+    """
 
+    print("Recherche du dataset SIRENE...")
 
-def get_dataset():
+    r = requests.get(
+        API_URL,
+        params={
+            "q": "Base SIRENE StockEtablissement parquet",
+            "page_size": 5,
+        },
+        timeout=60,
+    )
 
-    print("Lecture des métadonnées...")
-
-    r = requests.get(API_URL, timeout=60)
     r.raise_for_status()
 
-    return r.json()
+    datasets = r.json()["data"]
+
+    if not datasets:
+        raise RuntimeError("Dataset SIRENE introuvable.")
+
+    return datasets[0]
 
 
 def find_parquet_resource(dataset):
+    """
+    Recherche la ressource Parquet StockEtablissement.
+    """
+
+    print("Recherche du fichier Parquet...")
 
     for resource in dataset["resources"]:
 
-        url = resource.get("url", "")
+        title = (resource.get("title") or "").lower()
+        fmt = (resource.get("format") or "").lower()
+        url = resource.get("url") or ""
 
-        if url.lower().endswith(".parquet"):
+        if (
+            "stocketablissement" in title
+            and (
+                fmt == "parquet"
+                or url.lower().endswith(".parquet")
+            )
+        ):
             return resource
 
-    raise RuntimeError("Aucun fichier parquet trouvé.")
+    raise RuntimeError("Aucun fichier Parquet trouvé.")
 
 
-def download_resource(resource):
+def download_latest_dataset():
 
-    url = resource["url"]
-
-    print("Téléchargement :")
-    print(url)
-    print()
-
-    r = requests.get(url, stream=True, timeout=300)
-    r.raise_for_status()
-
-    total = 0
-
-    with open(PARQUET_FILE, "wb") as f:
-
-        for chunk in r.iter_content(1024 * 1024):
-
-            if not chunk:
-                continue
-
-            f.write(chunk)
-            total += len(chunk)
-
-            print(
-                f"\r{total/1024/1024:.1f} Mo",
-                end="",
-                flush=True,
-            )
-
-    print()
-    print("Téléchargement terminé.")
-    print(PARQUET_FILE)
-
-    return PARQUET_FILE
-
-
-def download_latest():
-
-    dataset = get_dataset()
+    dataset = find_dataset()
 
     resource = find_parquet_resource(dataset)
 
-    return download_resource(resource)
+    url = resource["url"]
+
+    filename = Path(url).name
+
+    destination = DOWNLOAD_DIR / filename
+
+    print()
+    print(f"Téléchargement : {filename}")
+
+    with requests.get(url, stream=True, timeout=300) as r:
+
+        r.raise_for_status()
+
+        with open(destination, "wb") as f:
+
+            for chunk in r.iter_content(1024 * 1024):
+
+                if chunk:
+                    f.write(chunk)
+
+    print("Téléchargement terminé.")
+    print(destination)
+
+    return destination
