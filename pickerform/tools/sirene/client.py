@@ -28,7 +28,7 @@ def find_dataset():
 
     if not datasets:
         print("Réponse API :")
-        print(response.json())
+        print(r.json())
         raise RuntimeError("Dataset SIRENE introuvable.")
 
     return datasets[0]
