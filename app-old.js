@@ -3,23 +3,12 @@
 // ========================
 
 class Result {
-    constructor({
-        nom,
-        adresse,
-        siret = "",
-        latitude = null,
-        longitude = null,
-        origine,
-        source
-    }) {
-        this.nom = nom;
-        this.adresse = adresse;
-        this.siret = siret;
-        this.latitude = latitude;
-        this.longitude = longitude;
-        this.origine = origine;
-        this.source = source;
-    }
+  constructor(nom, siret, adresse, source = null) {
+    this.nom = nom;
+    this.siret = siret;
+    this.adresse = adresse;
+    this.source = source; // objet brut d'origine (pour traçabilité si besoin)
+  }
 
   /**
    * Crée un Result depuis un enregistrement Grist (ligne locale)
@@ -34,7 +23,7 @@ class Result {
     const adresse = (row && mappings && row[mappings.Adresse]) || 
                     (row && row.Adresse) || 
                     "";
-    return new Result({ nom, siret, adresse, origine: row, source: row });
+    return new Result(nom, siret, adresse, row);
   }
 
   /**
@@ -44,7 +33,7 @@ class Result {
     const nom = apiResult?.nom_complet || "";
     const siret = apiResult?.siege?.siret || "";
     const adresse = apiResult?.siege?.adresse || "";
-    return new Result({ nom, siret, adresse, origine: apiResult, source: apiResult });
+    return new Result(nom, siret, adresse, apiResult);
   }
 }
 
@@ -80,37 +69,45 @@ grist.onRecord((record, mappings) => {
   mapped = grist.mapColumnNames(record);
 
   clearResults();
+  renderRecord();
 });
+
+
+// ========================
+// 3. RENDER SIMPLE
+// ========================
+
+function renderRecord() {
+  const el = document.getElementById("record");
+
+  if (!mapped) {
+    el.innerHTML = "⚠ Colonnes non configurées";
+    return;
+  }
+
+  el.innerHTML = `
+    <p><b>Nom :</b> ${mapped.Nom || ""}</p>
+    <p><b>Adresse :</b> ${mapped.Adresse || ""}</p>
+  `;
+}
 
 
 // ========================
 // 4. ACTION UTILISATEUR
 // ========================
 
-const searchInput = document.getElementById("search");
+document.getElementById("btn-search").addEventListener("click", async () => {
 
-let searchTimer;
+  const query = document.getElementById("search").value.trim();
 
-searchInput.addEventListener("input", () => {
+  if (!query) {
+    clearResults();
+    return;
+  }
 
-    clearTimeout(searchTimer);
+  const results = await search(query);
 
-    const query = searchInput.value.trim();
-
-    if (query.length < 3) {
-
-        clearResults();
-
-        return;
-
-    }
-
-    searchTimer = setTimeout(() => {
-
-        search(query);
-
-    },300);
-
+  renderResults(results);
 });
 
 
@@ -120,14 +117,13 @@ searchInput.addEventListener("input", () => {
 
 async function search(query) {
 
-    const [localResults, googleResults] = await Promise.all([
-        searchLocal(query),
-        searchGoogle(query)
-    ]);
+    const local = await searchLocal(query);
 
-    renderLocalResults(localResults);
+    if (local.length > 0) {
+        return local;
+    }
 
-    renderGoogleResults(googleResults);
+    return await searchEntreprise(query);
 
 }
 
@@ -210,7 +206,6 @@ function rowRecordsToRows(rowRecords) {
   return rows;
 }
 
-// Utilisée plus tard lors de l'ajout d'une structure Google.
 async function searchEntreprise(query) {
 
   // API INSEE / SIRENE (simplifiée ici)
@@ -221,20 +216,6 @@ async function searchEntreprise(query) {
 
   // Convertir chaque résultat API en Result DTO
   return (data.results || []).map(item => Result.fromEntrepriseAPI(item));
-}
-
-async function searchGoogle(query) {
-
-    return [
-        new Result({
-            nom: "Résultat Google de test",
-            siret: "",
-            adresse: "Adresse de test",
-            latitude: null,
-            longitude: null
-        })
-    ];
-
 }
 
 function normalize(text) {
@@ -273,27 +254,22 @@ function prepareLocalData(rows) {
 // 6. AFFICHAGE RESULTATS
 // ========================
 
-function renderLocalResults(results) {
+function renderResults(results) {
 
-  const container = document.getElementById("local-results");
+  const container = document.getElementById("results");
 
   container.innerHTML = "";
 
-  if (results.length === 0) {
-    return;
-  }
-
-  container.innerHTML = "<h3>📁 Structures déjà enregistrées</h3>";
-
-  results.slice(0,5).forEach(result => {
+  results.slice(0, 5).forEach(result => {
 
     const div = document.createElement("div");
     div.className = "result";
 
+    // result est maintenant toujours un Result DTO
     div.innerHTML = `
       <b>${result.nom}</b><br>
       ${result.siret || ""}<br>
-      ${result.adresse || ""}<br>
+      ${result.adresse || ""}
       <button>Choisir</button>
     `;
 
@@ -302,52 +278,11 @@ function renderLocalResults(results) {
     });
 
     container.appendChild(div);
-
   });
-
-}
-
-function renderGoogleResults(results) {
-
-  const container = document.getElementById("google-results");
-
-  container.innerHTML = "";
-
-  if (results.length === 0) {
-    return;
-  }
-
-  container.innerHTML = "<h3>🌍 Nouvelles structures trouvées</h3>";
-
-  results.slice(0,5).forEach(result => {
-
-    const div = document.createElement("div");
-    div.className = "result";
-
-    div.innerHTML = `
-      <b>${result.nom}</b><br>
-      ${result.adresse || ""}<br>
-      <button>Ajouter</button>
-    `;
-
-    div.querySelector("button").addEventListener("click", () => {
-
-      console.log(result);
-
-    });
-
-    container.appendChild(div);
-
-  });
-
 }
 
 function clearResults() {
-
-  document.getElementById("local-results").innerHTML = "";
-
-  document.getElementById("google-results").innerHTML = "";
-
+  document.getElementById("results").innerHTML = "";
 }
 
 // ========================
