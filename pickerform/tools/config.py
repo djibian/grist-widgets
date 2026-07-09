@@ -1,13 +1,21 @@
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent
 
-DOWNLOAD_DIR = BASE_DIR / "downloads"
-DOWNLOAD_DIR.mkdir(exist_ok=True)
+TOOLS_DIR = ROOT_DIR / "tools"
 
-DATA_DIR = BASE_DIR / "widget" / "data"
-DATA_DIR.mkdir(exist_ok=True)
+WIDGET_DIR = ROOT_DIR / "widget"
+
+DATA_DIR = WIDGET_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DOWNLOAD_DIR = ROOT_DIR / "downloads"
+DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+PARQUET_FILE = DOWNLOAD_DIR / "StockEtablissement.parquet"
+
+ENTREPRISES_JSON = DATA_DIR / "entreprises.json"
 
 DATASET_ID = "5c4ae55a634f4137716d5656"
 
-PARQUET_FILE = DOWNLOAD_DIR / "StockEtablissement.parquet"
+DEPARTEMENTS = ("44", "85")
