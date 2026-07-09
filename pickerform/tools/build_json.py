@@ -1,28 +1,3 @@
-from config import PARQUET_FILE
+from sirene.client import download_latest_dataset
 
-import polars as pl
-
-
-print("Ouverture du fichier...")
-
-lazy = pl.scan_parquet(PARQUET_FILE)
-
-print("Filtrage des départements...")
-
-df = (
-    lazy
-    .filter(
-        pl.col("codePostalEtablissement")
-        .cast(pl.Utf8)
-        .str.starts_with(("44", "85"))
-    )
-    .collect()
-)
-
-print()
-
-print(f"Nombre d'établissements : {len(df):,}")
-
-print()
-
-print(df.head())
+parquet_file = download_latest_dataset()
