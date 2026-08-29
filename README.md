@@ -12,11 +12,11 @@ Chaque widget vit dans son propre dossier sous `widgets/` et doit rester autonom
 
 Recherche une structure dans la table complète Grist puis complète la recherche avec les établissements officiels actifs des départements 44 et 85 via l'API Recherche d'Entreprises de la DINUM.
 
-Prévisualisation HTTPS de la branche de développement :
+Prévisualisation Grist de la branche de développement publiée par GitHub Pages :
 
-`https://cdn.jsdelivr.net/gh/djibian/grist-widgets@develop/widgets/structure-picker/index.html`
+`https://djibian.github.io/grist-widgets/widgets/structure-picker/`
 
-Pour valider une version précise avant fusion, utiliser de préférence l'URL jsDelivr figée sur le SHA du commit `develop` à tester.
+Pendant le développement, GitHub Pages doit publier la branche `develop`. Après validation et fusion, la stratégie de publication pourra être stabilisée sur `main`.
 
 Les tests automatisés sont lancés avec :
 
