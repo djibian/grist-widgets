@@ -57,6 +57,12 @@ h1 {
   color: #166534;
 }
 
+.configuration.warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
 .configuration.error {
   border-color: #fecaca;
   background: #fef2f2;
