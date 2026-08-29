@@ -2,7 +2,26 @@
 
 Widget Grist unique pour **rechercher, ajouter et compléter** les structures de stage.
 
-L'interface évite d'exposer plusieurs outils techniques : la recherche reste en haut et la structure actuellement sélectionnée est analysée en dessous. L'utilisateur peut ensuite compléter son identité officielle et sa localisation, avec aperçu avant écriture.
+L'interface est organisée en deux onglets fixes afin de séparer clairement les deux tâches de l'utilisateur sans exposer les outils techniques sous-jacents.
+
+## Interface
+
+### Rechercher / ajouter
+
+Onglet ouvert par défaut. Il contient dans un même flux :
+
+1. le champ de recherche ;
+2. les structures déjà enregistrées dans la table Grist complète ;
+3. les établissements actifs du 44 et du 85 trouvés dans l'Annuaire des Entreprises ;
+4. en dernier recours, la création manuelle.
+
+Le champ de recherche et ses résultats ne sont donc jamais séparés par le panneau d'enrichissement.
+
+### Compléter la sélection
+
+Cet onglet suit la ligne sélectionnée dans Grist. Il affiche le diagnostic du nom commercial, du SIREN/SIRET, de la raison sociale, de l'APE/NAF, de l'adresse et des coordonnées carte.
+
+Un badge sur l'onglet indique le nombre d'informations manquantes détectées. Aucun changement d'onglet n'est imposé automatiquement : l'utilisateur garde la maîtrise de son parcours.
 
 ## APIs publiques utilisées
 
@@ -43,13 +62,7 @@ Ces champs doivent pointer vers des colonnes de données modifiables.
 
 Il n'existe plus de mapping séparé `Adresse normalisée`, `Code postal` ou `Commune`. Le champ `Adresse` est l'unique adresse : lorsqu'une adresse géocodée est validée, elle remplace explicitement l'adresse actuelle.
 
-## Rechercher / ajouter
-
-La recherche interroge la table Grist complète puis l'Annuaire des Entreprises pour les établissements actifs du 44/85. Les doublons sont contrôlés par SIREN/SIRET.
-
-## Compléter la structure sélectionnée
-
-Le panneau **Structure sélectionnée** montre l'état du nom commercial, du SIREN/SIRET, de la raison sociale, de l'APE/NAF, de l'adresse et des coordonnées carte.
+## Enrichissement de la structure sélectionnée
 
 Le bouton **Analyser / compléter** :
 
