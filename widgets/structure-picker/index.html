@@ -96,11 +96,25 @@
         <div id="enterprise-choices" class="choice-block"></div>
         <div id="geocode-choices" class="choice-block"></div>
         <div id="proposal-panel" class="proposal-panel"></div>
+
+        <section id="contact-experiment" class="contact-experiment" aria-labelledby="contact-experiment-title">
+          <div class="contact-experiment-heading">
+            <div>
+              <h3 id="contact-experiment-title">Contacts publics <span class="experimental-tag">Expérimental</span></h3>
+              <p class="help">Teste OpenStreetMap : SIRET exact en priorité, puis proximité et similitude du nom en secours.</p>
+            </div>
+            <button id="contact-search" class="button button-secondary" type="button" disabled>Rechercher les contacts</button>
+          </div>
+          <div id="contact-current"></div>
+          <div id="contact-status" class="substatus contact-status" role="status" aria-live="polite"></div>
+          <div id="contact-results" class="contact-results"></div>
+        </section>
       </section>
     </section>
   </main>
 
   <script type="module" src="app.js"></script>
+  <script type="module" src="contacts-experiment.js"></script>
   <script>
     (() => {
       const tabs = [...document.querySelectorAll(".tab-button")];
