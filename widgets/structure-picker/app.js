@@ -1,15 +1,16 @@
 import {
   EXTERNAL_LIMIT,
   buildExternalSearchUrl,
+  candidateIsAlreadyLocal,
   flattenExternalResults,
-  localSiretSet,
+  localIdentifierSet,
   normalize,
-  normalizeSiret,
   searchLocal,
 } from "./search.js";
 import {
   addCandidateSafely,
   configurationMessage,
+  configurationWarning,
   fetchFullSnapshot,
   initializeGrist,
   prepareManualRow,
@@ -22,7 +23,7 @@ const EXTERNAL_DEBOUNCE_MS = 1200;
 const CLASSROOM_JITTER_MS = 5000;
 const MIN_EXTERNAL_INTERVAL_MS = 1800;
 const CACHE_TTL_MS = 20 * 60 * 1000;
-const CACHE_PREFIX = "structure-picker:v1:";
+const CACHE_PREFIX = "structure-picker:v2:";
 
 const ui = {
   search: document.getElementById("search"),
@@ -65,12 +66,12 @@ function setStatus(node, message = "", type = "") {
   if (type) node.classList.add(type);
 }
 
-function setConfigured(configured, message = "") {
+function setConfigured(configured, message = "", warning = "") {
   state.configured = configured;
   ui.search.disabled = !configured;
   ui.manualCreate.disabled = !configured;
-  ui.configStatus.textContent = message;
-  ui.configStatus.className = `configuration ${configured ? "ok" : "error"}`;
+  ui.configStatus.textContent = [message, warning].filter(Boolean).join(" ");
+  ui.configStatus.className = `configuration ${configured ? (warning ? "warning" : "ok") : "error"}`;
 }
 
 function addMeta(container, label, value) {
@@ -80,7 +81,7 @@ function addMeta(container, label, value) {
   container.appendChild(span);
 }
 
-function makeCard({ name, legalName, address, siret, commune, ape, buttonLabel, onClick }) {
+function makeCard({ name, legalName, address, identifier, identifierLabel = "SIRET", commune, ape, buttonLabel, onClick }) {
   const card = document.createElement("article");
   card.className = "result-card";
 
@@ -106,7 +107,7 @@ function makeCard({ name, legalName, address, siret, commune, ape, buttonLabel, 
 
   const meta = document.createElement("div");
   meta.className = "meta";
-  addMeta(meta, "SIRET", siret);
+  addMeta(meta, identifierLabel, identifier);
   if (commune && !String(address || "").toLowerCase().includes(String(commune).toLowerCase())) {
     addMeta(meta, "Commune", commune);
   }
@@ -157,10 +158,11 @@ function renderLocal(query) {
 
   for (const row of results) {
     ui.localResults.append(makeCard({
-      name: row.NomCommercial || row.Nom,
+      name: row.NomCommercial,
       legalName: row.RaisonSociale,
-      address: row.Adresse || row.AdresseNormalisee,
-      siret: row.SIRET,
+      address: row.AdresseNormalisee || row.Adresse,
+      identifier: row.SirenSiret,
+      identifierLabel: "SIREN/SIRET",
       commune: row.Commune,
       ape: row.APE,
       buttonLabel: "Ouvrir",
@@ -174,8 +176,10 @@ function renderLocal(query) {
 }
 
 function filterAgainstCurrentTable(candidates) {
-  const existing = localSiretSet(localRows());
-  return candidates.filter(candidate => !existing.has(normalizeSiret(candidate.siret))).slice(0, EXTERNAL_LIMIT);
+  const existing = localIdentifierSet(localRows());
+  return candidates
+    .filter(candidate => !candidateIsAlreadyLocal(candidate, existing))
+    .slice(0, EXTERNAL_LIMIT);
 }
 
 function renderExternal(candidates) {
@@ -190,10 +194,10 @@ function renderExternal(candidates) {
 
   for (const candidate of results) {
     ui.externalResults.append(makeCard({
-      name: candidate.nomCommercial || candidate.nom,
+      name: candidate.nomCommercial,
       legalName: candidate.raisonSociale,
       address: candidate.adresse,
-      siret: candidate.siret,
+      identifier: candidate.siret,
       commune: candidate.commune,
       ape: candidate.ape,
       buttonLabel: "Ajouter",
@@ -341,12 +345,12 @@ function scheduleSearch() {
 
 async function addExternal(candidate, button) {
   button.textContent = "Vérification…";
-  setStatus(ui.globalStatus, "Vérification du SIRET dans la table complète Grist…");
+  setStatus(ui.globalStatus, "Vérification du SIREN/SIRET dans la table complète Grist…");
   try {
     const result = await addCandidateSafely(candidate, state.mappings);
     state.snapshot = result.snapshot;
     if (result.status === "created") {
-      setStatus(ui.globalStatus, `${candidate.nom} a été ajoutée à Grist.`, "success");
+      setStatus(ui.globalStatus, `${candidate.nomCommercial} a été ajoutée à Grist.`, "success");
     } else if (result.reconciled) {
       setStatus(ui.globalStatus, "Un ajout concurrent a été détecté : le doublon a été supprimé et la structure existante sélectionnée.", "success");
     } else {
@@ -369,11 +373,21 @@ async function refreshFullTable(mappings) {
     if (generation !== state.refreshGeneration) return;
     state.snapshot = snapshot;
 
-    if (snapshot.missing.length) {
+    const blocking = snapshot.missing.length || snapshot.nonWritableRequired.length;
+    if (blocking) {
       setConfigured(false, configurationMessage(snapshot));
-      setStatus(ui.globalStatus, "Le widget est bloqué tant que Nom, Adresse et SIRET ne sont pas correctement mappés.", "error");
+      setStatus(
+        ui.globalStatus,
+        "Le widget est bloqué tant que Nom commercial, Adresse et SIREN/SIRET ne sont pas mappés vers des colonnes de données modifiables.",
+        "error",
+      );
     } else {
-      setConfigured(true, `Configuration valide — ${snapshot.rows.length} structure${snapshot.rows.length > 1 ? "s" : ""} indexée${snapshot.rows.length > 1 ? "s" : ""} depuis la table complète.`);
+      const warning = configurationWarning(snapshot);
+      setConfigured(
+        true,
+        `Configuration valide — ${snapshot.rows.length} structure${snapshot.rows.length > 1 ? "s" : ""} indexée${snapshot.rows.length > 1 ? "s" : ""} depuis la table complète.`,
+        warning,
+      );
       if (ui.globalStatus.classList.contains("error")) setStatus(ui.globalStatus, "");
     }
     scheduleSearch();
