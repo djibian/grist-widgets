@@ -12,8 +12,42 @@ export function normalize(value) {
     .trim();
 }
 
-export function normalizeSiret(value) {
+export function normalizeIdentifier(value) {
   return String(value ?? "").replace(/\D/g, "");
+}
+
+// Alias conservé pour les éventuels liens/tests historiques.
+export const normalizeSiret = normalizeIdentifier;
+
+export function identifierParts(value) {
+  const identifier = normalizeIdentifier(value);
+  if (identifier.length === 14) {
+    return { identifier, siren: identifier.slice(0, 9), siret: identifier };
+  }
+  if (identifier.length === 9) {
+    return { identifier, siren: identifier, siret: "" };
+  }
+  return { identifier, siren: "", siret: "" };
+}
+
+export function extractLocationFromNormalizedAddress(value) {
+  const address = String(value ?? "").trim();
+  if (!address) return { codePostal: "", commune: "" };
+
+  const matches = [...address.matchAll(/\b(\d{5})\b/g)];
+  if (!matches.length) return { codePostal: "", commune: "" };
+
+  // Le label du géocodeur IGN place normalement le code postal juste avant la commune.
+  // On prend le dernier code à 5 chiffres pour ne pas confondre avec un numéro présent plus tôt.
+  const match = matches[matches.length - 1];
+  const codePostal = match[1];
+  const afterPostalCode = address.slice((match.index ?? 0) + match[0].length);
+  const commune = afterPostalCode
+    .replace(/^[\s,;\-–—]+/, "")
+    .replace(/(?:,\s*)?(?:france|fr)$/i, "")
+    .trim();
+
+  return { codePostal, commune };
 }
 
 function tokens(value) {
@@ -90,34 +124,31 @@ export function fuzzyTextScore(query, text) {
 
 export function localSearchText(row) {
   return [
-    row.Nom,
     row.NomCommercial,
     row.RaisonSociale,
     row.Adresse,
     row.AdresseNormalisee,
     row.CodePostal,
     row.Commune,
-    row.SIRET,
-    row.SIREN,
+    row.SirenSiret,
   ].filter(Boolean).join(" ");
 }
 
 export function scoreLocal(row, query) {
-  const digits = normalizeSiret(query);
-  const siret = normalizeSiret(row.SIRET);
-  const siren = normalizeSiret(row.SIREN);
+  const queryIdentifier = identifierParts(query);
+  const rowIdentifier = identifierParts(row.SirenSiret);
 
-  if (digits.length === 14 && siret === digits) return 10;
-  if (digits.length === 9 && siren === digits) return 9;
+  if (queryIdentifier.siret && rowIdentifier.siret === queryIdentifier.siret) return 10;
+  if (queryIdentifier.siren && rowIdentifier.siren === queryIdentifier.siren) return 9;
 
-  const name = [row.NomCommercial, row.Nom, row.RaisonSociale].filter(Boolean).join(" ");
-  const address = [row.Adresse, row.AdresseNormalisee, row.CodePostal, row.Commune].filter(Boolean).join(" ");
+  const name = [row.NomCommercial, row.RaisonSociale].filter(Boolean).join(" ");
+  const address = [row.AdresseNormalisee, row.Adresse, row.CodePostal, row.Commune].filter(Boolean).join(" ");
 
   const nameScore = fuzzyTextScore(query, name);
   const addressScore = fuzzyTextScore(query, address);
   const globalScore = fuzzyTextScore(query, localSearchText(row));
 
-  let score = Math.max(nameScore, addressScore * 0.88, globalScore * 0.94);
+  let score = Math.max(nameScore, addressScore * 0.9, globalScore * 0.95);
   const normalizedQuery = normalize(query);
   const normalizedName = normalize(name);
   if (normalizedName.startsWith(normalizedQuery)) score += 0.08;
@@ -130,7 +161,7 @@ export function searchLocal(rows, query, limit = LOCAL_LIMIT) {
   return (Array.isArray(rows) ? rows : [])
     .map(row => ({ row, score: scoreLocal(row, query) }))
     .filter(item => item.score >= 0.43)
-    .sort((a, b) => b.score - a.score || String(a.row.Nom || "").localeCompare(String(b.row.Nom || ""), "fr"))
+    .sort((a, b) => b.score - a.score || String(a.row.NomCommercial || "").localeCompare(String(b.row.NomCommercial || ""), "fr"))
     .slice(0, limit)
     .map(item => item.row);
 }
@@ -161,14 +192,19 @@ export function candidateFrom(unit, establishment) {
   const enseigne = Array.isArray(establishment.liste_enseignes)
     ? firstNonEmpty(establishment.liste_enseignes)
     : "";
-  const nomCommercial = firstNonEmpty([enseigne, establishment.nom_commercial]);
   const raisonSociale = firstNonEmpty([unit?.nom_raison_sociale, unit?.nom_complet]);
-  const nom = firstNonEmpty([nomCommercial, raisonSociale, unit?.nom_complet]) || "Structure sans nom";
+  // Beaucoup d'établissements n'ont pas d'enseigne distincte. Dans ce cas, la raison sociale
+  // devient le nom commercial affichable afin que la structure reste exploitable dans Grist.
+  const nomCommercial = firstNonEmpty([
+    enseigne,
+    establishment.nom_commercial,
+    raisonSociale,
+    unit?.nom_complet,
+  ]) || "Structure sans nom";
   const latitude = Number(establishment.latitude);
   const longitude = Number(establishment.longitude);
 
   return {
-    nom,
     nomCommercial,
     raisonSociale,
     siren: String(unit?.siren ?? ""),
@@ -183,10 +219,34 @@ export function candidateFrom(unit, establishment) {
   };
 }
 
-export function flattenExternalResults(payload, localSirets = new Set(), limit = EXTERNAL_LIMIT) {
+export function candidateMatchesIdentifier(candidate, value) {
+  const local = identifierParts(value);
+  const candidateSiret = normalizeIdentifier(candidate?.siret);
+  const candidateSiren = normalizeIdentifier(candidate?.siren) || candidateSiret.slice(0, 9);
+  if (local.siret) return local.siret === candidateSiret;
+  if (local.siren) return local.siren === candidateSiren;
+  return false;
+}
+
+export function localIdentifierSet(rows) {
+  return new Set((Array.isArray(rows) ? rows : [])
+    .map(row => normalizeIdentifier(row.SirenSiret))
+    .filter(value => value.length === 9 || value.length === 14));
+}
+
+// Alias historique : le contenu est désormais un mélange contrôlé de SIREN (9) et SIRET (14).
+export const localSiretSet = localIdentifierSet;
+
+export function candidateIsAlreadyLocal(candidate, localIdentifiers) {
+  for (const identifier of localIdentifiers ?? []) {
+    if (candidateMatchesIdentifier(candidate, identifier)) return true;
+  }
+  return false;
+}
+
+export function flattenExternalResults(payload, localIdentifiers = new Set(), limit = EXTERNAL_LIMIT) {
   const candidates = [];
-  const seen = new Set();
-  const normalizedLocal = new Set([...localSirets].map(normalizeSiret).filter(Boolean));
+  const seenSirets = new Set();
 
   for (const unit of payload?.results ?? []) {
     let establishments = Array.isArray(unit.matching_etablissements) ? unit.matching_etablissements : [];
@@ -195,9 +255,9 @@ export function flattenExternalResults(payload, localSirets = new Set(), limit =
     for (const establishment of establishments) {
       const candidate = candidateFrom(unit, establishment);
       if (!candidate) continue;
-      const siret = normalizeSiret(candidate.siret);
-      if (!siret || seen.has(siret) || normalizedLocal.has(siret)) continue;
-      seen.add(siret);
+      const siret = normalizeIdentifier(candidate.siret);
+      if (!siret || seenSirets.has(siret) || candidateIsAlreadyLocal(candidate, localIdentifiers)) continue;
+      seenSirets.add(siret);
       candidates.push(candidate);
       if (candidates.length >= limit) return candidates;
     }
@@ -217,10 +277,4 @@ export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10
     per_page: String(perPage),
   });
   return `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
-}
-
-export function localSiretSet(rows) {
-  return new Set((Array.isArray(rows) ? rows : [])
-    .map(row => normalizeSiret(row.SIRET))
-    .filter(Boolean));
 }
