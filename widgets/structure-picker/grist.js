@@ -1,18 +1,20 @@
 import { candidateMatchesIdentifier, extractLocationFromAddress, identifierParts } from "./search.js";
 
 export const COLUMN_DEFS = [
-  { name: "NomCommercial", title: "Nom commercial — recherche + écriture", type: "Text", optional: false },
-  { name: "Adresse", title: "Adresse — recherche + géocodage + écriture", type: "Text", optional: false },
-  { name: "SirenSiret", title: "SIREN / SIRET — recherche + écriture", type: "Text", optional: false },
-  { name: "RaisonSociale", title: "Raison sociale — recherche + écriture", type: "Text", optional: true },
-  { name: "APE", title: "Code APE / NAF — enrichissement", type: "Text", optional: true },
-  { name: "Latitude", title: "Latitude — géocodage + carte", type: "Numeric", optional: true },
-  { name: "Longitude", title: "Longitude — géocodage + carte", type: "Numeric", optional: true },
+  { name: "NomCommercial", title: "Nom commercial", type: "Text", optional: false },
+  { name: "Adresse", title: "Adresse", type: "Text", optional: false },
+  { name: "SirenSiret", title: "SIREN / SIRET", type: "Text", optional: false },
+  { name: "RaisonSociale", title: "Raison sociale", type: "Text", optional: true },
+  { name: "Latitude", title: "Latitude", type: "Numeric", optional: true },
+  { name: "Longitude", title: "Longitude", type: "Numeric", optional: true },
+  { name: "Telephone", title: "Téléphone", type: "Text", optional: true },
+  { name: "Courriel", title: "Courriel", type: "Text", optional: true },
+  { name: "SiteWeb", title: "Site web", type: "Text", optional: true },
 ];
 
 const REQUIRED_COLUMNS = ["NomCommercial", "Adresse", "SirenSiret"];
 const WRITE_FIELDS = new Set(COLUMN_DEFS.map(definition => definition.name));
-const LABELS = Object.fromEntries(COLUMN_DEFS.map(definition => [definition.name, definition.title.split(" — ")[0]]));
+const LABELS = Object.fromEntries(COLUMN_DEFS.map(definition => [definition.name, definition.title]));
 let addQueue = Promise.resolve();
 
 export function initializeGrist() {
@@ -168,9 +170,11 @@ export function fieldsForCandidate(candidate, snapshot) {
   put("Adresse", candidate.adresse);
   put("SirenSiret", candidate.siret || candidate.siren);
   put("RaisonSociale", candidate.raisonSociale);
-  put("APE", candidate.ape);
   put("Latitude", candidate.latitude);
   put("Longitude", candidate.longitude);
+  put("Telephone", candidate.telephone);
+  put("Courriel", candidate.courriel);
+  put("SiteWeb", candidate.siteWeb);
   return fields;
 }
 

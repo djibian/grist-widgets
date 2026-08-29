@@ -9,15 +9,20 @@
 body { margin: 0; background: #ffffff; }
 button, input { font: inherit; }
 .app { width: min(960px, 100%); margin: 0 auto; padding: 18px; }
-.hero { margin-bottom: 14px; }
+.hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 4px; font-size: 1.35rem; }
 h2 { margin-bottom: 0; font-size: 1rem; }
 h3 { margin-bottom: 8px; font-size: 0.92rem; }
 .hero p, .help, .substatus, .meta, .result-legal, .muted { color: #6b7280; }
 .hero p { margin-bottom: 0; }
+.table-counter { position: relative; display: inline-flex; flex: 0 0 auto; min-width: 34px; height: 30px; align-items: center; justify-content: center; padding: 0 10px; border: 1px solid #d6dce5; border-radius: 10px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85); color: #334155; cursor: default; }
+.table-counter::after { content: attr(data-tooltip); position: absolute; top: calc(100% + 7px); right: 0; z-index: 10; width: max-content; max-width: 220px; padding: 6px 8px; border-radius: 6px; background: #0f172a; color: #ffffff; font-size: 0.72rem; font-weight: 500; line-height: 1.2; opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity 120ms ease, transform 120ms ease; }
+.table-counter:hover::after, .table-counter:focus-visible::after { opacity: 1; transform: translateY(0); }
+.table-counter:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.table-count { font-size: 0.84rem; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .configuration { margin: 0 0 14px; padding: 9px 11px; border: 1px solid #dbeafe; border-radius: 8px; background: #eff6ff; color: #1e40af; font-size: 0.85rem; }
-.configuration.ok { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+.configuration.pending { border-color: #e2e8f0; background: #f8fafc; color: #64748b; }
 .configuration.warning { border-color: #fde68a; background: #fffbeb; color: #92400e; }
 .configuration.error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
 .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid #cbd5e1; margin-bottom: 0; }
@@ -79,6 +84,8 @@ h3 { margin-bottom: 8px; font-size: 0.92rem; }
 .empty { padding: 10px 0; color: #6b7280; font-size: 0.88rem; }
 @media (max-width: 620px) {
   .app { padding: 14px; }
+  .hero { gap: 10px; }
+  .table-counter { min-width: 32px; height: 28px; padding-inline: 9px; }
   .tab-button { padding-inline: 8px; font-size: 0.88rem; }
   .result-card { grid-template-columns: 1fr; }
   .result-card .button { justify-self: start; }

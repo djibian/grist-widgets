@@ -18,13 +18,14 @@ test("local fuzzy search uses single address", () => {
   assert.equal(searchLocal(rows, "garag martn machecol")[0]?.id, 1);
 });
 
-test("DINUM candidate keeps coordinates", () => {
+test("DINUM candidate keeps coordinates without exposing APE", () => {
   const candidate = candidateFrom({ siren: "123456789", nom_raison_sociale: "MARTIN AUTOMOBILES" }, {
     siret: "12345678900011", etat_administratif: "A", liste_enseignes: ["GARAGE MARTIN"], adresse: "12 RUE DES ARTISANS 44270 MACHECOUL-SAINT-MEME", code_postal: "44270", libelle_commune: "MACHECOUL-SAINT-MEME", activite_principale: "45.20A", latitude: "47.1", longitude: "-1.8",
   });
   assert.equal(candidate.nomCommercial, "GARAGE MARTIN");
   assert.equal(candidate.latitude, 47.1);
   assert.equal(candidate.longitude, -1.8);
+  assert.equal(Object.prototype.hasOwnProperty.call(candidate, "ape"), false);
 });
 
 test("external conversion filters departments and duplicates", () => {

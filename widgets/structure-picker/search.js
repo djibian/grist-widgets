@@ -202,7 +202,6 @@ export function candidateFrom(unit, establishment) {
     codePostal: String(establishment.code_postal ?? ""),
     commune: String(establishment.libelle_commune ?? ""),
     departement: departmentOf(establishment),
-    ape: String(establishment.activite_principale ?? unit?.activite_principale ?? ""),
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
   };

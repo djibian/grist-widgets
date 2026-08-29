@@ -40,6 +40,8 @@ const ui = {
   search: document.getElementById("search"),
   manualCreate: document.getElementById("manual-create"),
   configStatus: document.getElementById("config-status"),
+  tableCounter: document.getElementById("table-counter"),
+  tableCount: document.getElementById("table-count"),
   globalStatus: document.getElementById("global-status"),
   localResults: document.getElementById("local-results"),
   externalResults: document.getElementById("external-results"),
@@ -91,12 +93,32 @@ function setStatus(node, message = "", type = "") {
   if (type) node.classList.add(type);
 }
 
+function setTableCount(count = null) {
+  if (!ui.tableCounter || !ui.tableCount) return;
+  if (!Number.isFinite(count)) {
+    ui.tableCounter.hidden = true;
+    ui.tableCount.textContent = "";
+    ui.tableCounter.removeAttribute("data-tooltip");
+    ui.tableCounter.removeAttribute("aria-label");
+    return;
+  }
+  const label = `${count} structure${count > 1 ? "s" : ""} dans la table`;
+  ui.tableCount.textContent = String(count);
+  ui.tableCounter.dataset.tooltip = label;
+  ui.tableCounter.setAttribute("aria-label", label);
+  ui.tableCounter.hidden = false;
+}
+
 function setConfigured(configured, message = "", warning = "") {
   state.configured = configured;
   ui.search.disabled = !configured;
   ui.manualCreate.disabled = !configured;
-  ui.configStatus.textContent = [message, warning].filter(Boolean).join(" ");
-  ui.configStatus.className = `configuration ${configured ? (warning ? "warning" : "ok") : "error"}`;
+
+  const pending = !configured && /^Connexion à Grist/.test(message);
+  const notice = configured ? warning : message;
+  ui.configStatus.hidden = configured && !warning;
+  ui.configStatus.textContent = notice;
+  ui.configStatus.className = `configuration ${pending ? "pending" : configured ? "warning" : "error"}`;
   renderSelectedSummary();
 }
 
@@ -107,7 +129,7 @@ function addMeta(container, label, value) {
   container.appendChild(span);
 }
 
-function makeCard({ name, legalName, address, identifier, identifierLabel = "SIRET", commune, ape, buttonLabel, onClick }) {
+function makeCard({ name, legalName, address, identifier, identifierLabel = "SIRET", commune, buttonLabel, onClick }) {
   const card = document.createElement("article");
   card.className = "result-card";
   const content = document.createElement("div");
@@ -133,7 +155,6 @@ function makeCard({ name, legalName, address, identifier, identifierLabel = "SIR
   meta.className = "meta";
   addMeta(meta, identifierLabel, identifier);
   if (commune && !String(address || "").toLowerCase().includes(String(commune).toLowerCase())) addMeta(meta, "Commune", commune);
-  addMeta(meta, "APE", ape);
   content.appendChild(meta);
 
   const button = document.createElement("button");
@@ -188,7 +209,6 @@ function renderLocal(query) {
       identifier: row.SirenSiret,
       identifierLabel: "SIREN/SIRET",
       commune: row.Commune,
-      ape: row.APE,
       buttonLabel: "Ouvrir",
       onClick: async () => {
         await selectRow(row.id);
@@ -220,7 +240,6 @@ function renderExternal(candidates) {
       address: candidate.adresse,
       identifier: candidate.siret,
       commune: candidate.commune,
-      ape: candidate.ape,
       buttonLabel: "Ajouter",
       onClick: button => addExternal(candidate, button),
     }));
@@ -431,7 +450,6 @@ function renderSelectedSummary() {
     healthItem("Nom commercial", row.NomCommercial, diagnosis.hasName),
     healthItem("SIREN / SIRET", row.SirenSiret, diagnosis.hasIdentifier),
     healthItem("Raison sociale", row.RaisonSociale, diagnosis.hasLegalName),
-    healthItem("APE / NAF", row.APE, diagnosis.hasApe),
     healthItem("Adresse", row.Adresse, diagnosis.hasAddress),
     healthItem("Coordonnées carte", diagnosis.hasCoordinates ? `${row.Latitude}, ${row.Longitude}` : "", diagnosis.hasCoordinates),
   );
@@ -662,18 +680,21 @@ async function refreshFullTable(mappings) {
     const snapshot = await fetchFullSnapshot(state.mappings);
     if (generation !== state.refreshGeneration) return;
     state.snapshot = snapshot;
+    setTableCount(snapshot.rows.length);
     const blocking = snapshot.missing.length || snapshot.nonWritableRequired.length;
     if (blocking) {
       setConfigured(false, configurationMessage(snapshot));
       setStatus(ui.globalStatus, "Le widget est bloqué tant que Nom commercial, Adresse et SIREN/SIRET ne sont pas mappés vers des colonnes de données modifiables.", "error");
     } else {
-      setConfigured(true, `Configuration valide — ${snapshot.rows.length} structure${snapshot.rows.length > 1 ? "s" : ""} dans la table complète.`, configurationWarning(snapshot));
+      setConfigured(true, "", configurationWarning(snapshot));
       if (ui.globalStatus.classList.contains("error")) setStatus(ui.globalStatus, "");
     }
     renderSelectedSummary();
     scheduleSearch();
   } catch (error) {
     console.error(error);
+    state.snapshot = null;
+    setTableCount(null);
     setConfigured(false, "Impossible de lire la table Grist complète.");
     setStatus(ui.globalStatus, error.message || "Erreur de lecture Grist.", "error");
   }
