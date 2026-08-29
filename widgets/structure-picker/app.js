@@ -435,7 +435,7 @@ function renderSelectedSummary() {
   const diagnosis = diagnoseRow(row);
   const title = document.createElement("div");
   title.className = "selected-title";
-  title.textContent = row.NomCommercial || "Structure sans nom commercial";
+  title.textContent = row.NomCommercial || "Structure sans nom usuel";
   ui.selectedSummary.appendChild(title);
   if (row.Adresse) {
     const address = document.createElement("div");
@@ -447,7 +447,7 @@ function renderSelectedSummary() {
   const grid = document.createElement("div");
   grid.className = "health-grid";
   grid.append(
-    healthItem("Nom commercial", row.NomCommercial, diagnosis.hasName),
+    healthItem("Nom usuel", row.NomCommercial, diagnosis.hasName),
     healthItem("SIREN / SIRET", row.SirenSiret, diagnosis.hasIdentifier),
     healthItem("Raison sociale", row.RaisonSociale, diagnosis.hasLegalName),
     healthItem("Adresse", row.Adresse, diagnosis.hasAddress),
@@ -684,7 +684,7 @@ async function refreshFullTable(mappings) {
     const blocking = snapshot.missing.length || snapshot.nonWritableRequired.length;
     if (blocking) {
       setConfigured(false, configurationMessage(snapshot));
-      setStatus(ui.globalStatus, "Le widget est bloqué tant que Nom commercial, Adresse et SIREN/SIRET ne sont pas mappés vers des colonnes de données modifiables.", "error");
+      setStatus(ui.globalStatus, "Le widget est bloqué tant que Nom usuel, Adresse et SIREN/SIRET ne sont pas mappés vers des colonnes de données modifiables.", "error");
     } else {
       setConfigured(true, "", configurationWarning(snapshot));
       if (ui.globalStatus.classList.contains("error")) setStatus(ui.globalStatus, "");

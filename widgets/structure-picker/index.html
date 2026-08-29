@@ -15,6 +15,12 @@
         <p>Rechercher, ajouter et compléter les structures de stage.</p>
       </div>
       <div id="table-counter" class="table-counter" tabindex="0" hidden>
+        <svg class="table-counter-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 21V5.75A1.75 1.75 0 0 1 6.75 4h7.5A1.75 1.75 0 0 1 16 5.75V21" />
+          <path d="M16 9h2.25A1.75 1.75 0 0 1 20 10.75V21" />
+          <path d="M8 8h2M12 8h1M8 12h2M12 12h1M8 16h2M12 16h1" />
+          <path d="M3 21h19" />
+        </svg>
         <span id="table-count" class="table-count"></span>
       </div>
     </header>
@@ -50,7 +56,7 @@
     <section id="panel-search" class="tab-panel" role="tabpanel" aria-labelledby="tab-search">
       <section class="search-section" aria-labelledby="search-title">
         <h2 id="search-title">Trouver une structure</h2>
-        <label class="search-label" for="search">Nom commercial, raison sociale, adresse, commune ou SIREN/SIRET</label>
+        <label class="search-label" for="search">Nom usuel, raison sociale, adresse, commune ou SIREN/SIRET</label>
         <input id="search" class="search-input" type="search" autocomplete="off" placeholder="Ex. garage Machecoul" aria-describedby="search-help" disabled>
         <p id="search-help" class="help">Recherche immédiate dans toute la table Grist, puis dans l’Annuaire des Entreprises pour les établissements actifs du 44 et du 85.</p>
       </section>

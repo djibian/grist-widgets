@@ -1,7 +1,7 @@
 import { candidateMatchesIdentifier, extractLocationFromAddress, identifierParts } from "./search.js";
 
 export const COLUMN_DEFS = [
-  { name: "NomCommercial", title: "Nom commercial", type: "Text", optional: false },
+  { name: "NomCommercial", title: "Nom usuel", type: "Text", optional: false },
   { name: "Adresse", title: "Adresse", type: "Text", optional: false },
   { name: "SirenSiret", title: "SIREN / SIRET", type: "Text", optional: false },
   { name: "RaisonSociale", title: "Raison sociale", type: "Text", optional: true },
@@ -200,7 +200,7 @@ async function removeCreatedRecord(tableId, rowId) {
 
 function validateCandidate(candidate) {
   const missing = [];
-  if (!String(candidate?.nomCommercial ?? "").trim()) missing.push("nom commercial");
+  if (!String(candidate?.nomCommercial ?? "").trim()) missing.push("nom usuel");
   if (!String(candidate?.adresse ?? "").trim()) missing.push("adresse");
   if (!String(candidate?.siret ?? "").trim()) missing.push("SIRET");
   if (missing.length) throw new Error(`Ce résultat externe est incomplet (${missing.join(", ")}) et ne peut pas être ajouté automatiquement.`);

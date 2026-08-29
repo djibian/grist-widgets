@@ -25,10 +25,18 @@ test("le panneau d'enrichissement est séparé et masqué par défaut", () => {
   assert.match(html, /id="proposal-panel"/);
 });
 
-test("le compteur de table remplace la bannière de configuration valide", () => {
+test("le compteur de table utilise le pictogramme bâtiment minimaliste", () => {
   assert.match(html, /id="table-counter"/);
+  assert.match(html, /class="table-counter-icon"/);
   assert.match(html, /id="table-count"/);
   assert.doesNotMatch(app, /Configuration valide/);
+});
+
+test("la terminologie visible utilise Nom usuel", () => {
+  assert.match(html, /Nom usuel, raison sociale/);
+  assert.match(app, /healthItem\("Nom usuel"/);
+  assert.doesNotMatch(html, /Nom commercial/);
+  assert.doesNotMatch(app, /Nom commercial/);
 });
 
 test("APE NAF n'est plus présenté par l'interface", () => {

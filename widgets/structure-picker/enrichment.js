@@ -1,7 +1,7 @@
 import { extractLocationFromAddress, identifierParts, normalize } from "./search.js";
 
 const FIELD_LABELS = {
-  NomCommercial: "Nom commercial",
+  NomCommercial: "Nom usuel",
   Adresse: "Adresse",
   SirenSiret: "SIREN / SIRET",
   RaisonSociale: "Raison sociale",
@@ -84,7 +84,9 @@ export function buildEnrichmentProposals(row, enterpriseCandidate = null, geocod
   const add = item => { if (item) proposals.push(item); };
 
   if (enterpriseCandidate) {
-    add(proposal("NomCommercial", row.NomCommercial, enterpriseCandidate.nomCommercial, "Annuaire des Entreprises"));
+    if (enterpriseCandidate.nomUsuelDistinct || !hasValue(row.NomCommercial)) {
+      add(proposal("NomCommercial", row.NomCommercial, enterpriseCandidate.nomCommercial, "Annuaire des Entreprises"));
+    }
     add(proposal("SirenSiret", row.SirenSiret, enterpriseCandidate.siret || enterpriseCandidate.siren, "Annuaire des Entreprises"));
     add(proposal("RaisonSociale", row.RaisonSociale, enterpriseCandidate.raisonSociale, "Annuaire des Entreprises"));
   }

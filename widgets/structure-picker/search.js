@@ -183,10 +183,10 @@ export function candidateFrom(unit, establishment) {
   if (!isAllowedDepartment(establishment)) return null;
 
   const enseigne = Array.isArray(establishment.liste_enseignes) ? firstNonEmpty(establishment.liste_enseignes) : "";
+  const nomUsuelPublic = firstNonEmpty([enseigne, establishment.nom_commercial]);
   const raisonSociale = firstNonEmpty([unit?.nom_raison_sociale, unit?.nom_complet]);
   const nomCommercial = firstNonEmpty([
-    enseigne,
-    establishment.nom_commercial,
+    nomUsuelPublic,
     raisonSociale,
     unit?.nom_complet,
   ]) || "Structure sans nom";
@@ -195,6 +195,7 @@ export function candidateFrom(unit, establishment) {
 
   return {
     nomCommercial,
+    nomUsuelDistinct: Boolean(nomUsuelPublic),
     raisonSociale,
     siren: String(unit?.siren ?? ""),
     siret: String(establishment.siret ?? ""),

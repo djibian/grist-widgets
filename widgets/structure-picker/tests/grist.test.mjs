@@ -5,11 +5,13 @@ import { COLUMN_DEFS, fieldsForCandidate, isFormulaColumn } from "../grist.js";
 test("mapping is minimal, readable and keeps map coordinates", () => {
   const names = COLUMN_DEFS.map(item => item.name);
   const titles = COLUMN_DEFS.map(item => item.title);
+  const byName = Object.fromEntries(COLUMN_DEFS.map(item => [item.name, item]));
   assert.equal(names.includes("AdresseNormalisee"), false);
   assert.equal(names.filter(name => name === "Adresse").length, 1);
   assert.equal(names.includes("APE"), false);
   assert.equal(names.includes("Latitude"), true);
   assert.equal(names.includes("Longitude"), true);
+  assert.equal(byName.NomCommercial.title, "Nom usuel");
   assert.equal(titles.some(title => title.includes("—")), false);
 });
 
