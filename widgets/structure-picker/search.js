@@ -16,7 +16,6 @@ export function normalizeIdentifier(value) {
   return String(value ?? "").replace(/\D/g, "");
 }
 
-// Alias conservé pour les éventuels liens/tests historiques.
 export const normalizeSiret = normalizeIdentifier;
 
 export function identifierParts(value) {
@@ -30,15 +29,13 @@ export function identifierParts(value) {
   return { identifier, siren: "", siret: "" };
 }
 
-export function extractLocationFromNormalizedAddress(value) {
+export function extractLocationFromAddress(value) {
   const address = String(value ?? "").trim();
   if (!address) return { codePostal: "", commune: "" };
 
   const matches = [...address.matchAll(/\b(\d{5})\b/g)];
   if (!matches.length) return { codePostal: "", commune: "" };
 
-  // Le label du géocodeur IGN place normalement le code postal juste avant la commune.
-  // On prend le dernier code à 5 chiffres pour ne pas confondre avec un numéro présent plus tôt.
   const match = matches[matches.length - 1];
   const codePostal = match[1];
   const afterPostalCode = address.slice((match.index ?? 0) + match[0].length);
@@ -49,6 +46,8 @@ export function extractLocationFromNormalizedAddress(value) {
 
   return { codePostal, commune };
 }
+
+export const extractLocationFromNormalizedAddress = extractLocationFromAddress;
 
 function tokens(value) {
   return normalize(value).split(/\s+/).filter(Boolean);
@@ -123,15 +122,9 @@ export function fuzzyTextScore(query, text) {
 }
 
 export function localSearchText(row) {
-  return [
-    row.NomCommercial,
-    row.RaisonSociale,
-    row.Adresse,
-    row.AdresseNormalisee,
-    row.CodePostal,
-    row.Commune,
-    row.SirenSiret,
-  ].filter(Boolean).join(" ");
+  return [row.NomCommercial, row.RaisonSociale, row.Adresse, row.CodePostal, row.Commune, row.SirenSiret]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function scoreLocal(row, query) {
@@ -142,7 +135,7 @@ export function scoreLocal(row, query) {
   if (queryIdentifier.siren && rowIdentifier.siren === queryIdentifier.siren) return 9;
 
   const name = [row.NomCommercial, row.RaisonSociale].filter(Boolean).join(" ");
-  const address = [row.AdresseNormalisee, row.Adresse, row.CodePostal, row.Commune].filter(Boolean).join(" ");
+  const address = [row.Adresse, row.CodePostal, row.Commune].filter(Boolean).join(" ");
 
   const nameScore = fuzzyTextScore(query, name);
   const addressScore = fuzzyTextScore(query, address);
@@ -189,12 +182,8 @@ export function candidateFrom(unit, establishment) {
   if (establishment.etat_administratif && establishment.etat_administratif !== "A") return null;
   if (!isAllowedDepartment(establishment)) return null;
 
-  const enseigne = Array.isArray(establishment.liste_enseignes)
-    ? firstNonEmpty(establishment.liste_enseignes)
-    : "";
+  const enseigne = Array.isArray(establishment.liste_enseignes) ? firstNonEmpty(establishment.liste_enseignes) : "";
   const raisonSociale = firstNonEmpty([unit?.nom_raison_sociale, unit?.nom_complet]);
-  // Beaucoup d'établissements n'ont pas d'enseigne distincte. Dans ce cas, la raison sociale
-  // devient le nom commercial affichable afin que la structure reste exploitable dans Grist.
   const nomCommercial = firstNonEmpty([
     enseigne,
     establishment.nom_commercial,
@@ -234,7 +223,6 @@ export function localIdentifierSet(rows) {
     .filter(value => value.length === 9 || value.length === 14));
 }
 
-// Alias historique : le contenu est désormais un mélange contrôlé de SIREN (9) et SIRET (14).
 export const localSiretSet = localIdentifierSet;
 
 export function candidateIsAlreadyLocal(candidate, localIdentifiers) {
@@ -265,7 +253,7 @@ export function flattenExternalResults(payload, localIdentifiers = new Set(), li
   return candidates;
 }
 
-export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10 } = {}) {
+export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10, codePostal = "" } = {}) {
   const params = new URLSearchParams({
     q: String(query ?? "").trim(),
     departement: DEPARTMENTS.join(","),
@@ -276,5 +264,6 @@ export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10
     page: "1",
     per_page: String(perPage),
   });
+  if (/^\d{5}$/.test(String(codePostal).trim())) params.set("code_postal", String(codePostal).trim());
   return `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
 }

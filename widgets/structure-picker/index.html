@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Structure Picker</title>
+  <title>Assistant Structures</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
@@ -11,19 +11,34 @@
   <main class="app">
     <header class="hero">
       <div>
-        <h1>Rechercher une structure</h1>
-        <p>Table complète Grist + établissements officiels actifs des départements 44 et 85.</p>
+        <h1>Assistant Structures</h1>
+        <p>Rechercher, ajouter et compléter les structures de stage.</p>
       </div>
       <button id="manual-create" class="button button-secondary" type="button" disabled>Créer manuellement</button>
     </header>
 
     <div id="config-status" class="configuration" role="status" aria-live="polite">Connexion à Grist…</div>
 
-    <label class="search-label" for="search">Nom commercial, raison sociale, adresse, commune ou SIREN/SIRET</label>
-    <input id="search" class="search-input" type="search" autocomplete="off" placeholder="Ex. garage Machecoul" aria-describedby="search-help" disabled>
-    <p id="search-help" class="help">Le code postal et la commune sont déduits automatiquement de l’adresse normalisée pour améliorer la recherche locale. L’Annuaire des Entreprises complète ensuite la recherche avec temporisation et cache de session.</p>
+    <section class="search-section" aria-labelledby="search-title">
+      <h2 id="search-title">Rechercher / ajouter</h2>
+      <label class="search-label" for="search">Nom commercial, raison sociale, adresse, commune ou SIREN/SIRET</label>
+      <input id="search" class="search-input" type="search" autocomplete="off" placeholder="Ex. garage Machecoul" aria-describedby="search-help" disabled>
+      <p id="search-help" class="help">Recherche immédiate dans toute la table Grist, puis dans l’Annuaire des Entreprises pour les établissements actifs du 44 et du 85.</p>
+    </section>
 
     <div id="global-status" class="status" role="status" aria-live="polite"></div>
+
+    <section class="assistant-panel" aria-labelledby="selected-title">
+      <div class="section-heading">
+        <h2 id="selected-title">Structure sélectionnée</h2>
+        <button id="enrich-button" class="button button-primary" type="button" disabled>Analyser / compléter</button>
+      </div>
+      <div id="selected-summary" class="selected-summary"></div>
+      <div id="enrich-status" class="substatus" role="status" aria-live="polite"></div>
+      <div id="enterprise-choices" class="choice-block"></div>
+      <div id="geocode-choices" class="choice-block"></div>
+      <div id="proposal-panel" class="proposal-panel"></div>
+    </section>
 
     <section class="results-section" aria-labelledby="local-title">
       <div class="section-heading">
@@ -42,7 +57,6 @@
       <div id="external-results" class="results"></div>
     </section>
   </main>
-
   <script type="module" src="app.js"></script>
 </body>
 </html>

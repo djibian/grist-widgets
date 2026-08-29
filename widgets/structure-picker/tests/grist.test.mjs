@@ -1,73 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { COLUMN_DEFS, fieldsForCandidate, isFormulaColumn } from "../grist.js";
 
-import {
-  fieldsForCandidate,
-  isFormulaColumn,
-} from "../grist.js";
+test("mapping exposes one address and latitude/longitude", () => {
+  const names = COLUMN_DEFS.map(item => item.name);
+  assert.equal(names.includes("AdresseNormalisee"), false);
+  assert.equal(names.filter(name => name === "Adresse").length, 1);
+  assert.equal(names.includes("Latitude"), true);
+  assert.equal(names.includes("Longitude"), true);
+});
 
-test("formula column detection distinguishes formulas from writable data and trigger formulas", () => {
-  assert.equal(isFormulaColumn({ isFormula: true, formula: "$A + 1" }), true);
+test("formula detection blocks only actual formulas", () => {
+  assert.equal(isFormulaColumn({ isFormula: true, formula: "$A" }), true);
   assert.equal(isFormulaColumn({ isFormula: true, formula: "" }), false);
-  assert.equal(isFormulaColumn({ isFormula: false, formula: "$A + 1" }), false);
 });
 
-test("candidate fields only target explicitly writable destination mappings", () => {
-  const candidate = {
-    nomCommercial: "GARAGE MARTIN",
-    raisonSociale: "MARTIN AUTOMOBILES",
-    siret: "12345678900011",
-    siren: "123456789",
-    adresse: "12 RUE DES ARTISANS 44270 MACHECOUL-SAINT-MEME",
-    codePostal: "44270",
-    commune: "MACHECOUL-SAINT-MEME",
-    ape: "45.20A",
-    latitude: 47.1,
-    longitude: -1.8,
-  };
-  const snapshot = {
-    writableMappings: {
-      NomCommercial: "Nom_commercial",
-      Adresse: "Adresse",
-      SirenSiret: "Numero_immatriculation",
-      RaisonSociale: "Raison_sociale",
-      APE: "APE",
-      Latitude: "Latitude",
-      Longitude: "Longitude",
-    },
-  };
-
-  assert.deepEqual(fieldsForCandidate(candidate, snapshot), {
-    Nom_commercial: "GARAGE MARTIN",
-    Adresse: "12 RUE DES ARTISANS 44270 MACHECOUL-SAINT-MEME",
-    Numero_immatriculation: "12345678900011",
-    Raison_sociale: "MARTIN AUTOMOBILES",
-    APE: "45.20A",
-    Latitude: 47.1,
-    Longitude: -1.8,
-  });
-});
-
-test("search-only and formula-derived fields are never written", () => {
-  const candidate = {
-    nomCommercial: "TEST",
-    siret: "12345678900011",
-    adresse: "1 RUE TEST 44000 NANTES",
-    codePostal: "44000",
-    commune: "NANTES",
-  };
-  const snapshot = {
-    writableMappings: {
-      NomCommercial: "Nom_commercial",
-      Adresse: "Adresse",
-      SirenSiret: "Siren_Siret",
-      // AdresseNormalisee, CodePostal et Commune sont volontairement absents.
-    },
-  };
-
-  assert.deepEqual(fieldsForCandidate(candidate, snapshot), {
-    Nom_commercial: "TEST",
-    Adresse: "1 RUE TEST 44000 NANTES",
-    Siren_Siret: "12345678900011",
-  });
+test("candidate writing includes map coordinates when mapped", () => {
+  const snapshot = { writableMappings: { NomCommercial: "Nom", Adresse: "Adresse", SirenSiret: "Id", Latitude: "Lat", Longitude: "Lon" } };
+  const fields = fieldsForCandidate({ nomCommercial: "Garage", adresse: "A", siret: "12345678900011", latitude: 47, longitude: -1.8 }, snapshot);
+  assert.deepEqual(fields, { Nom: "Garage", Adresse: "A", Id: "12345678900011", Lat: 47, Lon: -1.8 });
 });

@@ -1,4 +1,4 @@
-name: Structure Picker tests
+name: Assistant Structures tests
 
 on:
   push:
