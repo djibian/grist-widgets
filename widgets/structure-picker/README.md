@@ -2,52 +2,71 @@
 
 Widget Grist pour retrouver une structure de stage dans la totalité de la table Grist puis, si nécessaire, découvrir des établissements officiels actifs en Loire-Atlantique (44) et Vendée (85) via l'API Recherche d'Entreprises de la DINUM.
 
+## Principe
+
+Le widget utilise la même API publique que le widget betagouv `codeSiren` disponible dans la collection française de widgets Grist :
+
+`https://recherche-entreprises.api.gouv.fr/search`
+
+Le widget betagouv recherche surtout un SIREN à partir d'un nom. `Structure Picker` recherche un établissement précis, exploite le SIRET et peut créer la structure dans Grist.
+
 ## V1
 
 1. La recherche locale utilise `grist.docApi.fetchTable()` : elle porte sur la **table complète**, même si la vue Grist est filtrée.
 2. La recherche locale est floue : accents, ponctuation, préfixes et petites fautes de frappe sont tolérés.
-3. La recherche externe interroge `https://recherche-entreprises.api.gouv.fr/search` avec `departement=44,85` et ne conserve que les établissements actifs du 44/85.
-4. Nom commercial/enseigne, raison sociale, SIREN et SIRET restent distincts.
-5. Un SIRET déjà présent dans la table complète n'est pas reproposé comme nouvelle structure.
-6. Avant chaque ajout, la table complète est relue. Après création, une seconde lecture détecte une éventuelle course entre deux utilisateurs ; si une ligne identique existait déjà, le widget supprime uniquement la ligne qu'il vient de créer et sélectionne l'existante.
-7. La ligne existante ou créée est automatiquement sélectionnée dans Grist.
-8. Le widget reste bloqué tant que `Nom`, `Adresse` et `SIRET` ne sont pas mappés.
+3. La recherche externe utilise `departement=44,85` et ne conserve que les établissements actifs du 44/85.
+4. Le nom commercial et la raison sociale sont conservés séparément.
+5. Un seul mapping `SIREN / SIRET` est utilisé. Une valeur de 9 chiffres est interprétée comme un SIREN ; une valeur de 14 chiffres comme un SIRET. Lors d'un nouvel ajout, le widget écrit le SIRET, plus précis.
+6. Le code postal et la commune ne sont pas mappés : ils sont extraits en mémoire de l'adresse normalisée pour la recherche locale. Pour un résultat DINUM, ils proviennent directement de l'API.
+7. Avant chaque ajout, la table complète est relue. Après création, une seconde lecture détecte une éventuelle course entre deux utilisateurs.
+8. Les métadonnées de colonnes Grist sont contrôlées avant écriture. Une colonne calculée facultative est ignorée ; une colonne calculée utilisée comme destination obligatoire bloque l'ajout avec un message explicite.
 9. Les réponses externes sont mises en cache pour la session. Les appels sont temporisés, espacés, annulables et les réponses HTTP 429 respectent `Retry-After`.
 10. La création manuelle reste disponible lorsque l'Annuaire ne retrouve pas une enseigne ou une formulation usuelle.
 
 Aucune donnée du document Grist n'est envoyée à l'API externe. Seul le texte saisi dans le champ de recherche est transmis.
 
-## Colonnes Grist
+## Mappings Grist
 
-### Indispensables
+Les intitulés indiquent volontairement le rôle de chaque champ.
 
-- `Nom` : nom affiché dans la table ;
-- `Adresse` : adresse de l'établissement ;
-- `SIRET` : identifiant de l'établissement.
+### Obligatoires — recherche + écriture
 
-### Optionnelles
+- `NomCommercial` → **Nom commercial — recherche + écriture**. C'est le nom principal affiché par le widget.
+- `Adresse` → **Adresse — recherche + écriture**. C'est la colonne de données dans laquelle l'adresse d'un nouvel établissement est enregistrée.
+- `SirenSiret` → **SIREN / SIRET — recherche + écriture**. Un seul champ suffit.
 
-- `NomCommercial` : enseigne ou nom commercial ;
-- `RaisonSociale` ;
-- `SIREN` ;
-- `CodePostal` ;
-- `Commune` ;
-- `APE` ;
+Ces trois mappings doivent pointer vers des **colonnes de données modifiables**, pas vers des colonnes formule.
+
+### Facultatif — recherche uniquement
+
+- `AdresseNormalisee` → **Adresse normalisée — recherche uniquement**. Le widget ne tente jamais d'y écrire. Elle peut donc être produite par le géocodeur ou être une colonne calculée. Le code postal et la commune sont extraits automatiquement de cette adresse pour enrichir la recherche.
+
+### Facultatif — recherche + écriture
+
+- `RaisonSociale` → **Raison sociale — recherche + écriture**.
+
+### Facultatifs — écriture uniquement
+
+- `APE` → code APE / NAF ;
 - `Latitude` ;
-- `Longitude` ;
-- `AdresseNormalisee`.
+- `Longitude`.
 
-Lors d'un ajout externe, seules les colonnes effectivement mappées sont renseignées.
+Si l'un de ces champs facultatifs est mappé vers une colonne formule, il est simplement ignoré lors de l'ajout et le widget affiche un avertissement.
 
-## Accès Grist
+## Nom commercial
 
-Le widget demande l'accès `full` car il doit lire la table complète, créer une ligne, éventuellement supprimer sa propre ligne en cas de course concurrente, et déplacer le curseur.
+Le nom commercial est le nom principal du widget. L'API ne fournit pas toujours une enseigne distincte. Dans ce cas, la raison sociale est utilisée comme nom affichable de repli afin que la structure puisse malgré tout être ajoutée.
 
-## Dédoublonnage et concurrence
+## SIREN / SIRET et dédoublonnage
 
-Le widget protège fortement contre les ajouts concurrents par SIRET : verrou dans le navigateur, relecture juste avant création et réconciliation après création.
+Le champ unique peut contenir :
 
-Ce mécanisme n'est toutefois pas une contrainte d'unicité transactionnelle imposée par Grist. Pour une garantie absolue entre plusieurs navigateurs même en cas de coupure réseau au mauvais instant, il faut ajouter dans le document une règle d'accès Grist interdisant les doublons de SIRET. Grist documente ce mécanisme avec une colonne de comptage des doublons et une règle ACL refusant une création lorsque le compteur dépasse 1.
+- 9 chiffres : SIREN ;
+- 14 chiffres : SIRET.
+
+Un nouvel établissement est enregistré avec son SIRET. Pour les anciennes lignes qui ne contiennent qu'un SIREN, le widget considère tout établissement portant ce même SIREN comme déjà connu. C'est un choix conservateur destiné à éviter les doublons.
+
+Le widget protège aussi contre les ajouts concurrents : verrou dans le navigateur, relecture juste avant création et réconciliation après création. Cela ne remplace toutefois pas une contrainte transactionnelle d'unicité imposée au niveau du document Grist.
 
 ## API externe
 
@@ -56,17 +75,15 @@ API Recherche d'Entreprises de la DINUM :
 - publique et sans clé ;
 - recherche textuelle ou SIREN/SIRET ;
 - filtre API `departement=44,85` ;
-- filtre API unité légale active et contrôle supplémentaire de l'état de chaque établissement ;
-- contrôle local du département après réponse, car une recherche directe par SIREN/SIRET peut ignorer les filtres API ;
+- établissements actifs uniquement ;
+- contrôle local du département après réponse ;
 - pas de Google, pas d'API Entreprise avec jeton, pas d'index SIRENE local.
 
-## Prévisualisation de `develop`
+## Prévisualisation `develop`
 
-Canal HTTPS de développement :
+GitHub Pages publie la branche de développement pendant la phase de test :
 
-`https://cdn.jsdelivr.net/gh/djibian/grist-widgets@develop/widgets/structure-picker/index.html`
-
-Pour un test parfaitement reproductible, préférer une URL jsDelivr figée sur le SHA du commit à tester.
+`https://djibian.github.io/grist-widgets/widgets/structure-picker/`
 
 ## Tests
 
