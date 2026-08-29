@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 test("l'interface expose exactement les deux onglets principaux", () => {
   assert.match(html, /id="tab-search"[\s\S]*Rechercher \/ ajouter/);
@@ -22,4 +23,23 @@ test("le panneau d'enrichissement est séparé et masqué par défaut", () => {
   assert.match(html, /id="selected-summary"/);
   assert.match(html, /id="enrich-button"/);
   assert.match(html, /id="proposal-panel"/);
+});
+
+test("le compteur de table utilise le pictogramme bâtiment minimaliste", () => {
+  assert.match(html, /id="table-counter"/);
+  assert.match(html, /class="table-counter-icon"/);
+  assert.match(html, /id="table-count"/);
+  assert.doesNotMatch(app, /Configuration valide/);
+});
+
+test("la terminologie visible utilise Nom usuel", () => {
+  assert.match(html, /Nom usuel, raison sociale/);
+  assert.match(app, /healthItem\("Nom usuel"/);
+  assert.doesNotMatch(html, /Nom commercial/);
+  assert.doesNotMatch(app, /Nom commercial/);
+});
+
+test("APE NAF n'est plus présenté par l'interface", () => {
+  assert.doesNotMatch(app, /APE \/ NAF/);
+  assert.doesNotMatch(app, /addMeta\([^\n]*"APE"/);
 });

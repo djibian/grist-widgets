@@ -2,26 +2,7 @@
 
 Widget Grist unique pour **rechercher, ajouter et compléter** les structures de stage.
 
-L'interface est organisée en deux onglets fixes afin de séparer clairement les deux tâches de l'utilisateur sans exposer les outils techniques sous-jacents.
-
-## Interface
-
-### Rechercher / ajouter
-
-Onglet ouvert par défaut. Il contient dans un même flux :
-
-1. le champ de recherche ;
-2. les structures déjà enregistrées dans la table Grist complète ;
-3. les établissements actifs du 44 et du 85 trouvés dans l'Annuaire des Entreprises ;
-4. en dernier recours, la création manuelle.
-
-Le champ de recherche et ses résultats ne sont donc jamais séparés par le panneau d'enrichissement.
-
-### Compléter la sélection
-
-Cet onglet suit la ligne sélectionnée dans Grist. Il affiche le diagnostic du nom commercial, du SIREN/SIRET, de la raison sociale, de l'APE/NAF, de l'adresse et des coordonnées carte.
-
-Un badge sur l'onglet indique le nombre d'informations manquantes détectées. Aucun changement d'onglet n'est imposé automatiquement : l'utilisateur garde la maîtrise de son parcours.
+L'interface sépare clairement les deux usages dans deux onglets fixes : **Rechercher / ajouter** et **Compléter la sélection**.
 
 ## APIs publiques utilisées
 
@@ -29,9 +10,8 @@ Un badge sur l'onglet indique le nombre d'informations manquantes détectées. A
 
 `https://recherche-entreprises.api.gouv.fr/search`
 
-- même API que le widget betagouv `codeSiren` ;
 - recherche des établissements actifs du 44 et du 85 ;
-- récupération du SIRET, de la raison sociale, du code APE/NAF, de l'adresse et, lorsqu'elles existent, des coordonnées.
+- récupération du SIRET, de la raison sociale, de l'adresse et, lorsqu'elles existent, des coordonnées.
 
 ### Géocodage IGN / Géoplateforme
 
@@ -39,30 +19,44 @@ Un badge sur l'onglet indique le nombre d'informations manquantes détectées. A
 
 - normalisation de l'adresse ;
 - latitude et longitude ;
-- le code postal et la commune sont utilisés en mémoire pour améliorer la recherche Annuaire.
+- le code postal et la commune sont dérivés en mémoire de l'adresse afin d'améliorer la recherche Annuaire.
 
 ## Mappings Grist
 
 ### Obligatoires
 
-- `NomCommercial` → **Nom commercial — recherche + écriture** ;
-- `Adresse` → **Adresse — recherche + géocodage + écriture** ;
-- `SirenSiret` → **SIREN / SIRET — recherche + écriture**.
+- `NomCommercial` → **Nom commercial** ;
+- `Adresse` → **Adresse** ;
+- `SirenSiret` → **SIREN / SIRET**.
 
 Ces champs doivent pointer vers des colonnes de données modifiables.
 
 ### Facultatifs
 
-- `RaisonSociale` → raison sociale ;
-- `APE` → code APE / NAF ;
-- `Latitude` → latitude ;
-- `Longitude` → longitude.
+- `RaisonSociale` → **Raison sociale** ;
+- `Latitude` → **Latitude** ;
+- `Longitude` → **Longitude** ;
+- `Telephone` → **Téléphone** ;
+- `Courriel` → **Courriel** ;
+- `SiteWeb` → **Site web**.
 
-**Latitude et Longitude sont fortement recommandées** : l'assistant les remplit lors du géocodage et elles alimentent directement le widget carte des structures de stage.
+Latitude et Longitude sont fortement recommandées : l'assistant les remplit lors du géocodage et elles alimentent directement le widget carte des structures de stage.
 
-Il n'existe plus de mapping séparé `Adresse normalisée`, `Code postal` ou `Commune`. Le champ `Adresse` est l'unique adresse : lorsqu'une adresse géocodée est validée, elle remplace explicitement l'adresse actuelle.
+Téléphone, Courriel et Site web sont disponibles au mapping mais ne sont pas encore recherchés automatiquement sur `develop`.
 
-## Enrichissement de la structure sélectionnée
+Il n'existe pas de mapping séparé `Adresse normalisée`, `Code postal` ou `Commune`.
+
+## Interface
+
+Lorsque la configuration est valide, aucun grand message de confirmation n'est affiché. Un petit compteur numérique en haut à droite indique simplement le nombre de structures présentes dans la table ; son infobulle en donne le sens. Les messages de configuration restent visibles uniquement lorsqu'une intervention est utile.
+
+## Rechercher / ajouter
+
+La recherche interroge la table Grist complète puis l'Annuaire des Entreprises pour les établissements actifs du 44/85. Les doublons sont contrôlés par SIREN/SIRET.
+
+## Compléter la sélection
+
+L'onglet **Compléter la sélection** montre l'état du nom commercial, du SIREN/SIRET, de la raison sociale, de l'adresse et des coordonnées carte.
 
 Le bouton **Analyser / compléter** :
 
@@ -79,7 +73,7 @@ Les colonnes formule ne sont jamais écrites. Une proposition vers un champ non 
 
 `https://djibian.github.io/grist-widgets/widgets/structure-picker/`
 
-Le dossier conserve son nom historique `structure-picker` pour ne pas casser l'URL déjà configurée dans Grist ; l'interface et la fonction du widget sont désormais celles d'**Assistant Structures**.
+Le dossier conserve son nom historique `structure-picker` pour ne pas casser l'URL déjà configurée dans Grist.
 
 ## Tests
 

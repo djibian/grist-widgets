@@ -1,13 +1,15 @@
 import { extractLocationFromAddress, identifierParts, normalize } from "./search.js";
 
 const FIELD_LABELS = {
-  NomCommercial: "Nom commercial",
+  NomCommercial: "Nom usuel",
   Adresse: "Adresse",
   SirenSiret: "SIREN / SIRET",
   RaisonSociale: "Raison sociale",
-  APE: "APE / NAF",
   Latitude: "Latitude",
   Longitude: "Longitude",
+  Telephone: "Téléphone",
+  Courriel: "Courriel",
+  SiteWeb: "Site web",
 };
 
 function hasValue(value) {
@@ -44,11 +46,10 @@ export function diagnoseRow(row) {
     hasIdentifier: Boolean(identifier.siren),
     hasSiret: Boolean(identifier.siret),
     hasLegalName: hasValue(row.RaisonSociale),
-    hasApe: hasValue(row.APE),
     hasCoordinates: coordinatesComplete,
     codePostal: location.codePostal,
     commune: location.commune,
-    needsEnterprise: !identifier.siret || !hasValue(row.RaisonSociale) || !hasValue(row.APE),
+    needsEnterprise: !identifier.siret || !hasValue(row.RaisonSociale),
     needsGeocode: hasValue(row.Adresse) && !coordinatesComplete,
   };
 }
@@ -83,10 +84,11 @@ export function buildEnrichmentProposals(row, enterpriseCandidate = null, geocod
   const add = item => { if (item) proposals.push(item); };
 
   if (enterpriseCandidate) {
-    add(proposal("NomCommercial", row.NomCommercial, enterpriseCandidate.nomCommercial, "Annuaire des Entreprises"));
+    if (enterpriseCandidate.nomUsuelDistinct || !hasValue(row.NomCommercial)) {
+      add(proposal("NomCommercial", row.NomCommercial, enterpriseCandidate.nomCommercial, "Annuaire des Entreprises"));
+    }
     add(proposal("SirenSiret", row.SirenSiret, enterpriseCandidate.siret || enterpriseCandidate.siren, "Annuaire des Entreprises"));
     add(proposal("RaisonSociale", row.RaisonSociale, enterpriseCandidate.raisonSociale, "Annuaire des Entreprises"));
-    add(proposal("APE", row.APE, enterpriseCandidate.ape, "Annuaire des Entreprises"));
   }
 
   const addressSource = geocodeCandidate || enterpriseCandidate;

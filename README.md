@@ -12,9 +12,10 @@ L'Assistant Structures permet de rechercher, ajouter et compléter les structure
 
 - recherche dans toute la table Grist ;
 - recherche d'établissements via l'Annuaire des Entreprises ;
-- enrichissement SIREN/SIRET, raison sociale et APE ;
+- enrichissement SIREN/SIRET et raison sociale ;
 - géocodage IGN de l'adresse ;
-- alimentation de Latitude/Longitude pour le widget carte.
+- alimentation de Latitude/Longitude pour le widget carte ;
+- mappings facultatifs prêts pour Téléphone, Courriel et Site web.
 
 Prévisualisation de `develop` via GitHub Pages :
 
