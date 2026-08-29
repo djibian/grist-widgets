@@ -1,0 +1,8 @@
+{
+  "name": "grist-widgets",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --check widgets/structure-picker/search.js && node --check widgets/structure-picker/grist.js && node --check widgets/structure-picker/app.js && node --test widgets/structure-picker/tests/*.test.mjs"
+  }
+}

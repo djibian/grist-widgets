@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Structure Picker</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <h1>Rechercher une structure</h1>
+        <p>Table complète Grist + établissements officiels actifs des départements 44 et 85.</p>
+      </div>
+      <button id="manual-create" class="button button-secondary" type="button" disabled>Créer manuellement</button>
+    </header>
+
+    <div id="config-status" class="configuration" role="status" aria-live="polite">Connexion à Grist…</div>
+
+    <label class="search-label" for="search">Nom, enseigne, raison sociale, adresse, commune ou SIRET</label>
+    <input id="search" class="search-input" type="search" autocomplete="off" placeholder="Ex. garage Machecoul" aria-describedby="search-help" disabled>
+    <p id="search-help" class="help">La recherche Grist est immédiate. L’Annuaire des Entreprises complète ensuite la recherche avec temporisation et cache de session.</p>
+
+    <div id="global-status" class="status" role="status" aria-live="polite"></div>
+
+    <section class="results-section" aria-labelledby="local-title">
+      <div class="section-heading">
+        <h2 id="local-title">Déjà enregistrées dans Grist</h2>
+        <span id="local-count" class="count"></span>
+      </div>
+      <div id="local-results" class="results"></div>
+    </section>
+
+    <section class="results-section" aria-labelledby="external-title">
+      <div class="section-heading">
+        <h2 id="external-title">Autres structures trouvées — 44 / 85</h2>
+        <span id="external-count" class="count"></span>
+      </div>
+      <div id="external-status" class="substatus" role="status" aria-live="polite"></div>
+      <div id="external-results" class="results"></div>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
