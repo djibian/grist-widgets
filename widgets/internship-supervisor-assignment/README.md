@@ -2,53 +2,100 @@
 
 Widget Grist pour affecter automatiquement les stages aux enseignants à partir de quotas exacts définis par enseignant, classe et période.
 
-## Structure attendue
+## Version 1.1
 
-Classe :
-- Classe : libellé ;
-- Nombre_de_periodes_de_stage : entier de 1 à 4.
+La V1.1 renforce l'intégration au document Grist sans introduire encore l'optimisation géographique.
 
-Affectation :
-- Enseignant : référence vers Enseignant ;
-- Classe : référence vers Classe ;
-- Periode : numéro de période ;
-- Nombre_de_stages_a_suivre : quota exact.
+### Classe pilotée par Grist
 
-Stage :
-- Eleve : référence vers Eleves ;
-- Classe : référence vers Classe, idéalement calculée avec l'élève ;
-- Periode : numéro de période ;
-- Suivi_par : référence vers Enseignant et colonne modifiable.
+Le widget doit être associé à la table `Classe` et peut être piloté par la vue Classe grâce à **Select By**. La classe n'est plus choisie dans le widget : la ligne sélectionnée dans la vue Classe devient automatiquement le périmètre courant.
 
-Une ligne Affectation représente un quota exact Enseignant × Classe × Période. Le widget ne modifie que Stage.Suivi_par.
+### Périodes compactes
 
-## Fonctionnement V1
+Seules les périodes réellement définies par la colonne configurée comme **Nombre de périodes de stage** sont proposées. Une ou plusieurs périodes peuvent être cochées.
 
-- une classe à la fois ;
-- seules les périodes définies dans Classe.Nombre_de_periodes_de_stage sont proposées ;
-- une ou plusieurs périodes peuvent être sélectionnées ;
-- les quotas doivent être cohérents avec le nombre de stages ;
-- les affectations existantes sont conservées et déduites des quotas ;
-- le critère de diversité évite autant que possible qu'un enseignant suive plusieurs périodes du même élève ;
-- la proposition est prévisualisée avant toute écriture ;
-- les données sont relues au moment d'appliquer : si elles ont changé, l'écriture est refusée.
+Toutes les opérations suivantes sont strictement limitées aux périodes cochées :
 
-Le widget n'offre volontairement aucun bouton de réinitialisation.
+- contrôle des stages ;
+- création des stages manquants ;
+- contrôle des quotas ;
+- génération de la proposition ;
+- application des affectations.
 
-## Contrôles bloquants
+### Création des stages manquants
 
-Le calcul est notamment refusé en cas de :
-- quota total différent du nombre de stages ;
-- doublon Enseignant × Classe × Période dans Affectation ;
-- quota négatif ou non entier ;
-- période inexistante ;
-- plusieurs stages pour le même élève et la même période ;
-- affectation existante vers un enseignant non autorisé ;
-- affectations existantes dépassant déjà le quota.
+Le widget calcule l'ensemble attendu :
 
-## V2 géographique
+`élèves de la classe × périodes sélectionnées`
 
-L'interface réserve un critère Proximité géographique, désactivé en V1. Il pourra être activé lorsque les coordonnées des enseignants seront disponibles. Les niveaux Faible / Moyenne / Forte permettront alors de pondérer les critères concurrents.
+Il compare cet ensemble aux lignes de la table `Stage`. Les lignes manquantes peuvent être créées explicitement en une opération groupée. Seules les colonnes configurées comme **Élève** et **Période** sont renseignées ; les autres colonnes restent vides ou sont calculées par Grist.
 
-Prévisualisation GitHub Pages :
-https://djibian.github.io/grist-widgets/widgets/internship-supervisor-assignment/
+Les doublons élève × période bloquent la création et l'affectation.
+
+### Paramétrage des colonnes
+
+Les noms des cinq tables restent fixes :
+
+- `Classe` ;
+- `Eleves` ;
+- `Enseignant` ;
+- `Affectation` ;
+- `Stage`.
+
+Le bouton **⚙ Réglages** permet de choisir les colonnes utilisées pour chaque rôle fonctionnel. Le paramétrage est mémorisé dans les options du widget.
+
+Les colonnes attendues sont :
+
+**Classe**
+- libellé de la classe ;
+- nombre de périodes de stage.
+
+**Eleves**
+- classe de l'élève ;
+- identité de l'élève.
+
+**Enseignant**
+- identité de l'enseignant.
+
+**Affectation**
+- enseignant ;
+- classe ;
+- période ;
+- nombre de stages à suivre.
+
+**Stage**
+- élève ;
+- période ;
+- suivi par.
+
+La V1.1 détecte automatiquement les noms utilisés dans le fichier actuel, notamment les variantes singulier/pluriel de `Nombre de stage(s) à suivre`.
+
+### Optimisation
+
+Les critères d'optimisation ont été déplacés dans le panneau **⚙ Réglages** afin de garder l'interface principale compacte.
+
+La V1.1 conserve :
+
+- diversification des enseignants entre les périodes d'un même élève ;
+- priorité Faible / Moyenne / Forte.
+
+La proximité géographique reste affichée comme évolution future mais n'est pas active en V1.1.
+
+### Sécurité des écritures
+
+- les suivis déjà renseignés ne sont jamais écrasés ;
+- les quotas doivent être exacts ;
+- une proposition est prévisualisée avant écriture ;
+- les données sont relues avant application ;
+- une modification intervenue entre la prévisualisation et l'application invalide la proposition ;
+- les écritures utilisent les colonnes réellement configurées, jamais des noms codés en dur.
+
+## Prévisualisation develop
+
+`https://djibian.github.io/grist-widgets/widgets/internship-supervisor-assignment/`
+
+## Tests
+
+```bash
+npm run test:internship-supervisor-assignment
+```
