@@ -1,6 +1,42 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildAssignmentActions, buildStageCreationAction } from "../grist.js";
+import {
+  buildAssignmentActions,
+  buildStageCreationAction,
+  normalizeSourceMappings,
+  SOURCE_COLUMNS,
+  sourceMappingSignature,
+} from "../grist.js";
+
+test("primary Classe source declares two required native Grist fields", () => {
+  assert.deepEqual(SOURCE_COLUMNS, [
+    { name: "ClassLabel", title: "Classe", type: "Text", optional: false },
+    { name: "PeriodCount", title: "Nombre de périodes de stage", type: "Numeric", optional: false },
+  ]);
+});
+
+test("native source mappings are normalized from Grist mapping names", () => {
+  assert.deepEqual(normalizeSourceMappings({
+    ClassLabel: "Classe",
+    PeriodCount: "Nombre_de_periodes_de_stage",
+  }), {
+    classLabel: "Classe",
+    classPeriodCount: "Nombre_de_periodes_de_stage",
+  });
+});
+
+test("source mapping signature accepts normalized source mappings", () => {
+  assert.equal(
+    sourceMappingSignature({
+      classLabel: "Classe",
+      classPeriodCount: "Nombre_de_periodes_de_stage",
+    }),
+    JSON.stringify({
+      classLabel: "Classe",
+      classPeriodCount: "Nombre_de_periodes_de_stage",
+    }),
+  );
+});
 
 test("stage creation writes only the mapped student and period columns", () => {
   const action = buildStageCreationAction([
