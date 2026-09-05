@@ -1,10 +1,15 @@
 import { configurationFingerprint, stageCoverage } from "./assignment.js";
-import { FIXED_TABLES, inferMappings, mappingSignature, validateMappings } from "./mapping.js";
+import { DOCUMENT_TABLES, inferMappings, mappingSignature, validateMappings } from "./mapping.js";
 
 const OPTION_KEY = "internshipSupervisorAssignmentV11";
 const DEFAULT_OPTIMIZATION = Object.freeze({
   diversity: { enabled: true, priority: "moyenne" },
 });
+
+export const SOURCE_COLUMNS = Object.freeze([
+  { name: "ClassLabel", title: "Classe", type: "Text", optional: false },
+  { name: "PeriodCount", title: "Nombre de périodes de stage", type: "Numeric", optional: false },
+]);
 
 function rowsFromTable(table) {
   const ids = Array.isArray(table?.id) ? table.id : [];
@@ -54,7 +59,7 @@ export async function fetchMetadata() {
   const columnRows = rowsFromTable(columnsRaw);
   const result = { tables: {} };
 
-  for (const tableId of FIXED_TABLES) {
+  for (const tableId of DOCUMENT_TABLES) {
     const table = tableRows.find(row => String(row.tableId) === tableId);
     if (!table) continue;
     const columns = columnRows
@@ -87,6 +92,58 @@ async function getSelectedTableId() {
   }
 }
 
+function scalarMapping(value) {
+  return typeof value === "string" && value ? value : null;
+}
+
+export function normalizeSourceMappings(mappings) {
+  return {
+    classLabel: scalarMapping(mappings?.ClassLabel),
+    classPeriodCount: scalarMapping(mappings?.PeriodCount),
+  };
+}
+
+export function sourceMappingSignature(mappings) {
+  const normalized = normalizeSourceMappings({
+    ClassLabel: mappings?.ClassLabel ?? mappings?.classLabel,
+    PeriodCount: mappings?.PeriodCount ?? mappings?.classPeriodCount,
+  });
+  return JSON.stringify(normalized);
+}
+
+async function getSourceMappings() {
+  try {
+    const mappings = await grist.sectionApi.mappings();
+    return normalizeSourceMappings(mappings ?? {});
+  } catch {
+    return { classLabel: null, classPeriodCount: null };
+  }
+}
+
+function sourceMappingProblems(metadata, selectedTableId, sourceMappings) {
+  const problems = [];
+  if (selectedTableId !== "Classe") {
+    problems.push("Dans Source de données, sélectionne la table Classe.");
+  }
+
+  const classColumns = metadata?.tables?.Classe?.columns ?? [];
+  const checks = [
+    ["classLabel", "Classe"],
+    ["classPeriodCount", "Nombre de périodes de stage"],
+  ];
+  for (const [key, label] of checks) {
+    const columnId = sourceMappings?.[key];
+    if (!columnId) {
+      problems.push(`Dans le panneau de droite, associe le champ « ${label} » à une colonne de Classe.`);
+      continue;
+    }
+    if (!classColumns.some(column => column.colId === columnId)) {
+      problems.push(`Le mapping natif « ${label} » pointe vers une colonne inexistante.`);
+    }
+  }
+  return problems;
+}
+
 async function readStoredOptions() {
   try {
     const value = await grist.widgetApi.getOption(OPTION_KEY);
@@ -105,24 +162,27 @@ function normalizedOptimization(value) {
 }
 
 export async function loadConfiguration() {
-  const [metadata, stored, selectedTableId] = await Promise.all([
+  const [metadata, stored, selectedTableId, sourceMappings] = await Promise.all([
     fetchMetadata(),
     readStoredOptions(),
     getSelectedTableId(),
+    getSourceMappings(),
   ]);
   const mappings = inferMappings(metadata, stored?.mappings ?? {});
   return {
     metadata,
     mappings,
+    sourceMappings,
     optimization: normalizedOptimization(stored?.optimization),
     selectedTableId,
     mappingIssues: validateMappings(metadata, mappings),
+    sourceMappingProblems: sourceMappingProblems(metadata, selectedTableId, sourceMappings),
   };
 }
 
 export async function saveConfiguration(mappings, optimization) {
   const value = {
-    version: 1,
+    version: 2,
     mappings: { ...mappings },
     optimization: normalizedOptimization(optimization),
   };
@@ -131,17 +191,33 @@ export async function saveConfiguration(mappings, optimization) {
 }
 
 export function initializeGrist(onClassSelection) {
-  grist.ready({ requiredAccess: "full", allowSelectBy: true });
+  grist.ready({
+    requiredAccess: "full",
+    allowSelectBy: true,
+    columns: SOURCE_COLUMNS,
+  });
   if (typeof onClassSelection === "function") {
-    grist.onRecord(record => onClassSelection(ref(record?.id)));
-    grist.onNewRecord(() => onClassSelection(null));
+    grist.onRecord((record, mappings) => {
+      const sourceMappings = normalizeSourceMappings(mappings ?? {});
+      onClassSelection({
+        classId: ref(record?.id),
+        sourceMappings,
+      });
+    });
+    grist.onNewRecord(mappings => {
+      onClassSelection({
+        classId: null,
+        sourceMappings: normalizeSourceMappings(mappings ?? {}),
+      });
+    });
   }
 }
 
 export async function fetchSnapshot(mappings) {
-  const [metadata, selectedTableId, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw] = await Promise.all([
+  const [metadata, selectedTableId, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw] = await Promise.all([
     fetchMetadata(),
     getSelectedTableId(),
+    getSourceMappings(),
     fetchRawTable("Classe"),
     fetchRawTable("Eleves"),
     fetchRawTable("Enseignant"),
@@ -149,47 +225,52 @@ export async function fetchSnapshot(mappings) {
     fetchRawTable("Stage"),
   ]);
   const mappingIssues = validateMappings(metadata, mappings);
-  const read = (row, key) => {
+  const sourceProblems = sourceMappingProblems(metadata, selectedTableId, sourceMappings);
+  const readSecondary = (row, key) => {
     const columnId = mappings?.[key];
+    return columnId ? row?.[columnId] : null;
+  };
+  const readClass = (row, key) => {
+    const columnId = sourceMappings?.[key];
     return columnId ? row?.[columnId] : null;
   };
 
   const classes = rowsFromTable(classesRaw).map(row => ({
     id: row.id,
-    label: display(read(row, "classLabel"), `Classe #${row.id}`),
-    periodCount: integer(read(row, "classPeriodCount")),
+    label: display(readClass(row, "classLabel"), `Classe #${row.id}`),
+    periodCount: integer(readClass(row, "classPeriodCount")),
   }));
 
   const students = rowsFromTable(studentsRaw).map(row => ({
     id: row.id,
-    classId: ref(read(row, "studentClass")),
-    label: display(read(row, "studentLabel"), `Élève #${row.id}`),
+    classId: ref(readSecondary(row, "studentClass")),
+    label: display(readSecondary(row, "studentLabel"), `Élève #${row.id}`),
   }));
   const studentById = new Map(students.map(row => [row.id, row]));
 
   const teachers = rowsFromTable(teachersRaw).map(row => ({
     id: row.id,
-    label: display(read(row, "teacherLabel"), `Enseignant #${row.id}`),
+    label: display(readSecondary(row, "teacherLabel"), `Enseignant #${row.id}`),
   }));
 
   const quotas = rowsFromTable(quotasRaw).map(row => ({
     id: row.id,
-    teacherId: ref(read(row, "quotaTeacher")),
-    classId: ref(read(row, "quotaClass")),
-    period: integer(read(row, "quotaPeriod")),
-    target: integer(read(row, "quotaTarget")),
+    teacherId: ref(readSecondary(row, "quotaTeacher")),
+    classId: ref(readSecondary(row, "quotaClass")),
+    period: integer(readSecondary(row, "quotaPeriod")),
+    target: integer(readSecondary(row, "quotaTarget")),
   }));
 
   const stages = rowsFromTable(stagesRaw).map(row => {
-    const studentId = ref(read(row, "stageStudent"));
+    const studentId = ref(readSecondary(row, "stageStudent"));
     const student = studentById.get(studentId);
     return {
       id: row.id,
       studentId,
       studentLabel: student?.label ?? `Élève #${studentId ?? "?"}`,
       classId: student?.classId ?? null,
-      period: integer(read(row, "stagePeriod")),
-      teacherId: ref(read(row, "stageSupervisor")),
+      period: integer(readSecondary(row, "stagePeriod")),
+      teacherId: ref(readSecondary(row, "stageSupervisor")),
     };
   });
 
@@ -204,15 +285,15 @@ export async function fetchSnapshot(mappings) {
       mappings: { ...mappings },
       mappingIssues,
       selectedTableId,
+      sourceMappings,
+      sourceMappingProblems: sourceProblems,
     },
   };
 }
 
 export function configurationProblems(snapshot) {
   const problems = [];
-  if (snapshot?.configuration?.selectedTableId !== "Classe") {
-    problems.push("Le widget doit être associé à la table Classe et piloté par la vue Classe.");
-  }
+  for (const problem of snapshot?.configuration?.sourceMappingProblems ?? []) problems.push(problem);
   for (const mappingIssue of snapshot?.configuration?.mappingIssues ?? []) problems.push(mappingIssue.message);
   return problems;
 }
@@ -266,12 +347,16 @@ export async function createMissingStages(classId, periods, mappings) {
 export async function applyPlan(plan, mappings) {
   if (!plan) throw new Error("Aucune proposition à appliquer.");
   if (plan.mappingSignature && plan.mappingSignature !== mappingSignature(mappings)) {
-    throw new Error("Le paramétrage des colonnes a changé. Génère une nouvelle proposition.");
+    throw new Error("Le paramétrage des tables secondaires a changé. Génère une nouvelle proposition.");
   }
 
   const fresh = await fetchSnapshot(mappings);
   const problems = configurationProblems(fresh);
   if (problems.length) throw new Error(problems.join(" "));
+
+  if (plan.sourceMappingSignature && plan.sourceMappingSignature !== sourceMappingSignature(fresh.configuration.sourceMappings)) {
+    throw new Error("Le mapping de la source Classe a changé. Génère une nouvelle proposition.");
+  }
 
   const currentFingerprint = configurationFingerprint(fresh, plan.classId);
   if (currentFingerprint !== plan.fingerprint) {
