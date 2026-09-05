@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test:structure-picker": "node --check widgets/structure-picker/search.js && node --check widgets/structure-picker/grist.js && node --check widgets/structure-picker/geocode.js && node --check widgets/structure-picker/enrichment.js && node --check widgets/structure-picker/osm.js && node --check widgets/structure-picker/contacts-experiment.js && node --check widgets/structure-picker/app.js && node --test widgets/structure-picker/tests/*.test.mjs",
-    "test:internship-supervisor-assignment": "node --check widgets/internship-supervisor-assignment/assignment.js && node --check widgets/internship-supervisor-assignment/grist.js && node --check widgets/internship-supervisor-assignment/app.js && node --test widgets/internship-supervisor-assignment/tests/*.test.mjs",
+    "test:internship-supervisor-assignment": "node --check widgets/internship-supervisor-assignment/assignment.js && node --check widgets/internship-supervisor-assignment/mapping.js && node --check widgets/internship-supervisor-assignment/grist.js && node --check widgets/internship-supervisor-assignment/app.js && node --test widgets/internship-supervisor-assignment/tests/*.test.mjs",
     "test": "npm run test:structure-picker && npm run test:internship-supervisor-assignment"
   }
 }
