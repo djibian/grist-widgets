@@ -1,0 +1,27 @@
+name: Répartition des suivis de stage tests
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "widgets/internship-supervisor-assignment/**"
+      - "package.json"
+      - ".github/workflows/internship-supervisor-assignment-tests.yml"
+  pull_request:
+    paths:
+      - "widgets/internship-supervisor-assignment/**"
+      - "package.json"
+      - ".github/workflows/internship-supervisor-assignment-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm run test:internship-supervisor-assignment
