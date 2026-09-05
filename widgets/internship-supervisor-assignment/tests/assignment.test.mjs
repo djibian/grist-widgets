@@ -6,6 +6,7 @@ import {
   configurationFingerprint,
   generatePlan,
   periodsForClass,
+  stageCoverage,
 } from "../assignment.js";
 
 function fixture() {
@@ -31,7 +32,6 @@ function fixture() {
       { id: 43, studentId: 11, studentLabel: "Alice", classId: 1, period: 2, teacherId: null },
       { id: 44, studentId: 12, studentLabel: "Bob", classId: 1, period: 2, teacherId: null },
     ],
-    configuration: { missingColumns: [], followupWritable: true },
   };
 }
 
@@ -43,11 +43,37 @@ test("periodsForClass exposes only periods that exist", () => {
   assert.deepEqual(periodsForClass({ periodCount: 2.5 }), []);
 });
 
-test("analysis blocks a mismatch between stages and quotas", () => {
+test("stageCoverage reports only missing stages in selected periods", () => {
   const data = fixture();
-  data.quotas[0].target = 0;
-  const analysis = analyzeClass(data, 1, [1]);
+  data.stages = data.stages.filter(row => row.id !== 44 && row.id !== 41);
+  const p2 = stageCoverage(data, 1, [2]);
+  assert.equal(p2.expectedCount, 2);
+  assert.equal(p2.presentCount, 1);
+  assert.deepEqual(p2.missing.map(row => [row.studentId, row.period]), [[12, 2]]);
+});
+
+test("analysis distinguishes missing stages from quota consistency", () => {
+  const data = fixture();
+  data.stages.pop();
+  const analysis = analyzeClass(data, 1, [2]);
+  assert.ok(analysis.errors.some(row => row.code === "MISSING_STAGES"));
+  assert.ok(!analysis.errors.some(row => row.code === "QUOTA_TOTAL_MISMATCH"));
+});
+
+test("analysis compares quotas with expected students even when rows are missing", () => {
+  const data = fixture();
+  data.stages.pop();
+  data.quotas[2].target = 0;
+  const analysis = analyzeClass(data, 1, [2]);
+  assert.ok(analysis.errors.some(row => row.code === "MISSING_STAGES"));
   assert.ok(analysis.errors.some(row => row.code === "QUOTA_TOTAL_MISMATCH"));
+});
+
+test("analysis blocks duplicate stage rows for one student and period", () => {
+  const data = fixture();
+  data.stages.push({ id: 45, studentId: 11, studentLabel: "Alice", classId: 1, period: 1, teacherId: null });
+  const analysis = analyzeClass(data, 1, [1]);
+  assert.ok(analysis.errors.some(row => row.code === "DUPLICATE_STAGE"));
 });
 
 test("analysis blocks duplicate quota rows for a teacher/class/period", () => {
@@ -124,19 +150,19 @@ test("plan is deterministic for identical data", () => {
   assert.deepEqual(a.assignments, b.assignments);
 });
 
-test("fingerprint changes when a relevant assignment changes", () => {
+test("fingerprint changes when class membership changes", () => {
   const data = fixture();
   const before = configurationFingerprint(data, 1);
-  data.stages[0].teacherId = 21;
+  data.students[0].classId = 2;
   const after = configurationFingerprint(data, 1);
   assert.notEqual(before, after);
 });
 
-test("generatePlan exposes validation issues instead of producing a partial plan", () => {
+test("generatePlan refuses to produce a partial plan when a stage is missing", () => {
   const data = fixture();
   data.stages.pop();
   assert.throws(
     () => generatePlan(data, { classId: 1, periods: [2] }),
-    error => error instanceof AssignmentError && error.issues.some(row => row.code === "QUOTA_TOTAL_MISMATCH"),
+    error => error instanceof AssignmentError && error.issues.some(row => row.code === "MISSING_STAGES"),
   );
 });
