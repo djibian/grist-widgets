@@ -12,6 +12,7 @@ import {
   initializeGrist,
   loadConfiguration,
   saveConfiguration,
+  sourceMappingSignature,
 } from "./grist.js";
 import {
   inferMappings,
@@ -154,7 +155,7 @@ function renderAnalysis() {
   }
 
   const configProblems = currentConfigurationProblems();
-  el.settingsToggle.classList.toggle("attention", configProblems.some(message => message.includes("colonne") || message.includes("référence")));
+  el.settingsToggle.classList.toggle("attention", (state.snapshot?.configuration?.mappingIssues?.length ?? 0) > 0);
   if (configProblems.length) {
     el.analysis.className = "analysis";
     el.analysis.innerHTML = `<ul class="issues">${configProblems.map(message => `<li>${esc(message)}</li>`).join("")}</ul>`;
@@ -344,7 +345,8 @@ async function refreshData({ preservePeriods = true, announce = true } = {}) {
   }
 }
 
-async function handleClassSelection(classId) {
+async function handleClassSelection(selection) {
+  const classId = selection?.classId ?? null;
   const changed = classId !== state.selectedClassId;
   state.selectedClassId = classId;
   invalidatePlan();
@@ -398,6 +400,7 @@ async function generate() {
       criteria: state.optimization,
     });
     plan.mappingSignature = mappingSignature(state.mappings);
+    plan.sourceMappingSignature = sourceMappingSignature(snapshot.configuration.sourceMappings);
     renderScope(periods);
     renderPlan(plan);
     status("Proposition calculée. Aucune donnée Grist n'a encore été modifiée.", "ok");
