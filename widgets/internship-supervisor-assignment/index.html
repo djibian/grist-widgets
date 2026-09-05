@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Répartition des suivis de stage</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <h1>Répartition des suivis de stage</h1>
+        <p>Affecter les stages aux enseignants en respectant les quotas définis dans Grist.</p>
+      </div>
+      <button id="refresh" class="icon-button" type="button" title="Actualiser" aria-label="Actualiser">↻</button>
+    </header>
+
+    <div id="config-status" class="status pending" role="status" aria-live="polite">Connexion à Grist…</div>
+
+    <section class="card">
+      <h2>1. Périmètre</h2>
+      <label class="field"><span>Classe</span><select id="class-select"></select></label>
+      <fieldset class="periods-fieldset">
+        <legend>Périodes à traiter</legend>
+        <div id="periods" class="periods"></div>
+      </fieldset>
+    </section>
+
+    <section class="card">
+      <h2>2. Optimisation</h2>
+      <p class="hint">Les quotas sont obligatoires. Les critères servent seulement à départager les solutions possibles.</p>
+
+      <div class="criterion">
+        <label class="criterion-main">
+          <input id="criterion-diversity" type="checkbox" checked>
+          <span><strong>Diversifier les enseignants</strong><small>Évite qu'un même enseignant suive plusieurs périodes du même élève.</small></span>
+        </label>
+        <label class="priority"><span>Priorité</span>
+          <select id="priority-diversity">
+            <option value="faible">Faible</option>
+            <option value="moyenne" selected>Moyenne</option>
+            <option value="forte">Forte</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="criterion disabled" aria-disabled="true">
+        <label class="criterion-main">
+          <input type="checkbox" disabled>
+          <span><strong>Proximité géographique <span class="badge">V2</span></strong><small>Activée lorsque les coordonnées des enseignants seront disponibles.</small></span>
+        </label>
+        <label class="priority"><span>Priorité</span><select disabled><option>Forte</option></select></label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. Contrôle</h2>
+      <div id="analysis" class="analysis empty">Choisis une classe et les périodes à traiter.</div>
+      <button id="generate" class="primary" type="button" disabled>Générer une proposition</button>
+    </section>
+
+    <section id="proposal-card" class="card" hidden>
+      <h2>Proposition</h2>
+      <div id="proposal-summary" class="proposal-summary"></div>
+      <details>
+        <summary>Voir le détail des affectations proposées</summary>
+        <div class="table-wrap"><table><thead><tr><th>Période</th><th>Élève</th><th>Enseignant</th></tr></thead><tbody id="proposal-details"></tbody></table></div>
+      </details>
+      <details>
+        <summary>Voir le contrôle des quotas</summary>
+        <div class="table-wrap"><table><thead><tr><th>Période</th><th>Enseignant</th><th>Objectif</th><th>Déjà</th><th>Nouveau</th><th>Total</th></tr></thead><tbody id="quota-details"></tbody></table></div>
+      </details>
+      <button id="apply" class="primary" type="button">Appliquer les affectations</button>
+      <p class="hint">Une affectation existante n'est jamais écrasée. Si les données changent, la proposition doit être régénérée.</p>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
