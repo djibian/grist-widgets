@@ -2,17 +2,26 @@
 
 Widget Grist pour affecter automatiquement les stages aux enseignants à partir de quotas exacts définis par enseignant, classe et période.
 
-## Version 1.1
+## Version 1.1.1
 
-La V1.1 renforce l'intégration au document Grist sans introduire encore l'optimisation géographique.
+La V1.1.1 utilise désormais la configuration native de Grist pour la source principale du widget.
 
-### Classe pilotée par Grist
+### Source de données native : Classe
 
-Le widget doit être associé à la table `Classe` et peut être piloté par la vue Classe grâce à **Select By**. La classe n'est plus choisie dans le widget : la ligne sélectionnée dans la vue Classe devient automatiquement le périmètre courant.
+Dans le panneau de droite de Grist :
+
+1. choisir **Classe** comme source de données du widget ;
+2. associer le champ **Classe** à la colonne qui contient le libellé de la classe ;
+3. associer le champ **Nombre de périodes de stage** à la colonne correspondante ;
+4. utiliser **Select By / Sélectionner par** avec la vue Classe souhaitée.
+
+Ces deux champs sont déclarés comme mappings obligatoires par le widget via l'API native Grist. Ils ne sont plus configurés dans le menu ⚙ du widget.
+
+La ligne sélectionnée dans la vue Classe devient automatiquement la classe courante.
 
 ### Périodes compactes
 
-Seules les périodes réellement définies par la colonne configurée comme **Nombre de périodes de stage** sont proposées. Une ou plusieurs périodes peuvent être cochées.
+Seules les périodes réellement définies par le champ natif **Nombre de périodes de stage** sont proposées. Une ou plusieurs périodes peuvent être cochées.
 
 Toutes les opérations suivantes sont strictement limitées aux périodes cochées :
 
@@ -32,23 +41,17 @@ Il compare cet ensemble aux lignes de la table `Stage`. Les lignes manquantes pe
 
 Les doublons élève × période bloquent la création et l'affectation.
 
-### Paramétrage des colonnes
+### Tables secondaires
 
-Les noms des cinq tables restent fixes :
+Les noms des tables restent fixes :
 
-- `Classe` ;
+- `Classe` — source principale native ;
 - `Eleves` ;
 - `Enseignant` ;
 - `Affectation` ;
 - `Stage`.
 
-Le bouton **⚙ Réglages** permet de choisir les colonnes utilisées pour chaque rôle fonctionnel. Le paramétrage est mémorisé dans les options du widget.
-
-Les colonnes attendues sont :
-
-**Classe**
-- libellé de la classe ;
-- nombre de périodes de stage.
+Le bouton **⚙ Réglages** ne configure plus la source `Classe`. Il sert uniquement à choisir, lorsque nécessaire, les colonnes des tables secondaires :
 
 **Eleves**
 - classe de l'élève ;
@@ -68,18 +71,18 @@ Les colonnes attendues sont :
 - période ;
 - suivi par.
 
-La V1.1 détecte automatiquement les noms utilisés dans le fichier actuel, notamment les variantes singulier/pluriel de `Nombre de stage(s) à suivre`.
+Ces mappings secondaires sont détectés automatiquement dans le fichier actuel et mémorisés dans les options du widget.
 
 ### Optimisation
 
-Les critères d'optimisation ont été déplacés dans le panneau **⚙ Réglages** afin de garder l'interface principale compacte.
+Les critères d'optimisation restent dans le panneau **⚙ Réglages** afin de garder l'interface principale compacte.
 
-La V1.1 conserve :
+La V1.1.1 conserve :
 
 - diversification des enseignants entre les périodes d'un même élève ;
 - priorité Faible / Moyenne / Forte.
 
-La proximité géographique reste affichée comme évolution future mais n'est pas active en V1.1.
+La proximité géographique reste prévue pour une évolution ultérieure.
 
 ### Sécurité des écritures
 
@@ -88,7 +91,8 @@ La proximité géographique reste affichée comme évolution future mais n'est p
 - une proposition est prévisualisée avant écriture ;
 - les données sont relues avant application ;
 - une modification intervenue entre la prévisualisation et l'application invalide la proposition ;
-- les écritures utilisent les colonnes réellement configurées, jamais des noms codés en dur.
+- un changement du mapping natif de la source `Classe` invalide également la proposition ;
+- les écritures utilisent les colonnes secondaires réellement configurées.
 
 ## Prévisualisation develop
 

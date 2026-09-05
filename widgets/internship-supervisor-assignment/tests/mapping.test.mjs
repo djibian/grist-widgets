@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { inferMappings, mappingSignature, validateMappings } from "../mapping.js";
+import { inferMappings, mappingGroups, mappingSignature, validateMappings } from "../mapping.js";
 
 function metadata() {
   const table = (columns) => ({ columns: columns.map(column => ({ writable: true, type: "Text", ...column })) });
@@ -32,17 +32,23 @@ function metadata() {
   };
 }
 
-test("inferMappings recognises the current singular quota column", () => {
+test("inferMappings recognises the current secondary columns", () => {
   const mappings = inferMappings(metadata());
   assert.equal(mappings.quotaTarget, "Nombre_de_stage_a_suivre");
   assert.equal(mappings.stageSupervisor, "Suivi_par");
+  assert.equal(Object.hasOwn(mappings, "classLabel"), false);
+  assert.equal(Object.hasOwn(mappings, "classPeriodCount"), false);
 });
 
-test("saved valid mappings take precedence over automatic detection", () => {
+test("saved valid secondary mappings take precedence over automatic detection", () => {
   const data = metadata();
-  data.tables.Classe.columns.push({ colId: "Libelle", label: "Libellé", type: "Text", writable: true });
-  const mappings = inferMappings(data, { classLabel: "Libelle" });
-  assert.equal(mappings.classLabel, "Libelle");
+  data.tables.Eleves.columns.push({ colId: "NomComplet", label: "Nom complet", type: "Text", writable: false });
+  const mappings = inferMappings(data, { studentLabel: "NomComplet" });
+  assert.equal(mappings.studentLabel, "NomComplet");
+});
+
+test("mapping groups never expose the primary Classe source", () => {
+  assert.deepEqual(mappingGroups().map(group => group.table), ["Eleves", "Enseignant", "Affectation", "Stage"]);
 });
 
 test("validateMappings checks reference targets and writable stage fields", () => {

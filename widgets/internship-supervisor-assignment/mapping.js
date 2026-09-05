@@ -1,18 +1,7 @@
-export const FIXED_TABLES = Object.freeze(["Classe", "Eleves", "Enseignant", "Affectation", "Stage"]);
+export const DOCUMENT_TABLES = Object.freeze(["Classe", "Eleves", "Enseignant", "Affectation", "Stage"]);
+export const SECONDARY_TABLES = Object.freeze(["Eleves", "Enseignant", "Affectation", "Stage"]);
 
 export const MAPPING_DEFS = Object.freeze([
-  {
-    key: "classLabel",
-    table: "Classe",
-    label: "Libellé de la classe",
-    candidates: ["Classe", "Nom", "Libelle", "Libellé"],
-  },
-  {
-    key: "classPeriodCount",
-    table: "Classe",
-    label: "Nombre de périodes de stage",
-    candidates: ["Nombre_de_periodes_de_stage", "Nombre de périodes de stage", "Nb_periodes", "Nb périodes"],
-  },
   {
     key: "studentClass",
     table: "Eleves",
@@ -122,7 +111,7 @@ export function mappingDefinition(key) {
 }
 
 export function mappingGroups() {
-  return FIXED_TABLES.map(table => ({
+  return SECONDARY_TABLES.map(table => ({
     table,
     fields: MAPPING_DEFS.filter(definition => definition.table === table),
   }));
@@ -130,7 +119,7 @@ export function mappingGroups() {
 
 export function validateMappings(metadata, mappings) {
   const issues = [];
-  for (const tableId of FIXED_TABLES) {
+  for (const tableId of DOCUMENT_TABLES) {
     if (!metadata?.tables?.[tableId]) {
       issues.push({ code: "MISSING_TABLE", table: tableId, message: `Table Grist introuvable : ${tableId}.` });
     }
