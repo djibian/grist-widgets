@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Distance routière IGN</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 21s7-5.1 7-12a7 7 0 1 0-14 0c0 6.9 7 12 7 12Z"></path>
+          <circle cx="12" cy="9" r="2.4"></circle>
+        </svg>
+      </div>
+      <div>
+        <h1>Distance routière IGN</h1>
+        <p class="subtitle">Calcul et enregistrement dans Grist</p>
+      </div>
+    </header>
+
+    <section id="mappingError" class="mapping-error" role="alert">
+      <strong>Configuration incomplète.</strong><br>
+      Dans le panneau de création Grist, associez Nom et prénom, Adresse normalisée, Latitude, Longitude et Distance routière.
+    </section>
+
+    <section id="appCard" class="card">
+      <div class="panel">
+        <p class="eyebrow">Ligne sélectionnée</p>
+        <div class="record-line">
+          <div class="route-summary">
+            <p id="recordTitle" class="route-title">Sélectionnez une ligne</p>
+            <p id="recordAddress" class="address">L’adresse apparaîtra ici.</p>
+          </div>
+          <div class="metric" aria-live="polite">
+            <div><span id="distanceValue" class="metric-value">—</span><span class="metric-unit">km</span></div>
+            <div id="durationValue" class="duration"></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="calculateSelected" class="button button-primary" type="button" disabled>Calculer cette ligne</button>
+        </div>
+
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="panel">
+        <div class="notice">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M12 11v5M12 8h.01"></path>
+          </svg>
+          <span>Le calcul utilise le réseau routier BD TOPO® de l’IGN. Seuls les deux couples de coordonnées sont transmis à l’API lors du calcul.</span>
+        </div>
+      </div>
+    </section>
+
+    <p class="footer">
+      Service de calcul :
+      <a href="https://cartes.gouv.fr/aide/fr/guides-utilisateur/utiliser-les-services-de-la-geoplateforme/calcul-itineraire/" target="_blank" rel="noreferrer">Géoplateforme IGN</a>
+    </p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
