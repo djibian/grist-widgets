@@ -2,9 +2,9 @@
 
 Widget Grist pour affecter automatiquement les stages aux enseignants à partir de quotas exacts définis par enseignant, classe et période.
 
-## Version 1.1.3
+## Version 1.1.4
 
-La V1.1.3 conserve les corrections de la V1.1.2 et corrige un défaut purement visuel : le bloc de création des stages manquants restait affiché malgré l'attribut `hidden`, car sa règle CSS `display:flex` prenait le dessus. Les blocs masqués respectent désormais systématiquement `hidden`.
+La V1.1.4 renforce la correction d'affichage des stages manquants : le bloc est désormais vidé et masqué explicitement en JavaScript lorsqu'il n'y a plus de stage manquant, et les assets du widget sont versionnés pour éviter qu'un ancien CSS ou JavaScript reste servi depuis le cache.
 
 ### Source de données native : Classe
 
