@@ -154,6 +154,9 @@ function renderScope(preferredPeriods = null) {
 function renderAnalysis() {
   el.generate.disabled = true;
   el.stageCreation.hidden = true;
+  el.stageCreation.style.display = "none";
+  el.stageCreationTitle.textContent = "";
+  el.createStages.textContent = "Créer les stages manquants";
   el.createStages.disabled = true;
 
   if (!state.snapshot) {
@@ -204,6 +207,7 @@ function renderAnalysis() {
 
   if ((analysis.missingCount ?? 0) > 0) {
     el.stageCreation.hidden = false;
+    el.stageCreation.style.display = "";
     el.stageCreationTitle.textContent = `${analysis.missingCount} stage(s) manquant(s) sur ${analysis.expectedCount} attendu(s)`;
     el.createStages.textContent = `Créer les ${analysis.missingCount} stage(s) manquant(s)`;
     const coverageErrors = analysis.errors.filter(row => row.code !== "MISSING_STAGES" && row.code !== "QUOTA_TOTAL_MISMATCH" && row.code !== "DUPLICATE_QUOTA" && row.code !== "INVALID_QUOTA_TARGET" && row.code !== "INVALID_QUOTA_TEACHER" && row.code !== "EXISTING_ASSIGNMENT_NOT_ALLOWED" && row.code !== "EXISTING_ASSIGNMENT_OVER_QUOTA");
