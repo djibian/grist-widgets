@@ -98,9 +98,14 @@ export function inferMappings(metadata, saved = {}) {
       continue;
     }
 
-    const candidateNames = new Set(definition.candidates.map(normalize));
-    const found = columns.find(column => candidateNames.has(normalize(column.colId)))
-      ?? columns.find(column => candidateNames.has(normalize(column.label)));
+    let found = null;
+    for (const candidate of definition.candidates) {
+      const wanted = normalize(candidate);
+      found = columns.find(column => normalize(column.colId) === wanted)
+        ?? columns.find(column => normalize(column.label) === wanted)
+        ?? null;
+      if (found) break;
+    }
     result[definition.key] = found?.colId ?? "";
   }
   return result;
