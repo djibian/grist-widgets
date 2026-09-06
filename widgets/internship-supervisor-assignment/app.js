@@ -100,11 +100,19 @@ function currentConfigurationProblems() {
   return state.snapshot ? configurationProblems(state.snapshot) : [];
 }
 
+function updateApplyButton() {
+  const plan = state.plan;
+  const count = plan?.assignments?.length ?? 0;
+  el.apply.disabled = !count || state.busy;
+  el.apply.textContent = count ? `Appliquer les ${count} affectation(s)` : "Rien à appliquer";
+}
+
 function setBusy(busy) {
   state.busy = busy;
   el.refresh.disabled = busy;
   el.settingsSave.disabled = busy;
   renderAnalysis();
+  updateApplyButton();
 }
 
 function renderPeriods(preferred = null) {
@@ -178,7 +186,7 @@ function renderAnalysis() {
     + metric(analysis.students?.length ?? 0, "Élèves")
     + metric(analysis.expectedCount ?? 0, "Stages attendus")
     + metric(analysis.presentCount ?? 0, "Stages présents")
-    + metric(analysis.missingCount ?? 0, "Stages manquants")
+    + ((analysis.missingCount ?? 0) > 0 ? metric(analysis.missingCount, "Stages manquants") : "")
     + "</div>";
 
   html += `<div class="control-line"><strong>${esc(periodText)}</strong> : ${analysis.existingSelectedCount ?? 0} déjà affecté(s), ${analysis.unassignedSelectedCount ?? 0} présent(s) sans enseignant.</div>`;
@@ -225,10 +233,7 @@ function renderPlan(plan) {
     `<tr><td>P${row.period}</td><td>${esc(row.teacherLabel)}</td><td>${row.target}</td><td>${row.existing}</td><td>${row.proposed}</td><td><strong>${row.total}</strong></td></tr>`
   )).join("");
 
-  el.apply.disabled = !plan.assignments.length || state.busy;
-  el.apply.textContent = plan.assignments.length
-    ? `Appliquer les ${plan.assignments.length} affectation(s)`
-    : "Rien à appliquer";
+  updateApplyButton();
 }
 
 function columnOptionLabel(column) {
@@ -362,12 +367,14 @@ async function createStages() {
   status("Création des stages manquants…", "pending");
   try {
     const result = await createMissingStages(classId, periods, state.mappings);
+    invalidatePlan();
     if (state.selectedClassId === classId) {
       state.snapshot = result.snapshot;
       state.metadata = result.snapshot.configuration.metadata;
       renderScope(periods);
+      renderAnalysis();
+      await refreshData({ preservePeriods: true, announce: false });
     }
-    invalidatePlan();
     status(
       result.createdCount ? `${result.createdCount} stage(s) créé(s).` : "Tous les stages existaient déjà.",
       "ok",

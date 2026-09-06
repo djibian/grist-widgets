@@ -12,9 +12,11 @@ function metadata() {
       ]),
       Eleves: table([
         { colId: "Classe", label: "Classe", type: "Ref:Classe" },
+        { colId: "Nom", label: "Nom", writable: true },
         { colId: "Identite", label: "Identité", writable: false },
       ]),
       Enseignant: table([
+        { colId: "Nom", label: "Nom", writable: true },
         { colId: "Identite", label: "Identité", writable: false },
       ]),
       Affectation: table([
@@ -36,6 +38,8 @@ test("inferMappings recognises the current secondary columns", () => {
   const mappings = inferMappings(metadata());
   assert.equal(mappings.quotaTarget, "Nombre_de_stage_a_suivre");
   assert.equal(mappings.stageSupervisor, "Suivi_par");
+  assert.equal(mappings.studentLabel, "Identite");
+  assert.equal(mappings.teacherLabel, "Identite");
   assert.equal(Object.hasOwn(mappings, "classLabel"), false);
   assert.equal(Object.hasOwn(mappings, "classPeriodCount"), false);
 });
@@ -65,4 +69,12 @@ test("mappingSignature is stable regardless of object insertion order", () => {
   const a = inferMappings(metadata());
   const b = Object.fromEntries(Object.entries(a).reverse());
   assert.equal(mappingSignature(a), mappingSignature(b));
+});
+
+
+test("automatic detection respects candidate priority over physical column order", () => {
+  const data = metadata();
+  const mappings = inferMappings(data);
+  assert.equal(mappings.studentLabel, "Identite");
+  assert.equal(mappings.teacherLabel, "Identite");
 });
