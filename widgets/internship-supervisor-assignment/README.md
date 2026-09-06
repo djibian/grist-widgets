@@ -2,9 +2,9 @@
 
 Widget Grist pour affecter automatiquement les stages aux enseignants à partir de quotas exacts définis par enseignant, classe et période.
 
-## Version 1.1.1
+## Version 1.1.2
 
-La V1.1.1 utilise désormais la configuration native de Grist pour la source principale du widget.
+La V1.1.2 conserve la configuration native de Grist pour la source principale et corrige trois défauts d'usage observés en test réel : le compteur de stages manquants disparaît lorsqu'il vaut zéro, l'auto-détection privilégie réellement le champ Identité, et le bouton d'application est réactivé après génération d'une proposition.
 
 ### Source de données native : Classe
 
