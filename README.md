@@ -22,3 +22,26 @@ Prévisualisation de `develop` via GitHub Pages :
 `https://djibian.github.io/grist-widgets/widgets/structure-picker/`
 
 Tests : `npm test`.
+
+## Répartition des suivis de stage
+
+Dossier : `widgets/internship-supervisor-assignment/`
+
+Version stable actuelle : **V1.1.4**.
+
+Le widget répartit les stages entre les enseignants à partir des quotas définis dans `Affectation` :
+
+- classe pilotée par la source `Classe` et la sélection Grist ;
+- périodes limitées à celles réellement définies pour la classe ;
+- création explicite des stages manquants ;
+- contrôle bloquant des incohérences ;
+- conservation stricte des suivis déjà affectés ;
+- optimisation de la diversité enseignant–élève ;
+- prévisualisation avant écriture ;
+- application sécurisée avec relecture des données avant modification.
+
+URL du widget :
+
+`https://djibian.github.io/grist-widgets/widgets/internship-supervisor-assignment/`
+
+Tests dédiés : `npm run test:internship-supervisor-assignment`.
