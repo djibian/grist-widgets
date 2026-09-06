@@ -6,6 +6,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; }
 button, select, input { font: inherit; }
 button { border: 0; border-radius: 8px; cursor: pointer; }
