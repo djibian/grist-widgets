@@ -2,7 +2,7 @@ name: Assistant Structures tests
 
 on:
   push:
-    branches: [develop]
+    branches: [main]
     paths:
       - "widgets/structure-picker/**"
       - "package.json"

@@ -2,6 +2,8 @@
 
 Collection de widgets personnalisés pour Grist.
 
+La branche `main` est la branche de référence et la source publiée par GitHub Pages.
+
 Chaque widget vit dans son propre dossier sous `widgets/` et doit rester autonome, documenté et testable indépendamment.
 
 ## Assistant Structures
@@ -15,9 +17,9 @@ L'Assistant Structures permet de rechercher, ajouter et compléter les structure
 - enrichissement SIREN/SIRET et raison sociale ;
 - géocodage IGN de l'adresse ;
 - alimentation de Latitude/Longitude pour le widget carte ;
-- mappings facultatifs prêts pour Téléphone, Courriel et Site web.
+- recherche expérimentale de contacts publics via OpenStreetMap.
 
-Prévisualisation de `develop` via GitHub Pages :
+URL du widget :
 
 `https://djibian.github.io/grist-widgets/widgets/structure-picker/`
 
@@ -53,5 +55,9 @@ Dossier : `widgets/route-distance/`
 Le widget calcule, pour la ligne sélectionnée, la distance routière et éventuellement la durée entre un domicile de départ fixe et le domicile d'un élève. Le contexte de la ligne est capturé avant l'appel réseau afin d'éviter toute écriture sur une autre ligne en cas de changement de sélection pendant le calcul.
 
 L'appel à la Géoplateforme IGN est factorisé dans `shared/services/ign-route.js` pour être réutilisable par d'autres widgets.
+
+URL du widget :
+
+`https://djibian.github.io/grist-widgets/widgets/route-distance/`
 
 Tests dédiés : `npm run test:route-distance`.
