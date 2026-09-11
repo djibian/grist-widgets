@@ -45,3 +45,13 @@ URL du widget :
 `https://djibian.github.io/grist-widgets/widgets/internship-supervisor-assignment/`
 
 Tests dédiés : `npm run test:internship-supervisor-assignment`.
+
+## Distance routière IGN
+
+Dossier : `widgets/route-distance/`
+
+Le widget calcule, pour la ligne sélectionnée, la distance routière et éventuellement la durée entre un domicile de départ fixe et le domicile d'un élève. Le contexte de la ligne est capturé avant l'appel réseau afin d'éviter toute écriture sur une autre ligne en cas de changement de sélection pendant le calcul.
+
+L'appel à la Géoplateforme IGN est factorisé dans `shared/services/ign-route.js` pour être réutilisable par d'autres widgets.
+
+Tests dédiés : `npm run test:route-distance`.
