@@ -13,6 +13,8 @@
   --warning-soft: #fffbeb;
   --purple: #6d28d9;
   --purple-soft: #f5f3ff;
+  --refresh-accent: #0ea5e9;
+  --settings-accent: #f59e0b;
 }
 
 * { box-sizing: border-box; }
@@ -110,20 +112,23 @@ kbd { color: var(--muted); font: 10px/1 ui-monospace, SFMono-Regular, Menlo, mon
 .experiment-title { margin-bottom: 4px; font-size: 13px; font-weight: 700; }
 .prototype-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 24px; padding-top: 10px; border-top: 1px solid #f1f3f5; color: #94a3b8; font-size: 10px; line-height: 1.4; }
 
-/* Cycle 2 : silhouette Minimal figée ; seule la matière de l’accent change. */
+/* Cycle 3 : silhouette Minimal + points figés ; seule la stratégie de couleur varie. */
 .icon-accented { fill: none; stroke: none; }
 .icon-accented .icon-main { fill: #334155; stroke: none; }
 .icon-accented .icon-main-stroke { fill: none; stroke: #334155; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .icon-accented .icon-main-stroke--heavy { stroke-width: 3.5; }
-.refresh-action .icon-accent { fill: #0ea5e9; stroke: none; }
-.settings-action .icon-accent { fill: #f59e0b; stroke: none; }
-.refresh-action .icon-accent-stroke { fill: none; stroke: #0ea5e9; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.settings-action .icon-accent-stroke { fill: none; stroke: #f59e0b; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.icon-accent-stroke--heavy { stroke-width: 3.5 !important; }
+.refresh-action .icon-accent { fill: var(--refresh-accent); stroke: none; }
+.settings-action .icon-accent { fill: var(--settings-accent); stroke: none; }
 .icon-action:hover .icon-main { fill: #0f172a; }
 .icon-action:hover .icon-main-stroke { stroke: #0f172a; }
-.icon-action:hover .icon-accent,
-.icon-action:hover .icon-accent-stroke { filter: saturate(1.25); }
+.icon-action:hover .icon-accent { filter: saturate(1.22); }
+
+body[data-variant="current"] { --refresh-accent: #0ea5e9; --settings-accent: #f59e0b; }
+body[data-variant="cool"] { --refresh-accent: #2563eb; --settings-accent: #8b5cf6; }
+body[data-variant="coral"] { --refresh-accent: #14b8a6; --settings-accent: #f97316; }
+body[data-variant="vivid"] { --refresh-accent: #6366f1; --settings-accent: #e11d48; }
+body[data-variant="unified"] { --refresh-accent: #2563eb; --settings-accent: #2563eb; }
+body[data-variant="graphite"] { --refresh-accent: #64748b; --settings-accent: #64748b; }
 
 @media (max-width: 720px) {
   .variant-nav { align-items: flex-start; flex-direction: column; }

@@ -10,15 +10,19 @@ La variante retenue est **F · Minimal** : symboles réduits à quelques formes 
 
 ## Cycle 2 — traitement de l’accent coloré
 
-La silhouette Minimal issue du cycle 1 est désormais figée. La taille, le poids visuel, la couleur sombre, le bleu d’`Actualiser`, l’ambre de `Réglages`, l’absence de cadre et l’interaction restent constants.
+La variante retenue est **A · Points** : accents circulaires francs, exactement comme dans la variante Minimal initiale.
 
-Seule la forme / matière de l’accent varie :
+## Cycle 3 — stratégie de couleur
 
-- `?variant=points` : points circulaires — référence exacte du choix Minimal ;
-- `?variant=squares` : petits carrés arrondis ;
-- `?variant=pills` : capsules courtes ;
-- `?variant=rings` : anneaux évidés ;
-- `?variant=micro` : micro-points très discrets ;
-- `?variant=segments` : courts segments intégrés au symbole.
+La silhouette Minimal, la forme ronde des accents, leur taille, leur position, le poids visuel et l’absence de cadre sont désormais figés.
+
+Seule la stratégie chromatique varie :
+
+- `?variant=current` : azur + ambre — référence retenue jusque-là ;
+- `?variant=cool` : bleu + violet — plus froid et numérique ;
+- `?variant=coral` : turquoise + corail — contraste chaud/froid plus vivant ;
+- `?variant=vivid` : indigo + rose — plus expressif ;
+- `?variant=unified` : bleu unique — même couleur pour les deux actions ;
+- `?variant=graphite` : graphite — aucune couleur chromatique.
 
 Aucun widget réel n’utilise encore ces styles : cette page reste une maquette d’arbitrage visuel.
