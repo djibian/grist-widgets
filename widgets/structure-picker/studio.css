@@ -37,6 +37,8 @@
   letter-spacing: .06em;
 }
 .mode-switch .tab-button { margin-right: 18px; padding-block: 11px 10px; }
+.mode-switch .tab-button.active::after { background: var(--gw-color-workflow); }
+.mode-switch .tab-badge { background: var(--gw-color-warning); }
 .tab-panel { min-height: 0; padding-top: 0; }
 .search-work-grid, .enrich-work-grid { min-height: 510px; }
 .search-main { min-width: 0; }
@@ -52,8 +54,8 @@
   width: fit-content;
   padding: 3px 7px;
   border-radius: var(--gw-radius-pill);
-  background: var(--gw-color-primary-soft);
-  color: var(--gw-color-primary-text);
+  background: var(--gw-color-workflow-soft);
+  color: var(--gw-color-workflow);
   font-size: var(--gw-font-size-xs);
   font-weight: 750;
 }

@@ -35,9 +35,11 @@ test('matérialise le flux contexte calcul vérification', () => {
   assert.match(html, /Calcul sans écriture/);
 });
 
-test('utilise le bleu pour Géoplateforme IGN et ne laisse plus de bandeau supérieur', () => {
-  assert.match(studio, /\.route-shell \{[^}]*margin-top: 0/);
-  assert.match(studio, /\.route-header \.gw-kicker \{ color: var\(--gw-color-geography\); \}/);
+test('utilise le bleu workflow et le cadre commun de 920 px', () => {
+  assert.match(studio, /\.route-shell \{ width: min\(100% - 32px, 920px\); margin-top: 0; \}/);
+  assert.match(studio, /\.route-header \.gw-kicker \{ color: var\(--gw-color-workflow\); \}/);
+  assert.match(studio, /\.context-state\.pending \{ color: var\(--gw-color-workflow\); \}/);
+  assert.match(studio, /\.route-dot--origin,[\s\S]*\.route-dot--destination[\s\S]*var\(--gw-color-workflow\)/);
 });
 
 test('sépare le calcul de l’écriture dans Grist', () => {
