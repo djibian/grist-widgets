@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Assistant Structures — icônes nues Linear</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?rev=20260912-3">
 </head>
 <body>
   <nav class="variant-nav" aria-label="Variantes d’icônes nues Linear">
@@ -13,12 +16,12 @@
       <div class="variant-nav__hint">Même interface, aucun cadre : seul le langage des pictogrammes change</div>
     </div>
     <div class="variant-nav__links">
-      <a data-variant-link="solid" href="?variant=solid">A · Plein</a>
-      <a data-variant-link="bold" href="?variant=bold">B · Épais</a>
-      <a data-variant-link="duo" href="?variant=duo">C · Bicolore</a>
-      <a data-variant-link="color" href="?variant=color">D · Couleur</a>
-      <a data-variant-link="geo" href="?variant=geo">E · Géométrique</a>
-      <a data-variant-link="accent" href="?variant=accent">F · Accent</a>
+      <a data-variant-link="solid" href="?variant=solid&rev=3">A · Plein</a>
+      <a data-variant-link="bold" href="?variant=bold&rev=3">B · Épais</a>
+      <a data-variant-link="duo" href="?variant=duo&rev=3">C · Bicolore</a>
+      <a data-variant-link="color" href="?variant=color&rev=3">D · Couleur</a>
+      <a data-variant-link="geo" href="?variant=geo&rev=3">E · Géométrique</a>
+      <a data-variant-link="accent" href="?variant=accent&rev=3">F · Accent</a>
     </div>
   </nav>
 
@@ -38,7 +41,7 @@
       </div>
     </header>
 
-    <div class="configuration"><span class="configuration__dot"></span><span>Configuration prête</span></div>
+    <div class="configuration"><span class="configuration__dot"></span><span>Configuration prête</span><span class="variant-chip" id="variant-chip" aria-live="polite"></span></div>
 
     <div class="tabs-wrap">
       <div class="tabs" role="tablist" aria-label="Fonctions de l’Assistant Structures">
@@ -102,6 +105,6 @@
     </footer>
   </main>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?rev=20260912-3"></script>
 </body>
 </html>
