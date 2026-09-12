@@ -58,6 +58,8 @@ const variant = Object.hasOwn(VARIANTS, requested) ? requested : "solid";
 document.body.dataset.variant = variant;
 document.title = `Assistant Structures — Linear ${VARIANTS[variant].label}`;
 document.getElementById("variant-description").textContent = `${VARIANTS[variant].label} · ${VARIANTS[variant].description}`;
+const variantChip = document.getElementById("variant-chip");
+if (variantChip) variantChip.textContent = `Variante chargée : ${VARIANTS[variant].label}`;
 
 document.querySelectorAll("[data-variant-link]").forEach(link => {
   const active = link.dataset.variantLink === variant;
