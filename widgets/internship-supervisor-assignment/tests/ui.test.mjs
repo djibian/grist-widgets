@@ -37,6 +37,14 @@ test('utilise les pictogrammes validés Actualiser et Paramètres', () => {
   assert.match(html, /class="gw-icon--accented"/);
 });
 
+test('rend les actions globales explicites sur desktop', () => {
+  assert.match(css, /#refresh::after/);
+  assert.match(css, /content: "Actualiser"/);
+  assert.match(css, /#settings-toggle::after/);
+  assert.match(css, /content: "Paramétrage"/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*#refresh::after,[\s\S]*#settings-toggle::after \{ display: none; \}/);
+});
+
 test('garde le CSS local centré sur le métier et les états dynamiques', () => {
   assert.match(css, /var\(--gw-color-primary\)/);
   assert.match(css, /\.status\.ok/);
