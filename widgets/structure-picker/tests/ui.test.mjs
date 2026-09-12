@@ -60,6 +60,12 @@ test("supprime la marge supérieure héritée dans le widget embarqué", () => {
   assert.match(studio, /\.app\.gw-widget-frame \{ margin: 0 auto 32px; padding: 0; \}/);
 });
 
+test("utilise le bleu workflow pour navigation et sources, l'ambre pour l'attention", () => {
+  assert.match(studio, /\.mode-switch \.tab-button\.active::after \{ background: var\(--gw-color-workflow\); \}/);
+  assert.match(studio, /\.decision-source[\s\S]*background: var\(--gw-color-workflow-soft\);[\s\S]*color: var\(--gw-color-workflow\)/);
+  assert.match(studio, /\.mode-switch \.tab-badge \{ background: var\(--gw-color-warning\); \}/);
+});
+
 test("le compteur de table conserve le pictogramme bâtiment", () => {
   assert.match(html, /id="table-counter"/);
   assert.match(html, /class="table-counter-icon"/);
