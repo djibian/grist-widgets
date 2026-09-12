@@ -22,13 +22,25 @@ Principes :
 
 HTML, CSS et JavaScript natifs ; aucune dépendance d'exécution ni étape de build. Les tokens et classes partagés sont préfixés `gw`.
 
-Ordre de chargement recommandé : `tokens.css`, puis `base.css`, puis `components.css`. Un widget conserve ensuite sa feuille `style.css` locale pour sa mise en page et ses éléments métier.
+Ordre de chargement recommandé : `tokens.css`, puis `base.css`, puis `components.css`, puis `structure.css`. Un widget conserve ensuite sa feuille `style.css` locale pour ses éléments métier ; une feuille locale complémentaire peut préciser une composition spécifique sans redéfinir le socle.
+
+`structure.css` porte les grands motifs de composition Grist Studio :
+
+- `gw-widget-frame` et `gw-widget-header` — cadre et identité du widget ;
+- `gw-context-strip` / `gw-context-item` — contexte Grist permanent ;
+- `gw-work-section` ou `gw-work-grid` — espace de travail ;
+- `gw-decision-panel` — vérification ou décision avant action ;
+- `gw-step-heading` — étapes explicites du flux ;
+- `gw-action-dock` / `gw-validation-bar` — action dominante et validation.
+
+Ces classes doivent porter la structure commune. Le CSS local ne doit conserver que les éléments réellement propres au métier du widget.
 
 ## Fichiers
 
 - `tokens.css` — couleurs, typographie, espacements, rayons, ombres et accents fonctionnels ;
 - `base.css` — canvas, base typographique, focus et réduction des animations ;
 - `components.css` — boutons, actions d'en-tête, cartes, statuts, badges, formulaires, métriques et tables ;
+- `structure.css` — composition `contexte → travail → validation` ;
 - `icons.js` — définitions SVG partagées ;
 - `demo/` — démonstrations et références visuelles.
 
