@@ -1,58 +1,17 @@
-.gw-shell {
-  width: min(100% - 32px, 920px);
-  margin: 32px auto 44px;
-}
-
-.gw-stack { display: grid; gap: var(--gw-space-4); }
-.gw-cluster { display: flex; flex-wrap: wrap; gap: var(--gw-space-2); align-items: center; }
-.gw-split { display: flex; justify-content: space-between; gap: var(--gw-space-4); align-items: flex-start; }
-
-.gw-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--gw-space-6);
-}
-
 .gw-kicker {
   margin-bottom: 5px;
   color: var(--gw-color-text-faint);
   font-size: var(--gw-font-size-xs);
   font-weight: 760;
-  letter-spacing: 0.08em;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
-
 .gw-header__title { margin-bottom: var(--gw-space-1); }
 .gw-header__subtitle {
   margin: 0;
   color: var(--gw-color-text-muted);
   font-size: var(--gw-font-size-md);
   line-height: var(--gw-line-height-normal);
-}
-
-.gw-card {
-  border: 1px solid var(--gw-color-border);
-  border-radius: var(--gw-radius-lg);
-  background: var(--gw-color-surface);
-  box-shadow: var(--gw-shadow-card);
-  padding: 18px 20px 14px;
-}
-
-.gw-card--subtle { background: var(--gw-color-surface-subtle); }
-.gw-card__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--gw-space-3);
-  margin-bottom: var(--gw-space-3);
-}
-
-.gw-divider {
-  height: 1px;
-  border: 0;
-  background: var(--gw-color-border-subtle);
-  margin: var(--gw-space-4) 0;
 }
 
 .gw-button,
@@ -65,21 +24,18 @@
   font-weight: 700;
   transition: background-color var(--gw-transition-fast), border-color var(--gw-transition-fast), color var(--gw-transition-fast), box-shadow var(--gw-transition-fast);
 }
-
 .gw-button {
   min-height: 34px;
   padding: 8px 11px;
   border-radius: var(--gw-radius-sm);
-  font-size: 0.6875rem;
+  font-size: .6875rem;
 }
-
 .gw-button:disabled,
 .gw-icon-button:disabled,
 .gw-tool-button:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: .5;
 }
-
 .gw-button--primary {
   border-color: var(--gw-color-primary);
   background: var(--gw-color-primary);
@@ -90,7 +46,6 @@
   border-color: var(--gw-color-primary-hover);
   background: var(--gw-color-primary-hover);
 }
-
 .gw-button--secondary {
   border-color: var(--gw-color-border);
   background: var(--gw-color-surface);
@@ -100,9 +55,6 @@
   background: var(--gw-color-surface-subtle);
   color: var(--gw-color-text);
 }
-
-.gw-button--ghost { color: var(--gw-color-primary); }
-.gw-button--ghost:hover:not(:disabled) { background: var(--gw-color-primary-soft); }
 
 .gw-icon-button {
   display: inline-grid;
@@ -118,7 +70,6 @@
 .gw-icon-button:active:not(:disabled) { background: var(--gw-color-icon-active-bg); }
 .gw-icon-button svg { width: 20px; height: 20px; overflow: visible; }
 
-/* Secondary widget-wide actions: labelled on desktop, icon-only when space is scarce. */
 .gw-tool-button {
   display: inline-flex;
   min-height: 32px;
@@ -156,25 +107,10 @@
   font-size: var(--gw-font-size-sm);
   line-height: var(--gw-line-height-normal);
 }
-.gw-status--info {
-  border-color: var(--gw-color-info-border);
-  background: var(--gw-color-info-soft);
-  color: var(--gw-color-info);
-}
-.gw-status--success {
-  border-color: var(--gw-color-success-border);
-  background: var(--gw-color-success-soft);
-  color: var(--gw-color-success);
-}
 .gw-status--warning {
   border-color: var(--gw-color-warning-border);
   background: var(--gw-color-warning-soft);
   color: var(--gw-color-warning);
-}
-.gw-status--danger {
-  border-color: var(--gw-color-danger-border);
-  background: var(--gw-color-danger-soft);
-  color: var(--gw-color-danger);
 }
 
 .gw-badge {
@@ -189,17 +125,10 @@
   font-size: var(--gw-font-size-xs);
   font-weight: 750;
 }
-.gw-badge--primary { background: var(--gw-color-primary-soft); color: var(--gw-color-primary-text); }
-.gw-badge--success { background: var(--gw-color-success-soft); color: var(--gw-color-success); }
-.gw-badge--warning { background: var(--gw-color-warning-soft); color: var(--gw-color-warning); }
 .gw-badge--experimental { background: var(--gw-color-experimental-soft); color: var(--gw-color-experimental); }
 
-.gw-field { display: grid; gap: var(--gw-space-2); }
-.gw-field__label { font-size: var(--gw-font-size-sm); font-weight: 700; }
-.gw-field__help { margin: 0; color: var(--gw-color-text-muted); font-size: var(--gw-font-size-xs); }
 .gw-input,
-.gw-select,
-.gw-textarea {
+.gw-select {
   width: 100%;
   border: 1px solid #ccd8d1;
   border-radius: var(--gw-radius-md);
@@ -209,45 +138,14 @@
   outline: none;
 }
 .gw-input:focus,
-.gw-select:focus,
-.gw-textarea:focus {
+.gw-select:focus {
   border-color: #77bda7;
   box-shadow: var(--gw-focus-ring);
 }
 .gw-input:disabled,
-.gw-select:disabled,
-.gw-textarea:disabled {
+.gw-select:disabled {
   background: var(--gw-color-surface-subtle);
   color: var(--gw-color-text-faint);
-}
-
-.gw-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--gw-space-2);
-}
-.gw-metric {
-  padding: 10px 11px;
-  border: 1px solid var(--gw-color-border-subtle);
-  border-radius: var(--gw-radius-md);
-  background: #fbfcfb;
-}
-.gw-metric__value {
-  display: block;
-  font-size: var(--gw-font-size-lg);
-  font-weight: 760;
-  font-variant-numeric: tabular-nums;
-}
-.gw-metric__label { color: var(--gw-color-text-muted); font-size: var(--gw-font-size-xs); }
-
-.gw-empty-state {
-  padding: var(--gw-space-5);
-  border: 1px dashed var(--gw-color-border);
-  border-radius: var(--gw-radius-md);
-  background: var(--gw-color-surface-subtle);
-  color: var(--gw-color-text-muted);
-  text-align: center;
-  font-size: var(--gw-font-size-sm);
 }
 
 .gw-table-wrap { overflow-x: auto; }
@@ -256,16 +154,7 @@
 .gw-table td { padding: 8px 9px; text-align: left; border-bottom: 1px solid var(--gw-color-border-subtle); }
 .gw-table th { color: var(--gw-color-text-muted); font-size: var(--gw-font-size-xs); font-weight: 750; }
 
-.gw-muted { color: var(--gw-color-text-muted); }
-.gw-small { font-size: var(--gw-font-size-sm); }
-
 @media (max-width: 720px) {
-  .gw-shell {
-    width: min(100% - 20px, 920px);
-    margin-top: 14px;
-  }
-  .gw-card { padding: 15px; }
-  .gw-header { gap: var(--gw-space-4); }
   .gw-tool-button {
     width: 32px;
     padding: 0;
