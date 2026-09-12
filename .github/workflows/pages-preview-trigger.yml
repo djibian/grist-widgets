@@ -1,0 +1,20 @@
+name: Request Pages preview rebuild
+
+on:
+  push:
+    branches:
+      - contacts-resolver
+      - "preview/**"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  request:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Pages workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
