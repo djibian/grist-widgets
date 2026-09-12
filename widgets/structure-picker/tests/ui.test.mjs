@@ -80,9 +80,9 @@ test("conserve explicitement l’expérimentation Contacts publics", () => {
   assert.match(css, /--gw-color-experimental-border/);
 });
 
-test("applique le langage Linear aux onglets et aux résultats", () => {
+test("applique Grist Studio aux onglets et aux résultats", () => {
   assert.match(css, /\.tab-button\.active::after/);
   assert.match(css, /background: var\(--gw-color-primary\)/);
   assert.match(css, /\.result-card:hover/);
-  assert.match(css, /border-top: 1px solid #f0f2f4/);
+  assert.match(css, /border-top: 1px solid var\(--gw-color-border-subtle\)/);
 });

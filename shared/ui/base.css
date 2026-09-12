@@ -13,7 +13,9 @@ body {
   margin: 0;
   min-width: 300px;
   min-height: 100vh;
-  background: var(--gw-color-bg);
+  background:
+    radial-gradient(circle at 14% 5%, rgb(255 255 255 / 72%), transparent 26rem),
+    linear-gradient(180deg, #f5f8f6 0, var(--gw-color-bg) 22rem);
   color: var(--gw-color-text);
   font-size: var(--gw-font-size-md);
   line-height: var(--gw-line-height-normal);
@@ -37,14 +39,15 @@ p { margin-top: 0; }
 h1 {
   margin-bottom: var(--gw-space-1);
   font-size: var(--gw-font-size-xl);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
 }
 
 h2 {
   margin-bottom: var(--gw-space-1);
   font-size: var(--gw-font-size-lg);
   line-height: var(--gw-line-height-tight);
+  letter-spacing: -0.015em;
 }
 
 h3 {
@@ -59,7 +62,7 @@ h3 {
 }
 
 :focus-visible {
-  outline: 2px solid #93c5fd;
+  outline: 2px solid #77bda7;
   outline-offset: 2px;
 }
 
