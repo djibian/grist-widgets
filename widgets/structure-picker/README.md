@@ -4,13 +4,24 @@ Widget Grist unique pour **rechercher, ajouter et compléter** les structures de
 
 L’interface sépare les deux usages principaux dans deux onglets fixes : **Rechercher / ajouter** et **Compléter la sélection**.
 
+## Départements recherchés
+
+Le périmètre géographique du widget est configurable. Par défaut, un document qui n’a encore enregistré aucune option utilise :
+
+- `44 — Loire-Atlantique` ;
+- `85 — Vendée`.
+
+Le bouton **Départements** dans l’en-tête permet de rechercher un département par numéro ou par nom, puis de l’ajouter ou de le retirer. Au moins un département doit rester sélectionné.
+
+La liste est enregistrée dans les **options natives du Custom Widget Grist**. Elle est immédiatement utilisée par les recherches dans l’Annuaire des Entreprises et par leur filtrage. Elle servira également de périmètre aux futurs index de contacts, sans que cette étape ne génère encore ces index.
+
 ## APIs publiques utilisées
 
 ### Annuaire des Entreprises
 
 `https://recherche-entreprises.api.gouv.fr/search`
 
-- recherche des établissements actifs du 44 et du 85 ;
+- recherche des établissements actifs dans les départements configurés ;
 - récupération du SIRET, de la raison sociale, de l’adresse et, lorsqu’elles existent, des coordonnées.
 
 ### Géocodage IGN / Géoplateforme
@@ -62,7 +73,7 @@ Lorsque la configuration est valide, aucun grand message de confirmation n’est
 
 ## Rechercher / ajouter
 
-La recherche interroge la table Grist complète puis l’Annuaire des Entreprises pour les établissements actifs du 44/85. Les doublons sont contrôlés par SIREN/SIRET.
+La recherche interroge la table Grist complète puis l’Annuaire des Entreprises pour les établissements actifs des départements configurés. Les doublons sont contrôlés par SIREN/SIRET.
 
 Le bouton de création manuelle prépare une nouvelle ligne dans Grist ; la saisie elle-même reste effectuée dans la vue Grist.
 

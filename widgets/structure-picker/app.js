@@ -28,6 +28,12 @@ import {
   enterpriseSearchContext,
   selectedChanges,
 } from "./enrichment.js";
+import {
+  formatDepartmentCodes,
+  formatDepartmentScope,
+  getActiveDepartments,
+  onDepartmentsChanged,
+} from "./departments.js";
 
 const MIN_QUERY_LENGTH = 3;
 const EXTERNAL_DEBOUNCE_MS = 1200;
@@ -46,6 +52,7 @@ const ui = {
   localResults: document.getElementById("local-results"),
   externalResults: document.getElementById("external-results"),
   externalStatus: document.getElementById("external-status"),
+  externalScopeHelp: document.getElementById("external-scope-help"),
   localCount: document.getElementById("local-count"),
   externalCount: document.getElementById("external-count"),
   enrichButton: document.getElementById("enrich-button"),
@@ -229,7 +236,7 @@ function renderExternal(candidates) {
   const results = filterAgainstCurrentTable(candidates);
   ui.externalCount.textContent = results.length ? `${results.length} résultat${results.length > 1 ? "s" : ""}` : "";
   if (!results.length) {
-    ui.externalResults.append(emptyMessage("Aucune nouvelle structure active trouvée en Loire-Atlantique ou Vendée."));
+    ui.externalResults.append(emptyMessage(`Aucune nouvelle structure active trouvée dans ${formatDepartmentScope(getActiveDepartments())}.`));
     return;
   }
 
@@ -247,7 +254,8 @@ function renderExternal(candidates) {
 }
 
 function cacheKey(query, options = {}) {
-  return `${CACHE_PREFIX}${normalize(query)}:${String(options.codePostal ?? "")}`;
+  const departments = getActiveDepartments().join(",");
+  return `${CACHE_PREFIX}${departments}:${normalize(query)}:${String(options.codePostal ?? "")}`;
 }
 
 function readCache(query, options) {
@@ -324,7 +332,7 @@ async function runExternalSearch(query, generation) {
   if (!state.configured || normalize(query).length < MIN_QUERY_LENGTH) return;
   state.controller?.abort();
   state.controller = new AbortController();
-  setStatus(ui.externalStatus, "Recherche dans l’Annuaire des Entreprises (44 et 85)…");
+  setStatus(ui.externalStatus, `Recherche dans l’Annuaire des Entreprises (${formatDepartmentCodes(getActiveDepartments())})…`);
   try {
     const { items, cached } = await fetchExternal(query, state.controller.signal);
     if (generation !== state.searchGeneration) return;
@@ -708,6 +716,11 @@ function selectionChanged(rowId, mappings) {
   renderSelectedSummary();
 }
 
+function updateDepartmentScope() {
+  if (!ui.externalScopeHelp) return;
+  ui.externalScopeHelp.textContent = `Résultats actifs de l’Annuaire des Entreprises dans ${formatDepartmentScope(getActiveDepartments())}.`;
+}
+
 ui.search.addEventListener("input", scheduleSearch);
 ui.enrichButton.addEventListener("click", runEnrichment);
 ui.manualCreate.addEventListener("click", async () => {
@@ -719,6 +732,12 @@ ui.manualCreate.addEventListener("click", async () => {
     setStatus(ui.globalStatus, "Impossible de préparer une nouvelle ligne dans Grist.", "error");
   }
 });
+
+onDepartmentsChanged(() => {
+  updateDepartmentScope();
+  scheduleSearch();
+});
+updateDepartmentScope();
 
 setConfigured(false, "Connexion à Grist…");
 initializeGrist();

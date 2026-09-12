@@ -1,5 +1,9 @@
-const DEFAULT_DEPARTMENTS = ["44", "85"];
-export const DEPARTMENTS = Object.freeze([...DEFAULT_DEPARTMENTS]);
+import {
+  departmentFromPostalCode,
+  getActiveDepartments,
+  normalizeDepartmentCode,
+} from "./departments.js";
+
 export const LOCAL_LIMIT = 8;
 export const EXTERNAL_LIMIT = 10;
 
@@ -160,13 +164,12 @@ export function searchLocal(rows, query, limit = LOCAL_LIMIT) {
 }
 
 export function departmentOf(establishment) {
-  const explicit = String(establishment?.departement ?? "").trim().toUpperCase();
+  const explicit = normalizeDepartmentCode(establishment?.departement);
   if (explicit) return explicit;
-  const codePostal = String(establishment?.code_postal ?? "").trim();
-  return /^\d{5}$/.test(codePostal) ? codePostal.slice(0, 2) : "";
+  return departmentFromPostalCode(establishment?.code_postal);
 }
 
-export function isAllowedDepartment(establishment, departments = DEPARTMENTS) {
+export function isAllowedDepartment(establishment, departments = getActiveDepartments()) {
   return departments.includes(departmentOf(establishment));
 }
 
@@ -177,10 +180,10 @@ function firstNonEmpty(values) {
   return "";
 }
 
-export function candidateFrom(unit, establishment) {
+export function candidateFrom(unit, establishment, departments = getActiveDepartments()) {
   if (!establishment?.siret) return null;
   if (establishment.etat_administratif && establishment.etat_administratif !== "A") return null;
-  if (!isAllowedDepartment(establishment)) return null;
+  if (!isAllowedDepartment(establishment, departments)) return null;
 
   const enseigne = Array.isArray(establishment.liste_enseignes) ? firstNonEmpty(establishment.liste_enseignes) : "";
   const nomUsuelPublic = firstNonEmpty([enseigne, establishment.nom_commercial]);
@@ -232,7 +235,7 @@ export function candidateIsAlreadyLocal(candidate, localIdentifiers) {
   return false;
 }
 
-export function flattenExternalResults(payload, localIdentifiers = new Set(), limit = EXTERNAL_LIMIT) {
+export function flattenExternalResults(payload, localIdentifiers = new Set(), limit = EXTERNAL_LIMIT, departments = getActiveDepartments()) {
   const candidates = [];
   const seenSirets = new Set();
 
@@ -241,7 +244,7 @@ export function flattenExternalResults(payload, localIdentifiers = new Set(), li
     if (!establishments.length && unit.siege) establishments = [unit.siege];
 
     for (const establishment of establishments) {
-      const candidate = candidateFrom(unit, establishment);
+      const candidate = candidateFrom(unit, establishment, departments);
       if (!candidate) continue;
       const siret = normalizeIdentifier(candidate.siret);
       if (!siret || seenSirets.has(siret) || candidateIsAlreadyLocal(candidate, localIdentifiers)) continue;
@@ -253,10 +256,10 @@ export function flattenExternalResults(payload, localIdentifiers = new Set(), li
   return candidates;
 }
 
-export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10, codePostal = "" } = {}) {
+export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10, codePostal = "", departments = getActiveDepartments() } = {}) {
   const params = new URLSearchParams({
     q: String(query ?? "").trim(),
-    departement: DEPARTMENTS.join(","),
+    departement: departments.join(","),
     etat_administratif: "A",
     minimal: "true",
     include: "matching_etablissements,siege",

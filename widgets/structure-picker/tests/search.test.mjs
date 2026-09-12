@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildExternalSearchUrl, candidateFrom, extractLocationFromAddress, flattenExternalResults, normalize, searchLocal } from "../search.js";
+import { DEFAULT_DEPARTMENTS, setActiveDepartments } from "../departments.js";
 
 test("normalize handles accents and punctuation", () => {
   assert.equal(normalize("  Lycée Saint-Martin, Machecoul ! "), "lycee saint martin machecoul");
@@ -50,4 +51,22 @@ test("external URL supports postal-code disambiguation", () => {
   const url = new URL(buildExternalSearchUrl("Garage Martin", { codePostal: "44270" }));
   assert.equal(url.searchParams.get("departement"), "44,85");
   assert.equal(url.searchParams.get("code_postal"), "44270");
+});
+
+test("DINUM search and filtering use the configured departments", () => {
+  try {
+    setActiveDepartments(["49"]);
+    const url = new URL(buildExternalSearchUrl("Garage Martin"));
+    assert.equal(url.searchParams.get("departement"), "49");
+
+    const payload = { results: [{ siren: "222222222", nom_raison_sociale: "TEST", matching_etablissements: [
+      { siret: "22222222200011", etat_administratif: "A", code_postal: "49000" },
+      { siret: "22222222200022", etat_administratif: "A", code_postal: "44000" },
+    ] }] };
+    const candidates = flattenExternalResults(payload);
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].departement, "49");
+  } finally {
+    setActiveDepartments(DEFAULT_DEPARTMENTS);
+  }
 });
