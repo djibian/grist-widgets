@@ -1,7 +1,7 @@
 /* Grist Studio structural grammar: context -> work -> validation. */
 .gw-widget-frame {
   width: min(100% - 32px, 920px);
-  margin: 32px auto 44px;
+  margin: 0 auto 32px;
   overflow: hidden;
   border: 1px solid var(--gw-color-border);
   border-radius: var(--gw-radius-xl);
@@ -18,20 +18,27 @@
 }
 .gw-widget-heading { display: flex; min-width: 0; gap: 12px; align-items: flex-start; }
 .gw-widget-heading__text { min-width: 0; }
+
+/* Shared Grist Studio mark. The four tiles are drawn in CSS so every widget
+   gets exactly the same identity without maintaining widget-specific icons. */
 .gw-widget-icon {
-  display: grid;
-  place-items: center;
   width: 38px;
   height: 38px;
   flex: 0 0 auto;
   border-radius: 12px;
-  background: var(--gw-color-primary-soft);
-  color: var(--gw-color-primary);
-  font-size: 18px;
-  font-weight: 800;
+  background:
+    linear-gradient(#dfe7e2 0 0) 9px 9px / 8px 8px no-repeat,
+    linear-gradient(#79d4b7 0 0) 21px 9px / 8px 8px no-repeat,
+    linear-gradient(#79d4b7 0 0) 9px 21px / 8px 8px no-repeat,
+    linear-gradient(#dfe7e2 0 0) 21px 21px / 8px 8px no-repeat,
+    var(--gw-color-text);
+  color: transparent;
+  font-size: 0;
+  box-shadow: 0 8px 24px rgb(24 35 29 / 15%);
+  overflow: hidden;
 }
-.gw-widget-icon--organization { background: var(--gw-color-warning-soft); color: var(--gw-color-organization); }
-.gw-widget-icon--geography { background: var(--gw-color-info-soft); color: var(--gw-color-geography); }
+.gw-widget-icon--organization,
+.gw-widget-icon--geography { color: transparent; }
 .gw-widget-tools { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
 
 .gw-context-strip {
@@ -75,7 +82,7 @@
 .gw-step-heading__index {
   display: block;
   margin-bottom: 4px;
-  color: var(--gw-color-primary);
+  color: var(--gw-color-geography);
   font-size: var(--gw-font-size-xs);
   font-weight: 800;
   letter-spacing: .08em;
@@ -133,9 +140,19 @@
 }
 
 @media (max-width: 720px) {
-  .gw-widget-frame { width: min(100% - 20px, 920px); margin-top: 14px; }
+  .gw-widget-frame { width: min(100% - 20px, 920px); margin-top: 0; }
   .gw-widget-header { gap: 12px; padding: 18px 16px 15px; }
-  .gw-widget-icon { width: 34px; height: 34px; border-radius: 10px; }
+  .gw-widget-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background:
+      linear-gradient(#dfe7e2 0 0) 8px 8px / 7px 7px no-repeat,
+      linear-gradient(#79d4b7 0 0) 19px 8px / 7px 7px no-repeat,
+      linear-gradient(#79d4b7 0 0) 8px 19px / 7px 7px no-repeat,
+      linear-gradient(#dfe7e2 0 0) 19px 19px / 7px 7px no-repeat,
+      var(--gw-color-text);
+  }
   .gw-context-strip { grid-template-columns: 1fr; }
   .gw-context-item + .gw-context-item { border-left: 0; border-top: 1px solid var(--gw-color-border-subtle); }
   .gw-work-section { padding: 18px 16px; }
