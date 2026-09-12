@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grist Studio — proposition d’identité</title>
+  <link rel="stylesheet" href="studio.css">
+</head>
+<body>
+  <main class="concept-shell">
+    <header class="concept-header">
+      <div class="concept-brand">
+        <span class="studio-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <div>
+          <p class="concept-kicker">Proposition d’identité · 2026</p>
+          <h1>Grist Studio</h1>
+          <p>Une interface de travail calme, lisible et orientée décision pour tous les widgets du dépôt.</p>
+        </div>
+      </div>
+      <div class="concept-principles" aria-label="Principes de design">
+        <span>Contexte visible</span><span>Action évidente</span><span>Résultat vérifiable</span>
+      </div>
+    </header>
+
+    <nav class="demo-switcher" aria-label="Choisir un widget de démonstration">
+      <button class="demo-tab is-active" type="button" data-demo="structures">Assistant structures</button>
+      <button class="demo-tab" type="button" data-demo="stages">Affectation stages</button>
+      <button class="demo-tab" type="button" data-demo="distance">Distance IGN</button>
+    </nav>
+
+    <section class="widget-frame" aria-live="polite">
+      <article class="widget-demo is-active" data-panel="structures">
+        <header class="widget-header">
+          <div class="widget-title-group">
+            <div class="widget-icon widget-icon--jade" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 7.5h14M7.5 5v5M16.5 5v5M6 14h5M6 18h8"/></svg>
+            </div>
+            <div><p class="eyebrow">Données établissement</p><h2>Assistant structures</h2><p>Retrouver une entreprise et fiabiliser la fiche Grist.</p></div>
+          </div>
+          <div class="widget-tools"><button class="icon-btn" aria-label="Actualiser">↻</button><button class="icon-btn" aria-label="Réglages">⌘</button></div>
+        </header>
+
+        <div class="context-strip">
+          <div><span>Contexte Grist</span><strong>Stage · Camille Martin</strong></div>
+          <div><span>État</span><strong class="state-ok"><i></i> Synchronisé</strong></div>
+          <div><span>Fiche</span><strong>3 champs à vérifier</strong></div>
+        </div>
+
+        <div class="work-grid">
+          <section class="work-main">
+            <div class="section-heading"><div><p class="step-label">01 · Rechercher</p><h3>Quelle structure cherchez-vous ?</h3></div><span class="quiet-badge">44 + 85</span></div>
+            <label class="search-box"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg><input value="Garage Martin Machecoul" aria-label="Recherche de structure"><kbd>↵</kbd></label>
+            <p class="field-help">Nom usuel, commune, adresse, SIREN ou SIRET.</p>
+
+            <div class="results-list">
+              <button class="result-row is-selected" type="button">
+                <span class="result-check">✓</span>
+                <span><strong>Garage Martin Automobiles</strong><small>12 rue des Prés · 44270 Machecoul-Saint-Même</small><em>SIRET 812 345 678 00019</em></span>
+                <span class="match">Meilleur résultat</span>
+              </button>
+              <button class="result-row" type="button">
+                <span class="result-check"></span>
+                <span><strong>Martin Auto Services</strong><small>6 avenue de Nantes · 44270 Machecoul-Saint-Même</small><em>SIRET 901 234 567 00024</em></span>
+                <span class="match match--muted">Autre résultat</span>
+              </button>
+            </div>
+          </section>
+
+          <aside class="decision-panel">
+            <p class="step-label">02 · Vérifier</p>
+            <h3>Mise à jour proposée</h3>
+            <p class="decision-intro">Seules les différences utiles sont montrées.</p>
+            <div class="change-row"><span class="change-icon">A</span><div><small>Raison sociale</small><strong>Garage Martin Automobiles</strong></div><span class="change-state">Modifier</span></div>
+            <div class="change-row"><span class="change-icon">⌖</span><div><small>Adresse</small><strong>12 rue des Prés, 44270 Machecoul-Saint-Même</strong></div><span class="change-state">Modifier</span></div>
+            <div class="change-row change-row--quiet"><span class="change-icon">#</span><div><small>SIRET</small><strong>812 345 678 00019</strong></div><span class="change-state change-state--ok">Déjà correct</span></div>
+            <div class="action-dock"><button class="secondary-btn" type="button">Ignorer</button><button class="primary-btn" type="button">Appliquer 2 modifications</button></div>
+          </aside>
+        </div>
+      </article>
+
+      <article class="widget-demo" data-panel="stages">
+        <header class="widget-header">
+          <div class="widget-title-group">
+            <div class="widget-icon widget-icon--amber" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 8h14v10H5zM9 8V5h6v3M8 12h8M8 15h5"/></svg>
+            </div>
+            <div><p class="eyebrow">Organisation pédagogique</p><h2>Affectation des suivis de stage</h2><p>Construire une répartition équilibrée et contrôlable.</p></div>
+          </div>
+          <div class="widget-tools"><button class="icon-btn" aria-label="Actualiser">↻</button><button class="icon-btn" aria-label="Réglages">⌘</button></div>
+        </header>
+
+        <div class="context-strip">
+          <div><span>Classe</span><strong>Première professionnelle</strong></div>
+          <div><span>Périodes</span><strong>P1 · P2</strong></div>
+          <div><span>État</span><strong class="state-ok"><i></i> Données cohérentes</strong></div>
+        </div>
+
+        <section class="stage-work">
+          <div class="metrics-row"><div><strong>20</strong><span>élèves</span></div><div><strong>40</strong><span>stages attendus</span></div><div><strong>40</strong><span>stages présents</span></div><div class="metric-accent"><strong>0</strong><span>anomalie bloquante</span></div></div>
+          <div class="section-heading stage-heading"><div><p class="step-label">01 · Paramétrer</p><h3>Quelle répartition voulez-vous calculer ?</h3></div><div class="period-pills"><button class="period-pill is-on">P1</button><button class="period-pill is-on">P2</button><button class="period-pill">P3</button></div></div>
+          <div class="assignment-list">
+            <div class="assignment-row"><span class="avatar">AB</span><div><strong>A. Bernard</strong><small>Sciences</small></div><div class="load"><span style="--load:68%"></span></div><strong>7</strong><small>stages</small></div>
+            <div class="assignment-row"><span class="avatar">CM</span><div><strong>C. Moreau</strong><small>EPS</small></div><div class="load"><span style="--load:58%"></span></div><strong>6</strong><small>stages</small></div>
+            <div class="assignment-row"><span class="avatar">EL</span><div><strong>E. Leroy</strong><small>Mathématiques</small></div><div class="load"><span style="--load:49%"></span></div><strong>5</strong><small>stages</small></div>
+            <div class="assignment-row"><span class="avatar">NP</span><div><strong>N. Petit</strong><small>Économie</small></div><div class="load"><span style="--load:49%"></span></div><strong>5</strong><small>stages</small></div>
+          </div>
+          <div class="validation-bar"><div><span class="validation-dot"></span><div><strong>Répartition calculable</strong><small>Les contraintes connues peuvent être respectées.</small></div></div><button class="primary-btn" type="button">Calculer une proposition</button></div>
+        </section>
+      </article>
+
+      <article class="widget-demo" data-panel="distance">
+        <header class="widget-header">
+          <div class="widget-title-group">
+            <div class="widget-icon widget-icon--blue" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M6 18c3-4 5-7 5-10a4 4 0 1 1 8 0c0 4-5 9-5 9M8 18h8M15 8h.01"/></svg>
+            </div>
+            <div><p class="eyebrow">Géoplateforme IGN</p><h2>Distance routière</h2><p>Calculer puis enregistrer la distance liée à la ligne sélectionnée.</p></div>
+          </div>
+          <div class="widget-tools"><button class="icon-btn" aria-label="Actualiser">↻</button></div>
+        </header>
+
+        <div class="context-strip">
+          <div><span>Ligne Grist</span><strong>Camille Martin</strong></div>
+          <div><span>Destination</span><strong>Garage Martin Automobiles</strong></div>
+          <div><span>État</span><strong class="state-ok"><i></i> Coordonnées prêtes</strong></div>
+        </div>
+
+        <div class="distance-work">
+          <section class="route-card">
+            <div class="route-endpoint"><span class="route-dot route-dot--start"></span><div><small>Départ</small><strong>Lycée Saint-Martin</strong><p>Machecoul-Saint-Même</p></div></div>
+            <div class="route-line"><span></span><em>Itinéraire routier IGN</em></div>
+            <div class="route-endpoint"><span class="route-dot route-dot--end"></span><div><small>Arrivée</small><strong>Garage Martin Automobiles</strong><p>12 rue des Prés, Machecoul-Saint-Même</p></div></div>
+          </section>
+          <aside class="distance-summary"><p class="step-label">Résultat</p><div class="big-metric"><strong>18,4</strong><span>km</span></div><p class="time-metric">≈ 24 min</p><div class="calculation-note">BD TOPO® · seules les coordonnées sont transmises au service IGN.</div><button class="primary-btn primary-btn--wide" type="button">Enregistrer 18,4 km dans Grist</button></aside>
+        </div>
+      </article>
+    </section>
+
+    <footer class="concept-footer"><span>Prototype isolé : aucun widget existant n’est modifié.</span><span>HTML · CSS · JavaScript natifs</span></footer>
+  </main>
+  <script src="studio.js"></script>
+</body>
+</html>
