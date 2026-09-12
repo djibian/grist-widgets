@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
-const studio = await readFile(new URL('../studio.css', import.meta.url), 'utf8');
+const style = await readFile(new URL('../style.css', import.meta.url), 'utf8');
 
 test('charge le socle Grist Studio complet dans le bon ordre', () => {
   const tokens = html.indexOf('../../shared/ui/tokens.css');
@@ -12,8 +12,8 @@ test('charge le socle Grist Studio complet dans le bon ordre', () => {
   const components = html.indexOf('../../shared/ui/components.css');
   const structure = html.indexOf('../../shared/ui/structure.css');
   const local = html.indexOf('style.css?v=1.3.0');
-  const studioIndex = html.indexOf('studio.css?v=1.3.0');
-  assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local && local < studioIndex);
+  assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
+  assert.doesNotMatch(html, /studio\.css/);
 });
 
 test('préserve les identifiants métier et ajoute la validation explicite', () => {
@@ -35,11 +35,10 @@ test('matérialise le flux contexte calcul vérification', () => {
   assert.match(html, /Calcul sans écriture/);
 });
 
-test('utilise le bleu workflow et le cadre commun de 920 px', () => {
-  assert.match(studio, /\.route-shell \{ width: min\(100% - 32px, 920px\); margin-top: 0; \}/);
-  assert.match(studio, /\.route-header \.gw-kicker \{ color: var\(--gw-color-workflow\); \}/);
-  assert.match(studio, /\.context-state\.pending \{ color: var\(--gw-color-workflow\); \}/);
-  assert.match(studio, /\.route-dot--origin,[\s\S]*\.route-dot--destination[\s\S]*var\(--gw-color-workflow\)/);
+test('utilise le contrat visuel définitif Grist Studio', () => {
+  assert.match(style, /\.route-shell \{[\s\S]*width: min\(100% - 32px, 920px\)[\s\S]*margin-top: 0/);
+  assert.match(style, /\.route-header \.gw-kicker \{ color: var\(--gw-color-workflow\); \}/);
+  assert.doesNotMatch(style, /gw-color-geography/);
 });
 
 test('sépare le calcul de l’écriture dans Grist', () => {
