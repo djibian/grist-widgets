@@ -23,17 +23,22 @@
   --gw-color-icon-hover-bg: #f0f4f1;
   --gw-color-icon-active-bg: #e8eee9;
 
-  /* Signature action — jade */
+  /* Action — jade: controls, selection and validation. */
   --gw-color-primary: #0b7a5c;
   --gw-color-primary-hover: #075c46;
   --gw-color-primary-soft: #e9f6f1;
   --gw-color-primary-text: #075c46;
 
-  /* Functional accents */
-  --gw-color-organization: #b66a16;
-  --gw-color-organization-soft: #fff5e8;
-  --gw-color-geography: #3567d6;
-  --gw-color-geography-soft: #edf3ff;
+  /* Workflow — blue: identity, navigation, progression and information. */
+  --gw-color-workflow: #3567d6;
+  --gw-color-workflow-soft: #edf3ff;
+  --gw-color-workflow-border: #c9d8fb;
+
+  /* Backward-compatible aliases. New UI should use workflow tokens. */
+  --gw-color-geography: var(--gw-color-workflow);
+  --gw-color-geography-soft: var(--gw-color-workflow-soft);
+  --gw-color-organization: var(--gw-color-workflow);
+  --gw-color-organization-soft: var(--gw-color-workflow-soft);
 
   /* Semantic colors */
   --gw-color-success: #0b7a5c;
@@ -45,9 +50,9 @@
   --gw-color-danger: #b33b32;
   --gw-color-danger-soft: #fff0ef;
   --gw-color-danger-border: #efc2be;
-  --gw-color-info: #3567d6;
-  --gw-color-info-soft: #edf3ff;
-  --gw-color-info-border: #c9d8fb;
+  --gw-color-info: var(--gw-color-workflow);
+  --gw-color-info-soft: var(--gw-color-workflow-soft);
+  --gw-color-info-border: var(--gw-color-workflow-border);
   --gw-color-experimental: #7356a8;
   --gw-color-experimental-soft: #f4f0fb;
   --gw-color-experimental-border: #d8cbee;
