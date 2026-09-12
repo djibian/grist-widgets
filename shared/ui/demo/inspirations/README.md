@@ -6,15 +6,19 @@ Cette maquette sert à converger par cycles successifs de six variantes.
 
 ## Cycle 1 — forme fondamentale des symboles
 
-Base conservée : icônes nues, sombres, compactes, avec un petit accent coloré (bleu pour `Actualiser`, ambre pour `Réglages`). Taille, poids visuel, couleurs et interaction restent constants.
+La variante retenue est **F · Minimal** : symboles réduits à quelques formes essentielles, icônes nues, sombres et compactes, avec un accent coloré ponctuel.
 
-Seule la métaphore / silhouette du pictogramme varie :
+## Cycle 2 — traitement de l’accent coloré
 
-- `?variant=loop` : boucle circulaire + curseurs horizontaux ;
-- `?variant=sync` : deux flèches de synchronisation + réglages verticaux ;
-- `?variant=orbit` : anneau ouvert + réglage radial ;
-- `?variant=toggle` : rotation bidirectionnelle + interrupteurs ;
-- `?variant=technical` : cycle angulaire + égaliseur ;
-- `?variant=minimal` : signes réduits au strict minimum.
+La silhouette Minimal issue du cycle 1 est désormais figée. La taille, le poids visuel, la couleur sombre, le bleu d’`Actualiser`, l’ambre de `Réglages`, l’absence de cadre et l’interaction restent constants.
+
+Seule la forme / matière de l’accent varie :
+
+- `?variant=points` : points circulaires — référence exacte du choix Minimal ;
+- `?variant=squares` : petits carrés arrondis ;
+- `?variant=pills` : capsules courtes ;
+- `?variant=rings` : anneaux évidés ;
+- `?variant=micro` : micro-points très discrets ;
+- `?variant=segments` : courts segments intégrés au symbole.
 
 Aucun widget réel n’utilise encore ces styles : cette page reste une maquette d’arbitrage visuel.
