@@ -34,12 +34,6 @@
   --gw-color-workflow-soft: #edf3ff;
   --gw-color-workflow-border: #c9d8fb;
 
-  /* Backward-compatible aliases. New UI should use workflow tokens. */
-  --gw-color-geography: var(--gw-color-workflow);
-  --gw-color-geography-soft: var(--gw-color-workflow-soft);
-  --gw-color-organization: var(--gw-color-workflow);
-  --gw-color-organization-soft: var(--gw-color-workflow-soft);
-
   /* Semantic colors */
   --gw-color-success: #0b7a5c;
   --gw-color-success-soft: #e9f6f1;

@@ -4,15 +4,20 @@ Collection de widgets personnalisés pour Grist.
 
 La branche `main` est l’unique branche permanente, la référence du projet et la source publiée par GitHub Pages. Chaque widget vit dans son propre dossier sous `widgets/` et reste autonome, documenté et testable indépendamment.
 
-Le dépôt partage uniquement les briques réellement communes :
+## Architecture
 
-- `shared/ui/` — identité visuelle Linear et composants génériques ;
-- `shared/grist/` — petites primitives techniques communes à l’accès aux données Grist ;
-- `shared/services/` — services réutilisables, notamment le calcul d’itinéraire IGN.
+Le dépôt ne conserve que les briques réellement partagées :
+
+- `shared/ui/` — identité visuelle **Grist Studio** et composants structurels communs ;
+- `shared/grist/` — primitives communes d’accès aux données et métadonnées Grist ;
+- `shared/services/` — services réutilisables, notamment le calcul d’itinéraire IGN ;
+- `widgets/` — widgets publiés et leurs tests dédiés.
+
+L’identité Grist Studio suit la grammaire commune **contexte → travail → validation**. Les widgets partagent les mêmes tokens, composants et règles de couleur, tandis que leur logique métier et leurs composants spécifiques restent locaux.
 
 ## Assistant Structures
 
-Dossier historique : `widgets/structure-picker/`.
+Chemin publié historique : `widgets/structure-picker/`.
 
 L’Assistant Structures permet de rechercher, ajouter et compléter les structures de stage :
 
@@ -58,9 +63,9 @@ Tests dédiés : `npm run test:internship-supervisor-assignment`.
 
 Dossier : `widgets/route-distance/`.
 
-Le widget calcule, pour la ligne sélectionnée, la distance routière et éventuellement la durée entre un point de départ fixe et le domicile d’un élève. Le contexte de la ligne est capturé avant l’appel réseau afin d’éviter toute écriture sur une autre ligne en cas de changement de sélection pendant le calcul.
+Le widget calcule, pour la ligne sélectionnée, la distance routière et la durée entre un point de départ configuré dans le code et la destination sélectionnée. Le calcul et l’écriture sont séparés : le résultat est vérifié avant enregistrement dans Grist.
 
-L’appel à la Géoplateforme IGN est factorisé dans `shared/services/ign-route.js`. L’origine est encore définie dans le code ; sa configuration par adresse constitue une évolution prévue.
+L’appel à la Géoplateforme IGN est factorisé dans `shared/services/ign-route.js`. La configuration de l’origine par adresse constitue une évolution prévue.
 
 URL publiée :
 

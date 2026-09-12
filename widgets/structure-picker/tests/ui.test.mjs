@@ -4,7 +4,6 @@ import test from "node:test";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../style.css", import.meta.url), "utf8");
-const studio = await readFile(new URL("../studio.css", import.meta.url), "utf8");
 const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 const requiredIds = [
@@ -17,14 +16,14 @@ const requiredIds = [
   "contact-results",
 ];
 
-test("charge le socle Grist Studio complet avant les feuilles locales", () => {
+test("charge le socle Grist Studio complet avant la feuille locale", () => {
   const tokens = html.indexOf("../../shared/ui/tokens.css");
   const base = html.indexOf("../../shared/ui/base.css");
   const components = html.indexOf("../../shared/ui/components.css");
   const structure = html.indexOf("../../shared/ui/structure.css");
   const local = html.indexOf("style.css?v=1.3.0");
-  const studioLocal = html.indexOf("studio.css?v=1.3.0");
-  assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local && local < studioLocal);
+  assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
+  assert.doesNotMatch(html, /studio\.css/);
 });
 
 test("préserve le contrat DOM des modules fonctionnels", () => {
@@ -56,14 +55,12 @@ test("compose l'enrichissement en examiner puis vérifier", () => {
   assert.match(html, /id="proposal-panel"/);
 });
 
-test("supprime la marge supérieure héritée dans le widget embarqué", () => {
-  assert.match(studio, /\.app\.gw-widget-frame \{ margin: 0 auto 32px; padding: 0; \}/);
-});
-
-test("utilise le bleu workflow pour navigation et sources, l'ambre pour l'attention", () => {
-  assert.match(studio, /\.mode-switch \.tab-button\.active::after \{ background: var\(--gw-color-workflow\); \}/);
-  assert.match(studio, /\.decision-source[\s\S]*background: var\(--gw-color-workflow-soft\);[\s\S]*color: var\(--gw-color-workflow\)/);
-  assert.match(studio, /\.mode-switch \.tab-badge \{ background: var\(--gw-color-warning\); \}/);
+test("utilise une seule feuille locale et le contrat couleur définitif", () => {
+  assert.match(css, /\.app\.gw-widget-frame \{ margin: 0 auto 32px; padding: 0; \}/);
+  assert.match(css, /\.app-kicker[\s\S]*color: var\(--gw-color-workflow\)/);
+  assert.match(css, /\.tab-button\.active::after[\s\S]*background: var\(--gw-color-workflow\)/);
+  assert.match(css, /\.tab-badge[\s\S]*background: var\(--gw-color-warning\)/);
+  assert.doesNotMatch(css, /gw-color-organization|gw-color-geography/);
 });
 
 test("le compteur de table conserve le pictogramme bâtiment", () => {
@@ -96,8 +93,8 @@ test("conserve explicitement l’expérimentation Contacts publics", () => {
 test("applique la composition Grist Studio sans supprimer les composants métier", () => {
   assert.match(html, /class="gw-context-strip"/);
   assert.match(html, /class="mode-switch"/);
-  assert.match(studio, /\.search-work-grid/);
-  assert.match(studio, /\.enrich-work-grid/);
+  assert.match(css, /\.search-work-grid/);
+  assert.match(css, /\.enrich-work-grid/);
   assert.match(css, /\.result-card:hover/);
   assert.match(css, /\.proposal-row/);
 });
