@@ -4,6 +4,7 @@ import test from "node:test";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const config = await readFile(new URL("../departments-config.js", import.meta.url), "utf8");
+const contextStatus = await readFile(new URL("../context-status.js", import.meta.url), "utf8");
 const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const search = await readFile(new URL("../search.js", import.meta.url), "utf8");
 
@@ -19,6 +20,31 @@ test("le module monte une configuration dédiée des départements", () => {
     "department-search", "department-results", "department-save", "department-cancel",
   ]) assert.match(config, new RegExp(id), `ID manquant dans le module : ${id}`);
   assert.match(config, /Recherche par numéro ou nom/);
+});
+
+test("le menu Départements reste concis et reprend l'icône de paramétrage Grist Studio", () => {
+  assert.match(config, /text: "Départements"/);
+  assert.doesNotMatch(config, /Départements ·/);
+  assert.doesNotMatch(config, /text: "⚙"/);
+  assert.match(config, /gw-icon--accented/);
+  assert.match(config, /class: "gw-icon-main"/);
+  assert.match(config, /class: "gw-icon-accent"/);
+  assert.match(config, /cx: 17\.2, cy: 6\.2, r: 2\.3/);
+  assert.match(config, /cx: 7, cy: 12, r: 2\.3/);
+  assert.match(config, /cx: 17\.2, cy: 17\.8, r: 2\.3/);
+});
+
+test("l'état du bandeau utilise des messages courts et des couleurs sémantiques", () => {
+  assert.match(config, /import "\.\/context-status\.js"/);
+  assert.match(contextStatus, /Données Grist à jour\./);
+  assert.match(contextStatus, /Compléments recommandés\./);
+  assert.match(contextStatus, /Champs obligatoires à mapper\./);
+  assert.match(contextStatus, /Colonnes obligatoires non modifiables\./);
+  assert.match(contextStatus, /Lecture Grist impossible\./);
+  assert.match(contextStatus, /kind: "success"/);
+  assert.match(contextStatus, /kind: "warning"/);
+  assert.match(contextStatus, /kind: "error"/);
+  assert.match(contextStatus, /--gw-color-success/);
 });
 
 test("la configuration utilise les options natives Grist", () => {
