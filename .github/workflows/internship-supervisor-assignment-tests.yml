@@ -2,14 +2,16 @@ name: Répartition des suivis de stage tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - "widgets/internship-supervisor-assignment/**"
+      - "shared/ui/**"
       - "package.json"
       - ".github/workflows/internship-supervisor-assignment-tests.yml"
   pull_request:
     paths:
       - "widgets/internship-supervisor-assignment/**"
+      - "shared/ui/**"
       - "package.json"
       - ".github/workflows/internship-supervisor-assignment-tests.yml"
 
