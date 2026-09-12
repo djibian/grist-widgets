@@ -1,3 +1,5 @@
+import { recordsFromTable } from "../../shared/grist/records.js";
+import { isWritableColumn } from "../../shared/grist/metadata.js";
 import { configurationFingerprint, stageCoverage } from "./assignment.js";
 import { DOCUMENT_TABLES, inferMappings, mappingSignature, validateMappings } from "./mapping.js";
 
@@ -12,15 +14,7 @@ export const SOURCE_COLUMNS = Object.freeze([
 ]);
 
 function rowsFromTable(table) {
-  const ids = Array.isArray(table?.id) ? table.id : [];
-  return ids.map((rowId, index) => {
-    const row = { id: Number(rowId) };
-    for (const [columnId, values] of Object.entries(table ?? {})) {
-      if (columnId === "id") continue;
-      row[columnId] = Array.isArray(values) ? values[index] : null;
-    }
-    return row;
-  });
+  return recordsFromTable(table, { numericIds: true });
 }
 
 function ref(value) {
@@ -36,10 +30,6 @@ function integer(value) {
 function display(value, fallback) {
   const text = String(value ?? "").trim();
   return text || fallback;
-}
-
-function isWritableColumn(column) {
-  return !(Boolean(column?.isFormula) && String(column?.formula ?? "").trim());
 }
 
 async function fetchRawTable(tableId) {
