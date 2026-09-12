@@ -1,7 +1,7 @@
 const VARIANTS = Object.freeze({
   current: {
     label: "A · Azur + ambre",
-    description: "Référence retenue : azur pour Actualiser et ambre pour Réglages."
+    description: "Référence précédente : azur pour Actualiser et ambre pour Réglages."
   },
   cool: {
     label: "B · Bleu + violet",
@@ -16,8 +16,8 @@ const VARIANTS = Object.freeze({
     description: "Palette plus expressive et contemporaine, avec deux accents nettement différenciés."
   },
   unified: {
-    label: "E · Bleu unique",
-    description: "Une seule couleur d’accent pour les deux actions afin de maximiser la cohérence visuelle."
+    label: "E · Bleu unique — retenu",
+    description: "Variante retenue : bleu unique, point d’Actualiser détaché de l’anneau et taille optique harmonisée avec Réglages."
   },
   graphite: {
     label: "F · Graphite",
@@ -26,13 +26,13 @@ const VARIANTS = Object.freeze({
 });
 
 const ICONS = Object.freeze({
-  refresh: '<svg class="icon-accented" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-main-stroke icon-main-stroke--heavy" d="M18.2 7.2A8 8 0 1 0 19.2 15"/><circle class="icon-accent" cx="18.4" cy="6.8" r="2.2"/></svg>',
-  settings: '<svg class="icon-accented" viewBox="0 0 24 24" aria-hidden="true"><rect class="icon-main" x="4" y="5" width="8" height="3" rx="1.5"/><rect class="icon-main" x="12" y="10.5" width="8" height="3" rx="1.5"/><rect class="icon-main" x="4" y="16" width="8" height="3" rx="1.5"/><circle class="icon-accent" cx="15.5" cy="6.5" r="2.2"/><circle class="icon-accent" cx="8.5" cy="12" r="2.2"/><circle class="icon-accent" cx="15.5" cy="17.5" r="2.2"/></svg>'
+  refresh: '<svg class="icon-accented" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-main-stroke icon-main-stroke--heavy" d="M15.7 5.1A8 8 0 1 0 19.2 15"/><circle class="icon-accent" cx="20" cy="7" r="2.1"/></svg>',
+  settings: '<svg class="icon-accented" viewBox="0 0 24 24" aria-hidden="true"><rect class="icon-main" x="2.5" y="4.5" width="10.5" height="3.4" rx="1.7"/><rect class="icon-main" x="11" y="10.3" width="10.5" height="3.4" rx="1.7"/><rect class="icon-main" x="2.5" y="16.1" width="10.5" height="3.4" rx="1.7"/><circle class="icon-accent" cx="17.2" cy="6.2" r="2.3"/><circle class="icon-accent" cx="7" cy="12" r="2.3"/><circle class="icon-accent" cx="17.2" cy="17.8" r="2.3"/></svg>'
 });
 
 const params = new URLSearchParams(location.search);
 const requested = params.get("variant");
-const variant = Object.hasOwn(VARIANTS, requested) ? requested : "current";
+const variant = Object.hasOwn(VARIANTS, requested) ? requested : "unified";
 document.body.dataset.variant = variant;
 document.title = `Assistant Structures — Linear Accent ${VARIANTS[variant].label}`;
 document.getElementById("variant-description").textContent = `${VARIANTS[variant].label} · ${VARIANTS[variant].description}`;
