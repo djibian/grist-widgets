@@ -1,7 +1,6 @@
 import {
   DEFAULT_DEPARTMENTS,
   departmentInfo,
-  formatDepartmentCodes,
   getActiveDepartments,
   normalizeDepartments,
   searchDepartments,
@@ -9,6 +8,7 @@ import {
 } from "./departments.js";
 
 const OPTION_KEY = "departments";
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 function node(tagName, { id = "", className = "", text = "", type = "" } = {}) {
   const element = document.createElement(tagName);
@@ -17,6 +17,26 @@ function node(tagName, { id = "", className = "", text = "", type = "" } = {}) {
   if (text) element.textContent = text;
   if (type) element.type = type;
   return element;
+}
+
+function svgNode(tagName, attributes = {}) {
+  const element = document.createElementNS(SVG_NS, tagName);
+  for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, String(value));
+  return element;
+}
+
+function settingsIcon() {
+  const svg = svgNode("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" });
+  svg.classList.add("gw-icon--accented");
+  svg.append(
+    svgNode("rect", { class: "gw-icon-main", x: 2.5, y: 4.5, width: 10.5, height: 3.4, rx: 1.7 }),
+    svgNode("rect", { class: "gw-icon-main", x: 11, y: 10.3, width: 10.5, height: 3.4, rx: 1.7 }),
+    svgNode("rect", { class: "gw-icon-main", x: 2.5, y: 16.1, width: 10.5, height: 3.4, rx: 1.7 }),
+    svgNode("circle", { class: "gw-icon-accent", cx: 17.2, cy: 6.2, r: 2.3 }),
+    svgNode("circle", { class: "gw-icon-accent", cx: 7, cy: 12, r: 2.3 }),
+    svgNode("circle", { class: "gw-icon-accent", cx: 17.2, cy: 17.8, r: 2.3 }),
+  );
+  return svg;
 }
 
 function ensureSettingsUi() {
@@ -31,13 +51,13 @@ function ensureSettingsUi() {
       tools = node("div", { className: "gw-widget-tools" });
       header.appendChild(tools);
     }
-    const open = node("button", { id: "department-settings-open", className: "gw-tool-button", type: "button" });
+    const open = node("button", { id: "department-settings-open", className: "gw-tool-button icon-button", type: "button" });
+    open.title = "Départements";
+    open.setAttribute("aria-label", "Départements");
     open.setAttribute("aria-controls", "department-settings");
     open.setAttribute("aria-expanded", "false");
-    const icon = node("span", { text: "⚙" });
-    icon.setAttribute("aria-hidden", "true");
     const label = node("span", { id: "department-settings-label", className: "gw-tool-button__label", text: "Départements" });
-    open.append(icon, label);
+    open.append(settingsIcon(), label);
     tools.appendChild(open);
   }
 
@@ -116,8 +136,7 @@ function setStatus(message = "", type = "") {
 }
 
 function updateOpenLabel() {
-  if (!ui.openLabel) return;
-  ui.openLabel.textContent = `Départements · ${formatDepartmentCodes(savedDepartments)}`;
+  if (ui.openLabel) ui.openLabel.textContent = "Départements";
 }
 
 function renderSelected() {
