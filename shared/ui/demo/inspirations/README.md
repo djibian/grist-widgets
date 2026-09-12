@@ -1,16 +1,16 @@
-# Explorations visuelles
+# Variations Linear — actions d’en-tête
 
-Ces maquettes servent uniquement à comparer des directions d'interface avant la prochaine proposition du design system.
+Cette maquette conserve uniquement la direction visuelle Linear retenue pour la suite de l’exploration.
 
-Elles ne reproduisent pas les produits cités. Chaque variante reprend seulement des principes visuels généraux observables dans ces familles d'interfaces : densité, hiérarchie, traitement des actions secondaires, onglets, surfaces et bordures.
+Le contenu, la palette, les onglets et toute l’interface restent identiques. Seuls les boutons `Actualiser` et `Réglages` changent afin de comparer des traitements très différents :
 
-Les six variantes utilisent volontairement le même scénario « Assistant Structures » et la même palette afin de faciliter la comparaison :
+- `?variant=bare` : icônes nues, sans cadre au repos ;
+- `?variant=soft` : petites surfaces gris clair ;
+- `?variant=outline` : boutons à contour fin ;
+- `?variant=segment` : contrôle unique segmenté ;
+- `?variant=floating` : boutons circulaires légèrement flottants ;
+- `?variant=labeled` : pictogramme + libellé court.
 
-- `?theme=linear` : dense et silencieux ;
-- `?theme=vercel` : minimal et graphique ;
-- `?theme=raycast` : application native / surfaces flottantes ;
-- `?theme=shadcn` : composants web sobres et contemporains ;
-- `?theme=carbon` : institutionnel et structuré ;
-- `?theme=atlassian` : applicatif, doux et fonctionnel.
+Chaque variante utilise aussi un couple d’icônes différent pour l’actualisation et les réglages.
 
-Aucun widget réel n'utilise ces styles.
+Aucun widget réel n’utilise ces styles : cette page sert uniquement à arbitrer l’interface avant migration.
