@@ -1,4 +1,8 @@
+import { recordsFromTable } from "../../shared/grist/records.js";
+import { isFormulaColumn } from "../../shared/grist/metadata.js";
 import { candidateMatchesIdentifier, extractLocationFromAddress, identifierParts } from "./search.js";
+
+export { isFormulaColumn };
 
 export const COLUMN_DEFS = [
   { name: "NomCommercial", title: "Nom usuel", type: "Text", optional: false },
@@ -43,18 +47,6 @@ function resolveMappings(mappings, availableColumns) {
   return resolved;
 }
 
-function rowRecordsToObjects(rowRecords) {
-  const ids = Array.isArray(rowRecords?.id) ? rowRecords.id : [];
-  return ids.map((id, index) => {
-    const row = { id };
-    for (const [columnId, values] of Object.entries(rowRecords ?? {})) {
-      if (columnId === "id") continue;
-      row[columnId] = Array.isArray(values) ? values[index] : undefined;
-    }
-    return row;
-  });
-}
-
 function rowRecordsToLogicalRows(rowRecords, resolvedMappings) {
   const ids = Array.isArray(rowRecords?.id) ? rowRecords.id : [];
   return ids.map((id, index) => {
@@ -72,10 +64,6 @@ function rowRecordsToLogicalRows(rowRecords, resolvedMappings) {
   });
 }
 
-export function isFormulaColumn(metadata) {
-  return Boolean(metadata?.isFormula) && Boolean(String(metadata?.formula ?? "").trim());
-}
-
 async function fetchColumnMetadata(tableId) {
   const tables = await grist.docApi.fetchTable("_grist_Tables");
   const tableIds = Array.isArray(tables?.tableId) ? tables.tableId : [];
@@ -84,7 +72,7 @@ async function fetchColumnMetadata(tableId) {
   const tableRef = Array.isArray(tables?.id) ? tables.id[tableIndex] : null;
   if (tableRef === null || tableRef === undefined) return new Map();
 
-  const columns = rowRecordsToObjects(await grist.docApi.fetchTable("_grist_Tables_column"));
+  const columns = recordsFromTable(await grist.docApi.fetchTable("_grist_Tables_column"));
   const result = new Map();
   for (const column of columns) {
     if (column.parentId !== tableRef) continue;

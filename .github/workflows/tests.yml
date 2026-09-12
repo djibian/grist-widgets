@@ -1,19 +1,19 @@
-name: Assistant Structures tests
+name: Tests
 
 on:
   push:
     branches: [main]
     paths:
-      - "widgets/structure-picker/**"
-      - "shared/ui/**"
+      - "widgets/**"
+      - "shared/**"
       - "package.json"
-      - ".github/workflows/structure-picker-tests.yml"
+      - ".github/workflows/tests.yml"
   pull_request:
     paths:
-      - "widgets/structure-picker/**"
-      - "shared/ui/**"
+      - "widgets/**"
+      - "shared/**"
       - "package.json"
-      - ".github/workflows/structure-picker-tests.yml"
+      - ".github/workflows/tests.yml"
 
 permissions:
   contents: read
