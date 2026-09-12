@@ -2,10 +2,23 @@
 
 Fondation visuelle commune des widgets du dépôt.
 
-Principes : HTML, CSS et JavaScript natifs ; aucune dépendance d'exécution ni étape de build ; tokens et classes préfixés gw ; composants simples et composables ; accessibilité clavier et réduction des animations ; les composants spécifiques à un seul widget restent locaux.
+Principes : HTML, CSS et JavaScript natifs ; aucune dépendance d’exécution ni étape de build ; tokens et classes préfixés `gw` ; composants simples et composables ; accessibilité clavier et réduction des animations ; les composants spécifiques à un seul widget restent locaux.
 
-Ordre de chargement recommandé : tokens.css, puis base.css, puis components.css. Un widget conserve ensuite sa feuille style.css locale pour sa mise en page et ses éléments métier.
+Ordre de chargement recommandé : `tokens.css`, puis `base.css`, puis `components.css`. Un widget conserve ensuite sa feuille `style.css` locale pour sa mise en page et ses éléments métier.
 
-Fichiers : tokens.css pour les variables de design ; base.css pour la base typographique ; components.css pour les composants génériques ; icons.js pour les icônes SVG ; demo pour la page de référence visuelle.
+## Fichiers
 
-La bibliothèque reste volontairement petite. Un composant n'y entre que s'il est générique ou utilisé par plusieurs widgets.
+- `tokens.css` — variables de design ;
+- `base.css` — base typographique et styles globaux ;
+- `components.css` — composants génériques partagés ;
+- `icons.js` — définitions SVG de référence, notamment les icônes Actualiser et Paramètres validées ;
+- `demo/` — démonstration des composants partagés ;
+- `demo/inspirations/linear-final.html` — référence visuelle définitive du système Linear validé.
+
+La référence visuelle finale est publiée ici :
+
+`https://djibian.github.io/grist-widgets/shared/ui/demo/inspirations/linear-final.html`
+
+Les anciennes planches de comparaison et cycles de convergence ont été retirés de l’arbre courant après validation. Leur historique reste disponible dans Git.
+
+La bibliothèque reste volontairement petite. Un composant n’y entre que s’il est générique ou réellement utilisé par plusieurs widgets.
