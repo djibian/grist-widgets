@@ -7,43 +7,57 @@
   <link rel="stylesheet" href="../../shared/ui/tokens.css">
   <link rel="stylesheet" href="../../shared/ui/base.css">
   <link rel="stylesheet" href="../../shared/ui/components.css">
-  <link rel="stylesheet" href="style.css?v=1.2.0">
+  <link rel="stylesheet" href="../../shared/ui/structure.css">
+  <link rel="stylesheet" href="style.css?v=1.3.0">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
-  <main class="app">
-    <header class="hero gw-header">
-      <div>
-        <div class="app-kicker">Suivis de stage</div>
-        <h1>Répartition des suivis de stage</h1>
-        <p>Affectation automatique selon les quotas de suivi.</p>
+  <main class="app gw-widget-frame">
+    <header class="hero gw-widget-header">
+      <div class="gw-widget-heading">
+        <div class="gw-widget-icon gw-widget-icon--organization" aria-hidden="true">▤</div>
+        <div class="gw-widget-heading__text">
+          <div class="app-kicker">Organisation pédagogique</div>
+          <h1>Répartition des suivis de stage</h1>
+          <p>Affectation automatique selon les quotas de suivi.</p>
+        </div>
       </div>
-      <div class="hero-actions" aria-label="Actions secondaires">
-        <button id="refresh" class="gw-icon-button icon-button" type="button" title="Actualiser" aria-label="Actualiser">
+      <div class="hero-actions gw-widget-tools" aria-label="Actions du widget">
+        <button id="refresh" class="gw-tool-button icon-button" type="button" title="Actualiser" aria-label="Actualiser">
           <svg class="gw-icon--accented" viewBox="0 0 24 24" aria-hidden="true"><path class="gw-icon-main-stroke" d="M13.663 4.175A8 8 0 1 0 19.417 14.997"/><circle class="gw-icon-accent" cx="18.128" cy="6.858" r="2.1"/></svg>
+          <span class="gw-tool-button__label">Actualiser</span>
         </button>
-        <button id="settings-toggle" class="gw-icon-button icon-button" type="button" title="Paramètres" aria-label="Paramètres" aria-expanded="false">
+        <button id="settings-toggle" class="gw-tool-button icon-button" type="button" title="Paramétrage" aria-label="Paramétrage" aria-expanded="false">
           <svg class="gw-icon--accented" viewBox="0 0 24 24" aria-hidden="true"><rect class="gw-icon-main" x="2.5" y="4.5" width="10.5" height="3.4" rx="1.7"/><rect class="gw-icon-main" x="11" y="10.3" width="10.5" height="3.4" rx="1.7"/><rect class="gw-icon-main" x="2.5" y="16.1" width="10.5" height="3.4" rx="1.7"/><circle class="gw-icon-accent" cx="17.2" cy="6.2" r="2.3"/><circle class="gw-icon-accent" cx="7" cy="12" r="2.3"/><circle class="gw-icon-accent" cx="17.2" cy="17.8" r="2.3"/></svg>
+          <span class="gw-tool-button__label">Paramétrage</span>
         </button>
       </div>
     </header>
 
-    <div id="config-status" class="status pending" role="status" aria-live="polite">Connexion à Grist…</div>
-
-    <section class="scope-strip gw-card" aria-label="Périmètre du traitement">
-      <div class="scope-class">
-        <span>Classe sélectionnée</span>
-        <strong id="class-name">—</strong>
+    <section class="gw-context-strip" aria-label="Contexte Grist">
+      <div class="gw-context-item">
+        <span class="gw-context-label">Classe</span>
+        <strong id="class-name" class="gw-context-value">—</strong>
       </div>
-      <div class="scope-periods">
-        <span>Périodes traitées</span>
-        <div id="periods" class="periods"></div>
+      <div class="gw-context-item">
+        <span class="gw-context-label">Périodes</span>
+        <div id="periods" class="periods gw-context-value"></div>
       </div>
-      <p class="scope-note">Toutes les opérations ci-dessous concernent uniquement les périodes cochées.</p>
+      <div class="gw-context-item">
+        <span class="gw-context-label">État</span>
+        <div id="config-status" class="gw-context-status status pending" role="status" aria-live="polite">Connexion à Grist…</div>
+      </div>
     </section>
 
-    <section class="card gw-card">
+    <section class="gw-work-section prepare-section" aria-labelledby="prepare-title">
+      <div class="gw-step-heading">
+        <span class="gw-step-heading__index">01 · Préparer</span>
+        <h2 id="prepare-title" class="gw-step-heading__title">Vérifier le périmètre et les quotas</h2>
+        <p class="gw-step-heading__help">Les calculs concernent uniquement la classe et les périodes affichées ci-dessus.</p>
+      </div>
+
       <div id="analysis" class="analysis empty">Sélectionne une classe dans la vue Classe.</div>
+
       <div id="stage-creation" class="stage-creation" hidden>
         <div>
           <strong id="stage-creation-title"></strong>
@@ -51,37 +65,58 @@
         </div>
         <button id="create-stages" class="secondary gw-button gw-button--secondary" type="button">Créer les stages manquants</button>
       </div>
-      <div class="action-row">
-        <button id="generate" class="primary gw-button gw-button--primary" type="button" disabled>Générer la répartition</button>
+
+      <div class="gw-validation-bar prepare-validation">
+        <div class="gw-validation-bar__text">
+          <strong>Préparation de la répartition</strong>
+          <small>Le bouton devient disponible lorsque les données et quotas sont cohérents.</small>
+        </div>
+        <button id="generate" class="primary gw-button gw-button--primary" type="button" disabled>Calculer une proposition</button>
       </div>
     </section>
 
-    <section id="proposal-card" class="card gw-card" hidden>
-      <div class="section-heading">
-        <h2>Proposition</h2>
-        <span id="proposal-periods" class="small-context"></span>
+    <section id="proposal-card" class="gw-work-section proposal-section" hidden aria-labelledby="proposal-title">
+      <div class="gw-step-heading proposal-heading">
+        <span class="gw-step-heading__index">02 · Vérifier</span>
+        <div class="section-heading">
+          <div>
+            <h2 id="proposal-title" class="gw-step-heading__title">Contrôler la proposition</h2>
+            <p class="gw-step-heading__help">Vérifie le résultat avant toute écriture dans Grist.</p>
+          </div>
+          <span id="proposal-periods" class="small-context"></span>
+        </div>
       </div>
+
       <div id="proposal-summary" class="proposal-summary"></div>
-      <details>
-        <summary>Voir le détail des affectations proposées</summary>
-        <div class="table-wrap gw-table-wrap">
-          <table class="gw-table">
-            <thead><tr><th>Période</th><th>Élève</th><th>Enseignant</th></tr></thead>
-            <tbody id="proposal-details"></tbody>
-          </table>
+
+      <div class="proposal-details-grid">
+        <details>
+          <summary>Voir le détail des affectations proposées</summary>
+          <div class="table-wrap gw-table-wrap">
+            <table class="gw-table">
+              <thead><tr><th>Période</th><th>Élève</th><th>Enseignant</th></tr></thead>
+              <tbody id="proposal-details"></tbody>
+            </table>
+          </div>
+        </details>
+        <details>
+          <summary>Voir le contrôle des quotas</summary>
+          <div class="table-wrap gw-table-wrap">
+            <table class="gw-table">
+              <thead><tr><th>Période</th><th>Enseignant</th><th>Objectif</th><th>Déjà</th><th>Nouveau</th><th>Total</th></tr></thead>
+              <tbody id="quota-details"></tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+
+      <div class="gw-validation-bar proposal-validation">
+        <div class="gw-validation-bar__text">
+          <strong>Prêt à enregistrer</strong>
+          <small>Les suivis déjà renseignés ne sont jamais écrasés.</small>
         </div>
-      </details>
-      <details>
-        <summary>Voir le contrôle des quotas</summary>
-        <div class="table-wrap gw-table-wrap">
-          <table class="gw-table">
-            <thead><tr><th>Période</th><th>Enseignant</th><th>Objectif</th><th>Déjà</th><th>Nouveau</th><th>Total</th></tr></thead>
-            <tbody id="quota-details"></tbody>
-          </table>
-        </div>
-      </details>
-      <button id="apply" class="primary gw-button gw-button--primary" type="button">Appliquer les affectations</button>
-      <p class="hint">Les suivis déjà renseignés ne sont jamais écrasés.</p>
+        <button id="apply" class="primary gw-button gw-button--primary" type="button">Appliquer les affectations</button>
+      </div>
     </section>
   </main>
 
@@ -135,6 +170,6 @@
     </div>
   </aside>
 
-  <script type="module" src="app.js?v=1.2.0"></script>
+  <script type="module" src="app.js?v=1.3.0"></script>
 </body>
 </html>
