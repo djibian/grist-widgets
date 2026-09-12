@@ -1,28 +1,24 @@
-# Cycles de convergence — icônes Linear Accent
+# Référence visuelle Linear
 
-Cette maquette sert à converger par cycles successifs de six variantes.
+Ce dossier conserve uniquement la référence visuelle finale validée pour les widgets du dépôt.
 
-À chaque cycle, une seule dimension des icônes est modifiée. L’utilisateur choisit la variante préférée, qui devient la base du cycle suivant.
+## Référence définitive
 
-## Cycle 1 — forme fondamentale des symboles
+`linear-final.html` rassemble les choix désormais figés :
 
-La variante retenue est **F · Minimal** : symboles réduits à quelques formes essentielles, icônes nues, sombres et compactes, avec un accent coloré ponctuel.
+- base visuelle Linear ;
+- accent principal bleu `#2563eb` ;
+- texte principal sombre ;
+- cartes, champs, boutons et onglets sobres ;
+- onglet actif souligné en bleu ;
+- icône **Actualiser** avec arc sombre et point bleu détaché ;
+- icône **Paramètres** à trois réglages et points bleus ;
+- actions secondaires sans cadre au repos ;
+- halo neutre au survol ;
+- focus clavier visible.
 
-## Cycle 2 — traitement de l’accent coloré
+La page est publiée ici :
 
-La variante retenue est **A · Points** : accents circulaires francs, exactement comme dans la variante Minimal initiale.
+`https://djibian.github.io/grist-widgets/shared/ui/demo/inspirations/linear-final.html`
 
-## Cycle 3 — stratégie de couleur
-
-La silhouette Minimal, la forme ronde des accents, leur taille, leur position, le poids visuel et l’absence de cadre sont désormais figés.
-
-Seule la stratégie chromatique varie :
-
-- `?variant=current` : azur + ambre — référence retenue jusque-là ;
-- `?variant=cool` : bleu + violet — plus froid et numérique ;
-- `?variant=coral` : turquoise + corail — contraste chaud/froid plus vivant ;
-- `?variant=vivid` : indigo + rose — plus expressif ;
-- `?variant=unified` : bleu unique — même couleur pour les deux actions ;
-- `?variant=graphite` : graphite — aucune couleur chromatique.
-
-Aucun widget réel n’utilise encore ces styles : cette page reste une maquette d’arbitrage visuel.
+Les anciens cycles de comparaison ont été supprimés de l’arbre courant une fois les choix validés. Ils restent consultables dans l’historique Git si une décision de design doit un jour être retracée.
