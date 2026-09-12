@@ -4,7 +4,7 @@ Widget Grist pour affecter automatiquement les stages aux enseignants à partir 
 
 ## État stable
 
-Les règles métier actuellement en production correspondent à la version fonctionnelle **V1.1.4**. Les migrations visuelles ultérieures vers l’identité Linear commune n’ont pas modifié l’algorithme d’affectation ni les règles d’écriture.
+Les règles métier actuellement en production correspondent à la version fonctionnelle **V1.1.4**. Les évolutions visuelles vers l’identité **Grist Studio** n’ont pas modifié l’algorithme d’affectation ni les règles d’écriture.
 
 ### Source de données native : Classe
 
