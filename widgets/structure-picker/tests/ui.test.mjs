@@ -75,7 +75,7 @@ test("APE NAF n'est plus présenté par l'interface", () => {
 test("conserve explicitement l’expérimentation Contacts publics", () => {
   assert.match(html, /Contacts publics/);
   assert.match(html, /Expérimental/);
-  assert.match(html, /contacts-experiment\.js\?v=1\.2\.0/);
+  assert.match(html, /src="contacts-experiment\.js"/);
   assert.match(css, /\.contact-experiment/);
   assert.match(css, /--gw-color-experimental-border/);
 });
