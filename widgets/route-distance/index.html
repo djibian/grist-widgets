@@ -7,64 +7,71 @@
   <link rel="stylesheet" href="../../shared/ui/tokens.css">
   <link rel="stylesheet" href="../../shared/ui/base.css">
   <link rel="stylesheet" href="../../shared/ui/components.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../../shared/ui/structure.css">
+  <link rel="stylesheet" href="style.css?v=1.3.0">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
-  <main class="gw-shell route-shell">
-    <section class="gw-card route-surface">
-      <header class="gw-header route-header">
-        <div>
-          <div class="gw-kicker">Grist · Géoplateforme IGN</div>
-          <h1 class="gw-header__title">Distance routière IGN</h1>
-          <p class="gw-header__subtitle">Calcul et enregistrement dans Grist</p>
+  <main class="route-shell gw-widget-frame">
+    <header class="route-header gw-widget-header">
+      <div class="gw-widget-heading">
+        <div class="gw-widget-icon gw-widget-icon--geography" aria-hidden="true">⌖</div>
+        <div class="gw-widget-heading__text">
+          <div class="gw-kicker">Géoplateforme IGN</div>
+          <h1 class="gw-header__title">Distance routière</h1>
+          <p class="gw-header__subtitle">Calculer, vérifier puis enregistrer la distance dans Grist.</p>
         </div>
-      </header>
+      </div>
+    </header>
 
-      <section id="mappingError" class="gw-status gw-status--warning mapping-error" role="alert">
-        <strong>Configuration incomplète.</strong><br>
-        Dans le panneau de création Grist, associez Nom et prénom, Adresse normalisée, Latitude, Longitude et Distance routière.
-      </section>
-
-      <section id="appCard" class="route-content">
-        <div class="panel panel-main">
-          <p class="eyebrow">Ligne sélectionnée</p>
-          <div class="record-line">
-            <div class="route-summary">
-              <p id="recordTitle" class="route-title">Sélectionnez une ligne</p>
-              <p id="recordAddress" class="address">L’adresse apparaîtra ici.</p>
-            </div>
-            <div class="metric" aria-live="polite">
-              <div><span id="distanceValue" class="metric-value">—</span><span class="metric-unit">km</span></div>
-              <div id="durationValue" class="duration"></div>
-            </div>
-          </div>
-
-          <div class="actions">
-            <button id="calculateSelected" class="gw-button gw-button--primary route-primary" type="button" disabled>Calculer cette ligne</button>
-          </div>
-
-          <div id="status" class="status" role="status" aria-live="polite"></div>
-        </div>
-
-        <div class="panel panel-notice">
-          <div class="notice">
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="9"></circle>
-              <path d="M12 11v5M12 8h.01"></path>
-            </svg>
-            <span>Le calcul utilise le réseau routier BD TOPO® de l’IGN. Seuls les deux couples de coordonnées sont transmis à l’API lors du calcul.</span>
-          </div>
-        </div>
-      </section>
-
-      <p class="footer">
-        Service de calcul :
-        <a href="https://cartes.gouv.fr/aide/fr/guides-utilisateur/utiliser-les-services-de-la-geoplateforme/calcul-itineraire/" target="_blank" rel="noreferrer">Géoplateforme IGN</a>
-      </p>
+    <section id="mappingError" class="gw-status gw-status--warning mapping-error" role="alert">
+      <strong>Configuration incomplète.</strong><br>
+      Associez les colonnes nécessaires dans le panneau de création Grist.
     </section>
-  </main>
 
-  <script type="module" src="app.js"></script>
+    <section id="appCard">
+      <section class="gw-context-strip" aria-label="Contexte Grist">
+        <div class="gw-context-item"><span class="gw-context-label">Ligne Grist</span><strong id="recordTitle" class="gw-context-value">Sélectionnez une ligne</strong></div>
+        <div class="gw-context-item"><span class="gw-context-label">Destination</span><span id="recordAddress" class="gw-context-value">L’adresse apparaîtra ici.</span></div>
+        <div class="gw-context-item"><span class="gw-context-label">État</span><span id="routeContextState" class="gw-context-value context-state">Sélection requise</span></div>
+      </section>
+
+      <div class="gw-work-grid route-work-grid">
+        <section class="gw-work-main">
+          <div class="gw-step-heading">
+            <span class="gw-step-heading__index geography-step">01 · Calculer</span>
+            <h2 class="gw-step-heading__title">Itinéraire routier</h2>
+            <p class="gw-step-heading__help">Le calcul utilise l’origine configurée et la destination sélectionnée.</p>
+          </div>
+
+          <div class="route-path">
+            <div class="route-point"><span class="route-dot route-dot--origin"></span><div><small>Origine</small><strong>Point de départ configuré</strong><span>Coordonnées de référence du widget</span></div></div>
+            <div class="route-line"><span>Réseau routier IGN</span></div>
+            <div class="route-point"><span class="route-dot route-dot--destination"></span><div><small>Destination</small><strong id="destinationTitle">Aucune ligne sélectionnée</strong><span id="destinationAddress">Sélectionnez une ligne Grist.</span></div></div>
+          </div>
+
+          <div class="gw-action-dock route-calculate-dock">
+            <div class="gw-action-dock__text"><strong>Calcul sans écriture</strong><small>Le résultat est vérifié avant enregistrement.</small></div>
+            <button id="calculateSelected" class="gw-button gw-button--primary" type="button" disabled>Calculer l’itinéraire</button>
+          </div>
+        </section>
+
+        <aside class="gw-decision-panel route-result">
+          <div class="gw-step-heading">
+            <span class="gw-step-heading__index geography-step">02 · Vérifier</span>
+            <h2 class="gw-step-heading__title">Résultat</h2>
+            <p class="gw-step-heading__help">Contrôle le calcul avant de l’enregistrer.</p>
+          </div>
+          <div class="route-metric" aria-live="polite"><div><span id="distanceValue" class="metric-value">—</span><span class="metric-unit">km</span></div><div id="durationValue" class="duration"></div></div>
+          <div id="status" class="status" role="status" aria-live="polite">Aucun itinéraire calculé.</div>
+          <div class="notice"><span>BD TOPO® · seuls les couples de coordonnées sont transmis à l’API IGN.</span></div>
+          <div class="route-save-zone"><button id="saveSelected" class="gw-button gw-button--primary" type="button" disabled>Enregistrer dans Grist</button></div>
+        </aside>
+      </div>
+    </section>
+
+    <p class="footer">Service de calcul : Géoplateforme IGN</p>
+  </main>
+  <script type="module" src="app.js?v=1.3.0"></script>
 </body>
 </html>
