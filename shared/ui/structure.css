@@ -18,6 +18,9 @@
 }
 .gw-widget-heading { display: flex; min-width: 0; gap: 12px; align-items: flex-start; }
 .gw-widget-heading__text { min-width: 0; }
+.gw-widget-header .app-kicker,
+.gw-widget-header .gw-kicker,
+.gw-widget-frame .eyebrow { color: var(--gw-color-workflow); }
 
 /* Shared Grist Studio mark. The four tiles are drawn in CSS so every widget
    gets exactly the same identity without maintaining widget-specific icons. */
@@ -82,7 +85,7 @@
 .gw-step-heading__index {
   display: block;
   margin-bottom: 4px;
-  color: var(--gw-color-geography);
+  color: var(--gw-color-workflow);
   font-size: var(--gw-font-size-xs);
   font-weight: 800;
   letter-spacing: .08em;
@@ -90,6 +93,10 @@
 }
 .gw-step-heading__title { margin: 0; font-size: var(--gw-font-size-lg); letter-spacing: -.015em; }
 .gw-step-heading__help { margin: 4px 0 0; color: var(--gw-color-text-muted); font-size: var(--gw-font-size-sm); }
+.gw-step-heading .small-context {
+  background: var(--gw-color-workflow-soft);
+  color: var(--gw-color-workflow);
+}
 
 .gw-work-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .75fr); }
 .gw-work-main { min-width: 0; padding: 22px 24px; }
