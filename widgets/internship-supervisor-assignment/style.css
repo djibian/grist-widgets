@@ -14,7 +14,7 @@ select:focus-visible { border-color: #77bda7; box-shadow: var(--gw-focus-ring); 
 
 .app-kicker {
   margin-bottom: 4px;
-  color: var(--gw-color-organization);
+  color: var(--gw-color-workflow);
   font-size: var(--gw-font-size-xs);
   font-weight: 760;
   letter-spacing: .08em;
@@ -168,8 +168,8 @@ select:focus-visible { border-color: #77bda7; box-shadow: var(--gw-focus-ring); 
   flex: 0 0 auto;
   padding: 4px 8px;
   border-radius: var(--gw-radius-pill);
-  background: var(--gw-color-primary-soft);
-  color: var(--gw-color-primary-text);
+  background: var(--gw-color-workflow-soft);
+  color: var(--gw-color-workflow);
   font-size: var(--gw-font-size-xs);
   font-weight: 750;
 }
