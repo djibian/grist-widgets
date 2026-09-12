@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const css = await readFile(new URL('../style.css', import.meta.url), 'utf8');
+const structureCss = await readFile(new URL('../../../shared/ui/structure.css', import.meta.url), 'utf8');
 
 const requiredIds = [
   'config-status', 'refresh', 'settings-toggle', 'settings-panel', 'settings-backdrop',
@@ -36,8 +37,8 @@ test('utilise les pictogrammes validés Actualiser et Paramétrage', () => {
   assert.match(html, /x="2\.5" y="4\.5" width="10\.5" height="3\.4"/);
   assert.match(html, /cx="17\.2" cy="6\.2" r="2\.3"/);
   assert.match(html, /class="gw-icon--accented"/);
-  assert.match(html, /gw-tool-button__label">Actualiser</);
-  assert.match(html, /gw-tool-button__label">Paramétrage</);
+  assert.match(html, /gw-tool-button__label">Actualiser/);
+  assert.match(html, /gw-tool-button__label">Paramétrage/);
 });
 
 test('matérialise la grammaire contexte travail validation', () => {
@@ -49,6 +50,12 @@ test('matérialise la grammaire contexte travail validation', () => {
   assert.match(html, /02 · Vérifier/);
   assert.match(html, /class="gw-validation-bar prepare-validation"/);
   assert.match(html, /class="gw-validation-bar proposal-validation"/);
+});
+
+test('partage le mark Grist Studio, le bleu des étapes et supprime la marge haute', () => {
+  assert.match(structureCss, /\.gw-widget-frame[\s\S]*margin: 0 auto 32px/);
+  assert.match(structureCss, /\.gw-widget-icon[\s\S]*linear-gradient\(#79d4b7 0 0\)/);
+  assert.match(structureCss, /\.gw-step-heading__index[\s\S]*color: var\(--gw-color-geography\)/);
 });
 
 test('garde le CSS local centré sur le métier et les états dynamiques', () => {
