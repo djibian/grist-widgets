@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - "widgets/structure-picker/**"
+      - "shared/ui/**"
       - "package.json"
       - ".github/workflows/structure-picker-tests.yml"
   pull_request:
     paths:
       - "widgets/structure-picker/**"
+      - "shared/ui/**"
       - "package.json"
       - ".github/workflows/structure-picker-tests.yml"
 
