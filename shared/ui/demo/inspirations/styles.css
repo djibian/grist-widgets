@@ -56,7 +56,7 @@ h3 { margin: 0; font-size: 13px; }
 .record-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
 .header-actions { display: flex; align-items: center; gap: 7px; }
 .action-icon { display: grid; place-items: center; }
-.action-icon svg { width: 20px; height: 20px; overflow: visible; }
+.action-icon svg { width: 21px; height: 21px; overflow: visible; }
 .icon-action {
   display: inline-grid; place-items: center;
   width: 28px; height: 30px; padding: 0; border: 0; background: transparent;
@@ -69,6 +69,7 @@ h3 { margin: 0; font-size: 13px; }
 
 .configuration { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 6px; color: #64748b; font-size: 12px; }
 .configuration__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+.variant-chip { margin-left: 4px; padding-left: 10px; border-left: 1px solid #e5e7eb; color: #94a3b8; font-size: 10px; }
 .tabs-wrap { margin: 0 -20px; padding: 0 20px; border-bottom: 1px solid #eef0f3; }
 .tabs { display: flex; align-items: center; }
 .tab { position: relative; margin-right: 22px; padding: 10px 2px 9px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 650; }
@@ -109,41 +110,16 @@ kbd { color: var(--muted); font: 10px/1 ui-monospace, SFMono-Regular, Menlo, mon
 .experiment-title { margin-bottom: 4px; font-size: 13px; font-weight: 700; }
 .prototype-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 24px; padding-top: 10px; border-top: 1px solid #f1f3f5; color: #94a3b8; font-size: 10px; line-height: 1.4; }
 
-/* Toutes les variantes restent nues : aucun fond, contour ou chrome sur les actions. */
-.icon-solid, .icon-color, .icon-geo { fill: currentColor; stroke: none; }
-.icon-bold { fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
-.icon-duo, .icon-accented { fill: none; stroke: none; }
-
-body[data-variant="solid"] .icon-action { color: #334155; }
-body[data-variant="solid"] .icon-action:hover { color: #0f172a; }
-body[data-variant="solid"] .action-icon svg { width: 20px; height: 20px; }
-
-body[data-variant="bold"] .icon-action { color: #334155; }
-body[data-variant="bold"] .action-icon svg { width: 21px; height: 21px; }
-body[data-variant="bold"] .icon-action:hover { color: #0f172a; }
-
-body[data-variant="duo"] .icon-main { fill: #334155; }
-body[data-variant="duo"] .refresh-action .icon-accent { fill: #2563eb; }
-body[data-variant="duo"] .settings-action .icon-accent { fill: #7c3aed; }
-body[data-variant="duo"] .icon-action:hover .icon-main { fill: #0f172a; }
-body[data-variant="duo"] .icon-action:hover .icon-accent { filter: saturate(1.25); }
-body[data-variant="duo"] .action-icon svg { width: 21px; height: 21px; }
-
-body[data-variant="color"] .refresh-action { color: #2563eb; }
-body[data-variant="color"] .settings-action { color: #7c3aed; }
-body[data-variant="color"] .refresh-action:hover { color: #1d4ed8; }
-body[data-variant="color"] .settings-action:hover { color: #6d28d9; }
-body[data-variant="color"] .action-icon svg { width: 21px; height: 21px; }
-
-body[data-variant="geo"] .icon-action { color: #1f2937; }
-body[data-variant="geo"] .action-icon svg { width: 20px; height: 20px; }
-body[data-variant="geo"] .icon-action:hover { color: #2563eb; }
-
-body[data-variant="accent"] .icon-main { fill: #334155; }
-body[data-variant="accent"] .refresh-action .icon-accent { fill: #0ea5e9; }
-body[data-variant="accent"] .settings-action .icon-accent { fill: #f59e0b; }
-body[data-variant="accent"] .icon-action:hover .icon-main { fill: #0f172a; }
-body[data-variant="accent"] .action-icon svg { width: 21px; height: 21px; }
+/* Cycle de convergence : toutes les variantes partagent exactement le même traitement Accent. */
+.icon-accented { fill: none; stroke: none; }
+.icon-accented .icon-main { fill: #334155; stroke: none; }
+.icon-accented .icon-main-stroke { fill: none; stroke: #334155; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.icon-accented .icon-main-stroke--heavy { stroke-width: 3.5; }
+.refresh-action .icon-accent { fill: #0ea5e9; stroke: none; }
+.settings-action .icon-accent { fill: #f59e0b; stroke: none; }
+.icon-action:hover .icon-main { fill: #0f172a; }
+.icon-action:hover .icon-main-stroke { stroke: #0f172a; }
+.icon-action:hover .icon-accent { filter: saturate(1.25); }
 
 @media (max-width: 720px) {
   .variant-nav { align-items: flex-start; flex-direction: column; }
