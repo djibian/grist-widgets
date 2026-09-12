@@ -5,6 +5,7 @@ import test from 'node:test';
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const css = await readFile(new URL('../style.css', import.meta.url), 'utf8');
 const structureCss = await readFile(new URL('../../../shared/ui/structure.css', import.meta.url), 'utf8');
+const tokensCss = await readFile(new URL('../../../shared/ui/tokens.css', import.meta.url), 'utf8');
 
 const requiredIds = [
   'config-status', 'refresh', 'settings-toggle', 'settings-panel', 'settings-backdrop',
@@ -52,10 +53,13 @@ test('matérialise la grammaire contexte travail validation', () => {
   assert.match(html, /class="gw-validation-bar proposal-validation"/);
 });
 
-test('partage le mark Grist Studio, le bleu des étapes et supprime la marge haute', () => {
-  assert.match(structureCss, /\.gw-widget-frame[\s\S]*margin: 0 auto 32px/);
+test('partage le mark, le bleu workflow et le cadre commun', () => {
+  assert.match(structureCss, /\.gw-widget-frame[\s\S]*width: min\(100% - 32px, 920px\)[\s\S]*margin: 0 auto 32px/);
   assert.match(structureCss, /\.gw-widget-icon[\s\S]*linear-gradient\(#79d4b7 0 0\)/);
-  assert.match(structureCss, /\.gw-step-heading__index[\s\S]*color: var\(--gw-color-geography\)/);
+  assert.match(structureCss, /\.gw-widget-header \.app-kicker,[\s\S]*color: var\(--gw-color-workflow\)/);
+  assert.match(structureCss, /\.gw-step-heading__index[\s\S]*color: var\(--gw-color-workflow\)/);
+  assert.match(structureCss, /\.gw-step-heading \.small-context[\s\S]*background: var\(--gw-color-workflow-soft\)/);
+  assert.match(tokensCss, /--gw-color-workflow: #3567d6/);
 });
 
 test('garde le CSS local centré sur le métier et les états dynamiques', () => {
