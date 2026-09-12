@@ -1,4 +1,4 @@
-.app.gw-widget-frame { padding: 0; }
+.app.gw-widget-frame { margin: 0 auto 32px; padding: 0; }
 .hero.gw-widget-header { margin: 0; padding: 22px 24px 18px; }
 .hero h1 { margin-bottom: 4px; }
 .context-count-label { color: var(--gw-color-text-muted); font-size: var(--gw-font-size-xs); font-weight: 600; }
@@ -70,6 +70,7 @@
 .enrich-decision .contact-experiment { margin-top: 20px; padding-top: 16px; }
 
 @media (max-width: 720px) {
+  .app.gw-widget-frame { margin-top: 0; }
   .hero.gw-widget-header { padding: 18px 16px 15px; }
   .hero p { display: none; }
   .mode-switch { gap: 10px; padding: 0 16px; overflow-x: auto; }
