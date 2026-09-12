@@ -4,6 +4,7 @@ import test from "node:test";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../style.css", import.meta.url), "utf8");
+const studio = await readFile(new URL("../studio.css", import.meta.url), "utf8");
 const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 const requiredIds = [
@@ -16,21 +17,21 @@ const requiredIds = [
   "contact-results",
 ];
 
-test("charge le socle UI commun avant la feuille locale", () => {
+test("charge le socle Grist Studio complet avant les feuilles locales", () => {
   const tokens = html.indexOf("../../shared/ui/tokens.css");
   const base = html.indexOf("../../shared/ui/base.css");
   const components = html.indexOf("../../shared/ui/components.css");
-  const local = html.indexOf("style.css?v=1.2.0");
-  assert.ok(tokens >= 0 && tokens < base && base < components && components < local);
+  const structure = html.indexOf("../../shared/ui/structure.css");
+  const local = html.indexOf("style.css?v=1.3.0");
+  const studioLocal = html.indexOf("studio.css?v=1.3.0");
+  assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local && local < studioLocal);
 });
 
 test("préserve le contrat DOM des modules fonctionnels", () => {
-  for (const id of requiredIds) {
-    assert.match(html, new RegExp(`id=["']${id}["']`), `ID manquant: ${id}`);
-  }
+  for (const id of requiredIds) assert.match(html, new RegExp(`id=["']${id}["']`), `ID manquant: ${id}`);
 });
 
-test("l'interface expose exactement les deux onglets principaux", () => {
+test("conserve exactement les deux modes principaux", () => {
   assert.match(html, /id="tab-search"[\s\S]*Rechercher \/ ajouter/);
   assert.match(html, /id="tab-enrich"[\s\S]*Compléter la sélection/);
   assert.match(html, /id="enrich-badge"/);
@@ -39,21 +40,23 @@ test("l'interface expose exactement les deux onglets principaux", () => {
   assert.match(html, /ArrowLeft/);
 });
 
-test("le champ de recherche et ses résultats restent dans le même panneau", () => {
-  assert.match(
-    html,
-    /<section id="panel-search"[\s\S]*id="search"[\s\S]*id="local-results"[\s\S]*id="external-results"[\s\S]*id="manual-create"[\s\S]*<\/section>\s*<section id="panel-enrich"/,
-  );
+test("compose le mode recherche en travail puis décision", () => {
+  assert.match(html, /<section id="panel-search"[\s\S]*class="gw-work-grid search-work-grid"/);
+  assert.match(html, /01 · Rechercher/);
+  assert.match(html, /02 · Vérifier \/ ajouter/);
+  assert.match(html, /id="search"[\s\S]*id="local-results"[\s\S]*id="external-results"[\s\S]*id="manual-create"/);
 });
 
-test("le panneau d'enrichissement est séparé et masqué par défaut", () => {
+test("compose l'enrichissement en examiner puis vérifier", () => {
   assert.match(html, /<section id="panel-enrich"[^>]*hidden/);
+  assert.match(html, /01 · Examiner/);
+  assert.match(html, /02 · Vérifier/);
+  assert.match(html, /class="gw-decision-panel enrich-decision"/);
   assert.match(html, /id="selected-summary"/);
-  assert.match(html, /id="enrich-button"/);
   assert.match(html, /id="proposal-panel"/);
 });
 
-test("le compteur de table utilise le pictogramme bâtiment minimaliste", () => {
+test("le compteur de table conserve le pictogramme bâtiment", () => {
   assert.match(html, /id="table-counter"/);
   assert.match(html, /class="table-counter-icon"/);
   assert.match(html, /id="table-count"/);
@@ -80,9 +83,11 @@ test("conserve explicitement l’expérimentation Contacts publics", () => {
   assert.match(css, /--gw-color-experimental-border/);
 });
 
-test("applique Grist Studio aux onglets et aux résultats", () => {
-  assert.match(css, /\.tab-button\.active::after/);
-  assert.match(css, /background: var\(--gw-color-primary\)/);
+test("applique la composition Grist Studio sans supprimer les composants métier", () => {
+  assert.match(html, /class="gw-context-strip"/);
+  assert.match(html, /class="mode-switch"/);
+  assert.match(studio, /\.search-work-grid/);
+  assert.match(studio, /\.enrich-work-grid/);
   assert.match(css, /\.result-card:hover/);
-  assert.match(css, /border-top: 1px solid var\(--gw-color-border-subtle\)/);
+  assert.match(css, /\.proposal-row/);
 });

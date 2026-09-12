@@ -7,172 +7,115 @@
   <link rel="stylesheet" href="../../shared/ui/tokens.css">
   <link rel="stylesheet" href="../../shared/ui/base.css">
   <link rel="stylesheet" href="../../shared/ui/components.css">
-  <link rel="stylesheet" href="style.css?v=1.2.0">
+  <link rel="stylesheet" href="../../shared/ui/structure.css">
+  <link rel="stylesheet" href="style.css?v=1.3.0">
+  <link rel="stylesheet" href="studio.css?v=1.3.0">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
-  <main class="app">
-    <header class="hero gw-header">
-      <div>
-        <div class="app-kicker">Assistant Structures</div>
-        <h1>Structures de stage</h1>
-        <p>Rechercher, ajouter et compléter les structures utilisées dans Grist.</p>
-      </div>
-      <div id="table-counter" class="table-counter" tabindex="0" hidden>
-        <svg class="table-counter-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M5 21V5.75A1.75 1.75 0 0 1 6.75 4h7.5A1.75 1.75 0 0 1 16 5.75V21" />
-          <path d="M16 9h2.25A1.75 1.75 0 0 1 20 10.75V21" />
-          <path d="M8 8h2M12 8h1M8 12h2M12 12h1M8 16h2M12 16h1" />
-          <path d="M3 21h19" />
-        </svg>
-        <span id="table-count" class="table-count"></span>
+  <main class="app gw-widget-frame">
+    <header class="hero gw-widget-header">
+      <div class="gw-widget-heading">
+        <div class="gw-widget-icon" aria-hidden="true">▦</div>
+        <div class="gw-widget-heading__text">
+          <div class="app-kicker">Données établissement</div>
+          <h1>Assistant Structures</h1>
+          <p>Rechercher, ajouter et fiabiliser les structures utilisées dans Grist.</p>
+        </div>
       </div>
     </header>
 
-    <div id="config-status" class="configuration pending" role="status" aria-live="polite">Connexion à Grist…</div>
+    <section class="gw-context-strip" aria-label="Contexte Grist">
+      <div class="gw-context-item"><span class="gw-context-label">Table</span><strong class="gw-context-value">Structures de stage</strong></div>
+      <div class="gw-context-item"><span class="gw-context-label">Volume</span><div id="table-counter" class="table-counter gw-context-value" tabindex="0" hidden><svg class="table-counter-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V5.75A1.75 1.75 0 0 1 6.75 4h7.5A1.75 1.75 0 0 1 16 5.75V21"/><path d="M16 9h2.25A1.75 1.75 0 0 1 20 10.75V21"/><path d="M8 8h2M12 8h1M8 12h2M12 12h1M8 16h2M12 16h1"/><path d="M3 21h19"/></svg><span id="table-count" class="table-count"></span><span class="context-count-label">structures</span></div></div>
+      <div class="gw-context-item"><span class="gw-context-label">État</span><div id="config-status" class="configuration pending context-configuration" role="status" aria-live="polite">Connexion à Grist…</div></div>
+    </section>
 
-    <div class="tabs-wrap">
+    <div class="mode-switch">
+      <span class="mode-switch-label">Mode</span>
       <nav class="tabs" role="tablist" aria-label="Fonctions de l'Assistant Structures">
-        <button
-          id="tab-search"
-          class="tab-button active"
-          type="button"
-          role="tab"
-          aria-selected="true"
-          aria-controls="panel-search"
-          data-tab-target="panel-search"
-          tabindex="0"
-        >Rechercher / ajouter</button>
-        <button
-          id="tab-enrich"
-          class="tab-button"
-          type="button"
-          role="tab"
-          aria-selected="false"
-          aria-controls="panel-enrich"
-          data-tab-target="panel-enrich"
-          tabindex="-1"
-        >
-          <span>Compléter la sélection</span>
-          <span id="enrich-badge" class="tab-badge" hidden></span>
-        </button>
+        <button id="tab-search" class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="panel-search" data-tab-target="panel-search" tabindex="0">Rechercher / ajouter</button>
+        <button id="tab-enrich" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-enrich" data-tab-target="panel-enrich" tabindex="-1"><span>Compléter la sélection</span><span id="enrich-badge" class="tab-badge" hidden></span></button>
       </nav>
     </div>
 
     <section id="panel-search" class="tab-panel" role="tabpanel" aria-labelledby="tab-search">
-      <section class="search-section" aria-labelledby="search-title">
-        <div class="eyebrow">Recherche</div>
-        <h2 id="search-title">Trouver une structure</h2>
-        <label class="search-label" for="search">Nom usuel, raison sociale, adresse, commune ou SIREN/SIRET</label>
-        <input id="search" class="search-input gw-input" type="search" autocomplete="off" placeholder="Ex. garage Machecoul" aria-describedby="search-help" disabled>
-        <p id="search-help" class="help">Recherche immédiate dans toute la table Grist, puis dans l’Annuaire des Entreprises pour les établissements actifs du 44 et du 85.</p>
-      </section>
+      <div class="gw-work-grid search-work-grid">
+        <section class="gw-work-main search-main">
+          <div class="gw-step-heading"><span class="gw-step-heading__index">01 · Rechercher</span><h2 id="search-title" class="gw-step-heading__title">Trouver une structure</h2><p class="gw-step-heading__help">Nom usuel, raison sociale, adresse, commune ou SIREN/SIRET.</p></div>
+          <section class="search-section" aria-labelledby="search-title"><label class="search-label" for="search">Recherche</label><input id="search" class="search-input gw-input" type="search" autocomplete="off" placeholder="Ex. garage Machecoul" aria-describedby="search-help" disabled><p id="search-help" class="help">Recherche immédiate dans toute la table Grist.</p></section>
+          <div id="global-status" class="status" role="status" aria-live="polite"></div>
+          <section class="results-section" aria-labelledby="local-title"><div class="section-heading"><h3 id="local-title">Déjà dans Grist</h3><span id="local-count" class="count"></span></div><div id="local-results" class="results"></div></section>
+        </section>
 
-      <div id="global-status" class="status" role="status" aria-live="polite"></div>
-
-      <section class="results-section" aria-labelledby="local-title">
-        <div class="section-heading">
-          <h2 id="local-title">Déjà enregistrées dans Grist</h2>
-          <span id="local-count" class="count"></span>
-        </div>
-        <div id="local-results" class="results"></div>
-      </section>
-
-      <section class="results-section" aria-labelledby="external-title">
-        <div class="section-heading">
-          <h2 id="external-title">Autres structures trouvées — 44 / 85</h2>
-          <span id="external-count" class="count"></span>
-        </div>
-        <div id="external-status" class="substatus" role="status" aria-live="polite"></div>
-        <div id="external-results" class="results"></div>
-      </section>
-
-      <div class="tab-footer">
-        <button id="manual-create" class="button button-secondary gw-button gw-button--secondary" type="button" disabled>Structure introuvable ? Créer manuellement</button>
+        <aside class="gw-decision-panel search-decision">
+          <div class="gw-step-heading"><span class="gw-step-heading__index">02 · Vérifier / ajouter</span><h2 id="external-title" class="gw-step-heading__title">Nouvelles structures</h2><p class="gw-step-heading__help">Résultats actifs de l’Annuaire des Entreprises pour le 44 et le 85.</p></div>
+          <div id="external-status" class="substatus" role="status" aria-live="polite"></div>
+          <div class="section-heading compact-heading"><span class="decision-source">Annuaire des Entreprises</span><span id="external-count" class="count"></span></div>
+          <div id="external-results" class="results external-results"></div>
+          <div class="tab-footer"><button id="manual-create" class="button button-secondary gw-button gw-button--secondary" type="button" disabled>Structure introuvable ? Créer manuellement</button></div>
+        </aside>
       </div>
     </section>
 
     <section id="panel-enrich" class="tab-panel" role="tabpanel" aria-labelledby="tab-enrich" hidden>
-      <section class="assistant-panel" aria-labelledby="selected-title">
-        <div class="section-heading">
-          <div>
-            <div class="eyebrow">Sélection actuelle</div>
-            <h2 id="selected-title">Structure sélectionnée</h2>
-          </div>
-          <button id="enrich-button" class="button button-primary gw-button gw-button--primary" type="button" disabled>Analyser / compléter</button>
-        </div>
-        <div id="selected-summary" class="selected-summary"></div>
-        <div id="enrich-status" class="substatus" role="status" aria-live="polite"></div>
-        <div id="enterprise-choices" class="choice-block"></div>
-        <div id="geocode-choices" class="choice-block"></div>
-        <div id="proposal-panel" class="proposal-panel"></div>
-
-        <section id="contact-experiment" class="contact-experiment" aria-labelledby="contact-experiment-title">
-          <div class="contact-experiment-heading">
-            <div>
-              <h3 id="contact-experiment-title">Contacts publics <span class="experimental-tag gw-badge gw-badge--experimental">Expérimental</span></h3>
-              <p class="help">Teste OpenStreetMap : SIRET exact en priorité, puis proximité et similitude du nom en secours.</p>
-            </div>
-            <button id="contact-search" class="button button-secondary gw-button gw-button--secondary" type="button" disabled>Rechercher les contacts</button>
-          </div>
-          <div id="contact-current"></div>
-          <div id="contact-status" class="substatus contact-status" role="status" aria-live="polite"></div>
-          <div id="contact-results" class="contact-results"></div>
+      <div class="gw-work-grid enrich-work-grid">
+        <section class="gw-work-main assistant-panel" aria-labelledby="selected-title">
+          <div class="gw-step-heading"><span class="gw-step-heading__index">01 · Examiner</span><h2 id="selected-title" class="gw-step-heading__title">Structure sélectionnée</h2><p class="gw-step-heading__help">Repère les informations fiables et celles qui manquent.</p></div>
+          <div id="selected-summary" class="selected-summary"></div>
+          <div class="gw-action-dock enrich-action-dock"><div class="gw-action-dock__text"><strong>Diagnostic de la fiche</strong><small>Recherche les données publiques susceptibles de compléter la sélection.</small></div><button id="enrich-button" class="button button-primary gw-button gw-button--primary" type="button" disabled>Analyser / compléter</button></div>
         </section>
-      </section>
+
+        <aside class="gw-decision-panel enrich-decision">
+          <div class="gw-step-heading"><span class="gw-step-heading__index">02 · Vérifier</span><h2 class="gw-step-heading__title">Modifications proposées</h2><p class="gw-step-heading__help">Seules les données retenues seront écrites dans Grist.</p></div>
+          <div id="enrich-status" class="substatus" role="status" aria-live="polite"></div>
+          <div id="enterprise-choices" class="choice-block"></div>
+          <div id="geocode-choices" class="choice-block"></div>
+          <div id="proposal-panel" class="proposal-panel"></div>
+          <section id="contact-experiment" class="contact-experiment" aria-labelledby="contact-experiment-title"><div class="contact-experiment-heading"><div><h3 id="contact-experiment-title">Contacts publics <span class="experimental-tag gw-badge gw-badge--experimental">Expérimental</span></h3><p class="help">Recherche complémentaire dans OpenStreetMap.</p></div><button id="contact-search" class="button button-secondary gw-button gw-button--secondary" type="button" disabled>Rechercher</button></div><div id="contact-current"></div><div id="contact-status" class="substatus contact-status" role="status" aria-live="polite"></div><div id="contact-results" class="contact-results"></div></section>
+        </aside>
+      </div>
     </section>
   </main>
 
-  <script type="module" src="app.js?v=1.2.0"></script>
+  <script type="module" src="app.js?v=1.3.0"></script>
   <script type="module" src="contacts-experiment.js"></script>
   <script>
     (() => {
-      const tabs = [...document.querySelectorAll(".tab-button")];
-      const panels = [...document.querySelectorAll(".tab-panel")];
-      const selectedSummary = document.getElementById("selected-summary");
-      const enrichBadge = document.getElementById("enrich-badge");
-
+      const tabs = [...document.querySelectorAll('.tab-button')];
+      const panels = [...document.querySelectorAll('.tab-panel')];
+      const selectedSummary = document.getElementById('selected-summary');
+      const enrichBadge = document.getElementById('enrich-badge');
       function activateTab(button, shouldFocus = false) {
         const targetId = button.dataset.tabTarget;
         for (const tab of tabs) {
           const active = tab === button;
-          tab.classList.toggle("active", active);
-          tab.setAttribute("aria-selected", String(active));
+          tab.classList.toggle('active', active);
+          tab.setAttribute('aria-selected', String(active));
           tab.tabIndex = active ? 0 : -1;
         }
         for (const panel of panels) panel.hidden = panel.id !== targetId;
         if (shouldFocus) button.focus();
       }
-
       tabs.forEach((button, index) => {
-        button.addEventListener("click", () => activateTab(button));
-        button.addEventListener("keydown", event => {
+        button.addEventListener('click', () => activateTab(button));
+        button.addEventListener('keydown', event => {
           let nextIndex = null;
-          if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
-          if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
-          if (event.key === "Home") nextIndex = 0;
-          if (event.key === "End") nextIndex = tabs.length - 1;
+          if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+          if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === 'Home') nextIndex = 0;
+          if (event.key === 'End') nextIndex = tabs.length - 1;
           if (nextIndex === null) return;
           event.preventDefault();
           activateTab(tabs[nextIndex], true);
         });
       });
-
       function updateEnrichmentBadge() {
-        const missing = selectedSummary.querySelectorAll(".health-item.missing").length;
+        const missing = selectedSummary.querySelectorAll('.health-item.missing').length;
         enrichBadge.hidden = missing === 0;
-        enrichBadge.textContent = missing ? String(missing) : "";
-        enrichBadge.setAttribute(
-          "aria-label",
-          missing ? `${missing} information${missing > 1 ? "s" : ""} à compléter` : "Aucune information manquante",
-        );
+        enrichBadge.textContent = missing ? String(missing) : '';
       }
-
-      new MutationObserver(updateEnrichmentBadge).observe(selectedSummary, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      });
+      new MutationObserver(updateEnrichmentBadge).observe(selectedSummary, { childList: true, subtree: true, characterData: true });
       updateEnrichmentBadge();
     })();
   </script>
