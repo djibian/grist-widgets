@@ -1,24 +1,7 @@
-# Référence visuelle Linear
+# Références visuelles historiques
 
-Ce dossier conserve uniquement la référence visuelle finale validée pour les widgets du dépôt.
+Ce dossier conserve les références utilisées pendant les cycles de convergence visuelle.
 
-## Référence définitive
+`linear-final.html` documente la référence Linear qui a précédé l'adoption de **Grist Studio**. Elle reste utile pour retracer certaines décisions (sobriété, densité, actions secondaires, focus clavier), mais elle n'est plus la spécification active du dépôt.
 
-`linear-final.html` rassemble les choix désormais figés :
-
-- base visuelle Linear ;
-- accent principal bleu `#2563eb` ;
-- texte principal sombre ;
-- cartes, champs, boutons et onglets sobres ;
-- onglet actif souligné en bleu ;
-- icône **Actualiser** avec arc sombre et point bleu détaché ;
-- icône **Paramètres** à trois réglages et points bleus ;
-- actions secondaires sans cadre au repos ;
-- halo neutre au survol ;
-- focus clavier visible.
-
-La page est publiée ici :
-
-`https://djibian.github.io/grist-widgets/shared/ui/demo/inspirations/linear-final.html`
-
-Les anciens cycles de comparaison ont été supprimés de l’arbre courant une fois les choix validés. Ils restent consultables dans l’historique Git si une décision de design doit un jour être retracée.
+La spécification courante est décrite dans `shared/ui/README.md` et implémentée par `tokens.css`, `base.css` et `components.css`.
