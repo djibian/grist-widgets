@@ -1,3 +1,4 @@
+import "./context-status.js";
 import {
   DEFAULT_DEPARTMENTS,
   departmentInfo,
