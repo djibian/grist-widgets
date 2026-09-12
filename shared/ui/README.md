@@ -53,5 +53,5 @@ Le CSS local ne doit conserver que les éléments réellement propres au métier
 
 - `tokens.css` — couleurs, typographie, espacements, rayons, ombres et rôles sémantiques ;
 - `base.css` — canvas, base typographique, focus et réduction des animations ;
-- `components.css` — boutons, actions d’en-tête, cartes, statuts, badges, formulaires, métriques et tables ;
+- `components.css` — boutons, actions d’en-tête, statuts, badges, champs et tables réellement partagés ;
 - `structure.css` — composition `contexte → travail → validation`.
