@@ -6,12 +6,14 @@ on:
     paths:
       - "widgets/route-distance/**"
       - "shared/services/**"
+      - "shared/ui/**"
       - "package.json"
       - ".github/workflows/route-distance-tests.yml"
   pull_request:
     paths:
       - "widgets/route-distance/**"
       - "shared/services/**"
+      - "shared/ui/**"
       - "package.json"
       - ".github/workflows/route-distance-tests.yml"
 
