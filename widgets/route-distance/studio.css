@@ -1,5 +1,6 @@
-.route-shell { width: min(100% - 32px, 820px); }
+.route-shell { width: min(100% - 32px, 820px); margin-top: 0; }
 .route-header { padding-bottom: 18px; }
+.route-header .gw-kicker { color: var(--gw-color-geography); }
 .mapping-error { margin: 0; border-radius: 0; border-left: 0; border-right: 0; }
 .geography-step { color: var(--gw-color-geography); }
 .context-state.ready { color: var(--gw-color-success); }
@@ -26,4 +27,4 @@
 .route-save-zone { margin-top: auto; padding-top: 18px; }
 .route-save-zone .gw-button { width: 100%; }
 .footer { margin: 0; padding: 10px 16px; background: #fbfcfb; }
-@media (max-width: 720px) { .route-shell { width: min(100% - 20px, 820px); } .route-result { min-height: 330px; } }
+@media (max-width: 720px) { .route-shell { width: min(100% - 20px, 820px); margin-top: 0; } .route-result { min-height: 330px; } }

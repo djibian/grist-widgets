@@ -56,6 +56,10 @@ test("compose l'enrichissement en examiner puis vérifier", () => {
   assert.match(html, /id="proposal-panel"/);
 });
 
+test("supprime la marge supérieure héritée dans le widget embarqué", () => {
+  assert.match(studio, /\.app\.gw-widget-frame \{ margin: 0 auto 32px; padding: 0; \}/);
+});
+
 test("le compteur de table conserve le pictogramme bâtiment", () => {
   assert.match(html, /id="table-counter"/);
   assert.match(html, /class="table-counter-icon"/);
