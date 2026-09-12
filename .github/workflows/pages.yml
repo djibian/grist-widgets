@@ -1,0 +1,83 @@
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+      - contacts-resolver
+      - "preview/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main and all branches
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: source
+
+      - name: Assemble production and previews
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p site
+          git -C source archive main | tar -x -C site
+          rm -rf site/previews
+          mkdir -p site/previews
+
+          git -C source fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+
+          branches=("contacts-resolver")
+          while IFS= read -r ref; do
+            branch="${ref#refs/remotes/origin/}"
+            branches+=("$branch")
+          done < <(git -C source for-each-ref --format='%(refname)' 'refs/remotes/origin/preview/*')
+
+          declare -A seen
+          for branch in "${branches[@]}"; do
+            if [[ -n "${seen[$branch]:-}" ]]; then
+              continue
+            fi
+            seen[$branch]=1
+
+            ref="refs/remotes/origin/$branch"
+            if ! git -C source show-ref --verify --quiet "$ref"; then
+              continue
+            fi
+
+            slug="${branch#preview/}"
+            mkdir -p "site/previews/$slug"
+            git -C source archive "$ref" | tar -x -C "site/previews/$slug"
+          done
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
