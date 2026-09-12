@@ -10,6 +10,85 @@ import {
 
 const OPTION_KEY = "departments";
 
+function node(tagName, { id = "", className = "", text = "", type = "" } = {}) {
+  const element = document.createElement(tagName);
+  if (id) element.id = id;
+  if (className) element.className = className;
+  if (text) element.textContent = text;
+  if (type) element.type = type;
+  return element;
+}
+
+function ensureSettingsUi() {
+  const externalTitle = document.getElementById("external-title");
+  const externalHelp = externalTitle?.parentElement?.querySelector(".gw-step-heading__help");
+  if (externalHelp && !externalHelp.id) externalHelp.id = "external-scope-help";
+
+  const header = document.querySelector(".gw-widget-header");
+  if (header && !document.getElementById("department-settings-open")) {
+    let tools = header.querySelector(".gw-widget-tools");
+    if (!tools) {
+      tools = node("div", { className: "gw-widget-tools" });
+      header.appendChild(tools);
+    }
+    const open = node("button", { id: "department-settings-open", className: "gw-tool-button", type: "button" });
+    open.setAttribute("aria-controls", "department-settings");
+    open.setAttribute("aria-expanded", "false");
+    const icon = node("span", { text: "⚙" });
+    icon.setAttribute("aria-hidden", "true");
+    const label = node("span", { id: "department-settings-label", className: "gw-tool-button__label", text: "Départements" });
+    open.append(icon, label);
+    tools.appendChild(open);
+  }
+
+  if (!document.getElementById("department-settings")) {
+    const panel = node("section", { id: "department-settings", className: "gw-work-grid" });
+    panel.hidden = true;
+    panel.setAttribute("aria-labelledby", "department-settings-title");
+
+    const main = node("section", { className: "gw-work-main" });
+    const mainHeading = node("div", { className: "gw-step-heading" });
+    mainHeading.append(
+      node("span", { className: "gw-step-heading__index", text: "Configuration" }),
+      node("h2", { id: "department-settings-title", className: "gw-step-heading__title", text: "Départements recherchés" }),
+      node("p", { className: "gw-step-heading__help", text: "Ces départements limitent les recherches dans l’Annuaire des Entreprises et prépareront le chargement des futurs index locaux." }),
+    );
+    const selected = node("div", { id: "department-selected", className: "meta" });
+    selected.setAttribute("aria-live", "polite");
+    const searchLabel = node("label", { className: "search-label", text: "Ajouter un département" });
+    searchLabel.htmlFor = "department-search";
+    const search = node("input", { id: "department-search", className: "gw-input", type: "search" });
+    search.autocomplete = "off";
+    search.placeholder = "Ex. 49 ou Maine-et-Loire";
+    const status = node("div", { id: "department-config-status", className: "substatus" });
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    main.append(mainHeading, selected, searchLabel, search, status);
+
+    const aside = node("aside", { className: "gw-decision-panel" });
+    const asideHeading = node("div", { className: "gw-step-heading" });
+    asideHeading.append(
+      node("span", { className: "gw-step-heading__index", text: "Ajouter / retirer" }),
+      node("h2", { className: "gw-step-heading__title", text: "Résultats" }),
+      node("p", { className: "gw-step-heading__help", text: "Recherche par numéro ou nom. Au moins un département doit rester sélectionné." }),
+    );
+    const results = node("div", { id: "department-results", className: "results" });
+    const footer = node("div", { className: "tab-footer" });
+    footer.append(
+      node("button", { id: "department-cancel", className: "gw-button gw-button--secondary", text: "Annuler", type: "button" }),
+      node("button", { id: "department-save", className: "gw-button gw-button--primary", text: "Enregistrer", type: "button" }),
+    );
+    aside.append(asideHeading, results, footer);
+    panel.append(main, aside);
+
+    const context = document.querySelector(".gw-context-strip");
+    if (context) context.insertAdjacentElement("afterend", panel);
+    else document.querySelector(".app")?.prepend(panel);
+  }
+}
+
+ensureSettingsUi();
+
 const ui = {
   open: document.getElementById("department-settings-open"),
   openLabel: document.getElementById("department-settings-label"),
@@ -25,8 +104,8 @@ const ui = {
 let savedDepartments = [...DEFAULT_DEPARTMENTS];
 let draftDepartments = [...savedDepartments];
 
-function clearNode(node) {
-  node?.replaceChildren();
+function clearNode(nodeToClear) {
+  nodeToClear?.replaceChildren();
 }
 
 function setStatus(message = "", type = "") {
@@ -45,10 +124,7 @@ function renderSelected() {
   clearNode(ui.selected);
   for (const code of draftDepartments) {
     const info = departmentInfo(code);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "gw-button gw-button--secondary";
-    button.textContent = `${code} · ${info?.name ?? code} ×`;
+    const button = node("button", { className: "gw-button gw-button--secondary", type: "button", text: `${code} · ${info?.name ?? code} ×` });
     button.title = `Retirer ${info?.name ?? code}`;
     button.addEventListener("click", () => {
       draftDepartments = draftDepartments.filter(value => value !== code);
@@ -60,12 +136,7 @@ function renderSelected() {
     });
     ui.selected?.appendChild(button);
   }
-  if (!draftDepartments.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty";
-    empty.textContent = "Aucun département sélectionné.";
-    ui.selected?.appendChild(empty);
-  }
+  if (!draftDepartments.length) ui.selected?.appendChild(node("div", { className: "empty", text: "Aucun département sélectionné." }));
   if (ui.save) ui.save.disabled = !draftDepartments.length;
 }
 
@@ -73,34 +144,21 @@ function renderResults() {
   clearNode(ui.results);
   const query = ui.search?.value ?? "";
   if (!query.trim()) {
-    const empty = document.createElement("div");
-    empty.className = "empty";
-    empty.textContent = "Recherche par numéro ou nom de département.";
-    ui.results?.appendChild(empty);
+    ui.results?.appendChild(node("div", { className: "empty", text: "Recherche par numéro ou nom de département." }));
     return;
   }
 
   const matches = searchDepartments(query, { exclude: draftDepartments, limit: 10 });
   if (!matches.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty";
-    empty.textContent = "Aucun autre département correspondant.";
-    ui.results?.appendChild(empty);
+    ui.results?.appendChild(node("div", { className: "empty", text: "Aucun autre département correspondant." }));
     return;
   }
 
   for (const item of matches) {
-    const card = document.createElement("article");
-    card.className = "result-card";
-    const content = document.createElement("div");
-    const name = document.createElement("div");
-    name.className = "result-name";
-    name.textContent = `${item.code} — ${item.name}`;
-    content.appendChild(name);
-    const add = document.createElement("button");
-    add.type = "button";
-    add.className = "button button-secondary";
-    add.textContent = "Ajouter";
+    const card = node("article", { className: "result-card" });
+    const content = node("div");
+    content.appendChild(node("div", { className: "result-name", text: `${item.code} — ${item.name}` }));
+    const add = node("button", { className: "button button-secondary", type: "button", text: "Ajouter" });
     add.addEventListener("click", () => {
       draftDepartments = normalizeDepartments([...draftDepartments, item.code], []);
       if (ui.search) ui.search.value = "";
