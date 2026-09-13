@@ -1,5 +1,10 @@
 import { applyEnrichmentChanges, fetchFullSnapshot } from "./grist.js";
 import { osmContactSource } from "./contact-sources/osm.js";
+import {
+  contactSourceSummary,
+  isExactSiretCandidate,
+  isNearbyNameCandidate,
+} from "./contact-model.js";
 import { identifierParts } from "./search.js";
 
 const CONTACT_SOURCE = osmContactSource;
@@ -106,11 +111,15 @@ function refreshAvailability() {
 }
 
 function confidenceText(candidate) {
-  return candidate.confidence === "siret" ? "Correspondance SIRET" : "Correspondance probable";
+  return isExactSiretCandidate(candidate) ? "Correspondance SIRET" : "Correspondance probable";
+}
+
+function candidateContact(candidate, key) {
+  return candidate?.contacts?.[key] ?? "";
 }
 
 function makeContactLine(field, candidate, cardIndex) {
-  const proposed = candidate[field.key];
+  const proposed = candidateContact(candidate, field.key);
   if (!proposed) return null;
 
   const current = valueOf(field.logical);
@@ -122,7 +131,7 @@ function makeContactLine(field, candidate, cardIndex) {
   checkbox.type = "checkbox";
   checkbox.dataset.contactField = field.logical;
   checkbox.dataset.contactCard = String(cardIndex);
-  checkbox.checked = Boolean(candidate.confidence === "siret" && !hasText(current) && writable);
+  checkbox.checked = Boolean(isExactSiretCandidate(candidate) && !hasText(current) && writable);
   checkbox.disabled = !writable;
 
   const content = document.createElement("div");
@@ -144,7 +153,8 @@ function selectedChangesForCard(card, candidate) {
   const changes = {};
   for (const field of FIELD_CONFIG) {
     const checkbox = card.querySelector(`input[data-contact-field="${field.logical}"]:checked:not(:disabled)`);
-    if (checkbox && candidate[field.key]) changes[field.logical] = candidate[field.key];
+    const proposed = candidateContact(candidate, field.key);
+    if (checkbox && proposed) changes[field.logical] = proposed;
   }
   return changes;
 }
@@ -161,15 +171,15 @@ function renderCandidates(candidates) {
     heading.className = "contact-card-heading";
     const name = document.createElement("div");
     name.className = "contact-card-name";
-    name.textContent = candidate.nom || String(valueOf("NomCommercial") || "Structure");
+    name.textContent = candidate.identity?.name || String(valueOf("NomCommercial") || "Structure");
     const confidence = document.createElement("span");
-    confidence.className = `contact-confidence ${candidate.confidence === "siret" ? "exact" : "nearby"}`;
+    confidence.className = `contact-confidence ${isExactSiretCandidate(candidate) ? "exact" : "nearby"}`;
     confidence.textContent = confidenceText(candidate);
     heading.append(name, confidence);
 
     const source = document.createElement("div");
     source.className = "contact-source";
-    source.textContent = candidate.source;
+    source.textContent = contactSourceSummary(candidate);
     card.append(heading, source);
 
     const fields = document.createElement("div");
@@ -232,9 +242,9 @@ async function searchContacts() {
     if (requestGeneration !== generation) return;
     renderCandidates(result.candidates);
 
-    if (result.mode === "siret") {
+    if (result.candidates.some(isExactSiretCandidate)) {
       setStatus("Contact public trouvé avec le même SIRET. Les champs vides modifiables sont présélectionnés.", "success");
-    } else if (result.mode === "nearby") {
+    } else if (result.candidates.some(isNearbyNameCandidate)) {
       setStatus("Contact possible trouvé par proximité et similitude du nom. Rien n’est présélectionné : vérifie avant d’appliquer.");
     } else {
       setStatus(`Aucun contact public suffisamment fiable trouvé dans ${CONTACT_SOURCE.label}.`);
