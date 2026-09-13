@@ -1,9 +1,11 @@
 import { applyEnrichmentChanges, fetchFullSnapshot } from "./grist.js";
-import { osmContactSource } from "./contact-sources/osm.js";
+import {
+  availableContactSources,
+  searchContactSources,
+} from "./contact-search.js";
 import {
   contactSourceSummary,
   isExactSiretCandidate,
-  isNearbyNameCandidate,
 } from "./contact-model.js";
 import {
   CONTACT_CONFIDENCE,
@@ -11,8 +13,6 @@ import {
   resolveContactCandidates,
 } from "./contact-ranking.js";
 import { identifierParts } from "./search.js";
-
-const CONTACT_SOURCE = osmContactSource;
 
 const FIELD_CONFIG = Object.freeze([
   { logical: "Telephone", key: "telephone", label: "Téléphone" },
@@ -25,6 +25,7 @@ const ui = {
   searchButton: document.getElementById("contact-search"),
   current: document.getElementById("contact-current"),
   status: document.getElementById("contact-status"),
+  sources: document.getElementById("contact-sources"),
   results: document.getElementById("contact-results"),
 };
 
@@ -102,26 +103,58 @@ function renderCurrentContacts() {
   ui.current.appendChild(list);
 }
 
+function renderSourceStates(states = []) {
+  clearNode(ui.sources);
+  if (!ui.sources || !states.length) return;
+
+  const list = document.createElement("div");
+  list.className = "contact-source-list";
+  for (const state of states) {
+    const item = document.createElement("span");
+    const empty = state.status === "success" && state.candidateCount === 0;
+    item.className = `contact-source-state ${state.status}${empty ? " empty" : ""}`;
+
+    const label = document.createElement("strong");
+    label.textContent = state.label;
+    const detail = document.createElement("span");
+    if (state.status === "error") {
+      detail.textContent = "indisponible";
+      if (state.error) item.title = state.error;
+    } else if (state.candidateCount === 0) {
+      detail.textContent = "aucun résultat";
+    } else {
+      detail.textContent = `${state.candidateCount} résultat${state.candidateCount > 1 ? "s" : ""}`;
+    }
+    item.append(label, detail);
+    list.appendChild(item);
+  }
+  ui.sources.appendChild(list);
+}
+
 function refreshAvailability() {
   renderCurrentContacts();
   clearNode(ui.results);
+  clearNode(ui.sources);
   writableMappings = {};
   const context = currentContext();
-  const available = Boolean(currentRecord && currentRecord.id !== "new" && CONTACT_SOURCE.canSearch(context));
+  const sources = currentRecord && currentRecord.id !== "new" ? availableContactSources(context) : [];
+  const available = sources.length > 0;
   if (ui.searchButton) ui.searchButton.disabled = !available;
 
   if (!currentRecord || currentRecord.id === "new") {
-    setStatus("Sélectionne une structure existante pour tester la recherche de contacts.");
+    setStatus("Sélectionne une structure existante pour rechercher ses contacts publics.");
   } else if (!available) {
-    setStatus("Pour tester les contacts, complète d’abord le SIRET ou les coordonnées de la structure avec l’analyse ci-dessus.");
+    setStatus("Complète d’abord le SIRET ou les coordonnées de la structure avec l’analyse ci-dessus.");
   } else {
-    setStatus("");
+    setStatus(`${sources.length} source${sources.length > 1 ? "s" : ""} publique${sources.length > 1 ? "s" : ""} disponible${sources.length > 1 ? "s" : ""}.`);
   }
 }
 
 function confidenceClass(candidate, context) {
   const confidence = contactConfidence(candidate, context);
-  return confidence.level === CONTACT_CONFIDENCE.VERY_RELIABLE ? "exact" : "nearby";
+  if (confidence.level === CONTACT_CONFIDENCE.VERY_RELIABLE) return "exact";
+  if (confidence.level === CONTACT_CONFIDENCE.PROBABLE) return "probable";
+  return "verify";
 }
 
 function candidateContact(candidate, key) {
@@ -169,6 +202,20 @@ function selectedChangesForCard(card, candidate) {
   return changes;
 }
 
+function renderCandidateProvenance(candidate) {
+  const provenance = Array.isArray(candidate?.source?.provenance) ? candidate.source.provenance : [];
+  const labels = [...new Set(provenance.map(source => source?.label || source?.id).filter(Boolean))];
+  const row = document.createElement("div");
+  row.className = "contact-provenance";
+  for (const labelText of labels) {
+    const badge = document.createElement("span");
+    badge.className = "contact-provenance-badge";
+    badge.textContent = labelText;
+    row.appendChild(badge);
+  }
+  return row;
+}
+
 function renderCandidates(candidates, context) {
   clearNode(ui.results);
   if (!candidates.length) return;
@@ -179,13 +226,17 @@ function renderCandidates(candidates, context) {
 
     const heading = document.createElement("div");
     heading.className = "contact-card-heading";
+    const nameBlock = document.createElement("div");
+    nameBlock.className = "contact-card-identity";
     const name = document.createElement("div");
     name.className = "contact-card-name";
     name.textContent = candidate.identity?.name || String(valueOf("NomCommercial") || "Structure");
+    nameBlock.append(name, renderCandidateProvenance(candidate));
+
     const confidence = document.createElement("span");
     confidence.className = `contact-confidence ${confidenceClass(candidate, context)}`;
     confidence.textContent = contactConfidence(candidate, context).label;
-    heading.append(name, confidence);
+    heading.append(nameBlock, confidence);
 
     const source = document.createElement("div");
     source.className = "contact-source";
@@ -230,10 +281,28 @@ function renderCandidates(candidates, context) {
   });
 }
 
+function finalSearchStatus(candidates, states, context) {
+  const failures = states.filter(state => state.status === "error").length;
+  const successful = states.length - failures;
+  const suffix = failures ? ` ${failures} source${failures > 1 ? "s" : ""} indisponible${failures > 1 ? "s" : ""}.` : "";
+
+  if (candidates.length) {
+    const best = contactConfidence(candidates[0], context);
+    if (best.level === CONTACT_CONFIDENCE.VERY_RELIABLE) {
+      return { message: `Contact très fiable trouvé. Les champs vides modifiables du meilleur candidat sont présélectionnés.${suffix}`, type: "success" };
+    }
+    return { message: `${candidates.length} proposition${candidates.length > 1 ? "s" : ""} classée${candidates.length > 1 ? "s" : ""} par fiabilité. Vérifie avant d’appliquer.${suffix}`, type: "" };
+  }
+
+  if (!successful && failures) return { message: "Les sources publiques disponibles sont temporairement indisponibles.", type: "error" };
+  return { message: `Aucun contact public suffisamment fiable trouvé.${suffix}`, type: "" };
+}
+
 async function searchContacts() {
   if (!currentRecord || currentRecord.id === "new") return;
   const context = currentContext();
-  if (!CONTACT_SOURCE.canSearch(context)) return;
+  const sources = availableContactSources(context);
+  if (!sources.length) return;
 
   generation += 1;
   const requestGeneration = generation;
@@ -241,31 +310,28 @@ async function searchContacts() {
   controller = new AbortController();
   ui.searchButton.disabled = true;
   clearNode(ui.results);
-  setStatus(`Recherche de contacts publics dans ${CONTACT_SOURCE.label}…`);
+  clearNode(ui.sources);
+  setStatus(`Recherche dans ${sources.length} source${sources.length > 1 ? "s" : ""} publique${sources.length > 1 ? "s" : ""}…`);
 
   try {
     const snapshot = await fetchFullSnapshot(currentMappings);
     if (requestGeneration !== generation) return;
     writableMappings = snapshot.writableMappings ?? {};
 
-    const result = await CONTACT_SOURCE.search(context, { signal: controller.signal });
+    const result = await searchContactSources(context, { signal: controller.signal, sources });
     if (requestGeneration !== generation) return;
+    renderSourceStates(result.states);
+
     const candidates = resolveContactCandidates(result.candidates, context);
     renderCandidates(candidates, context);
-
-    if (candidates.some(isExactSiretCandidate)) {
-      setStatus("Contact public trouvé avec le même SIRET. Les champs vides modifiables sont présélectionnés.", "success");
-    } else if (candidates.some(isNearbyNameCandidate)) {
-      setStatus("Contact possible trouvé par proximité et similitude du nom. Rien n’est présélectionné : vérifie avant d’appliquer.");
-    } else {
-      setStatus(`Aucun contact public suffisamment fiable trouvé dans ${CONTACT_SOURCE.label}.`);
-    }
+    const finalStatus = finalSearchStatus(candidates, result.states, context);
+    setStatus(finalStatus.message, finalStatus.type);
   } catch (error) {
     if (error?.name === "AbortError") return;
     console.error(error);
     setStatus(error.message || "Recherche de contacts indisponible.", "error");
   } finally {
-    if (requestGeneration === generation) ui.searchButton.disabled = !CONTACT_SOURCE.canSearch(currentContext());
+    if (requestGeneration === generation) ui.searchButton.disabled = !availableContactSources(currentContext()).length;
   }
 }
 
