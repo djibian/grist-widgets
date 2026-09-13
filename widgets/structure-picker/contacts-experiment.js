@@ -5,6 +5,11 @@ import {
   isExactSiretCandidate,
   isNearbyNameCandidate,
 } from "./contact-model.js";
+import {
+  CONTACT_CONFIDENCE,
+  contactConfidence,
+  resolveContactCandidates,
+} from "./contact-ranking.js";
 import { identifierParts } from "./search.js";
 
 const CONTACT_SOURCE = osmContactSource;
@@ -60,6 +65,8 @@ function hasText(value) {
 function currentContext() {
   const identifier = identifierParts(valueOf("SirenSiret"));
   const name = String(valueOf("NomCommercial") ?? "").trim();
+  const address = String(valueOf("Adresse") ?? "").trim();
+  const siteWeb = String(valueOf("SiteWeb") ?? "").trim();
   const rawLatitude = valueOf("Latitude");
   const rawLongitude = valueOf("Longitude");
   const latitude = Number(rawLatitude);
@@ -68,6 +75,8 @@ function currentContext() {
   return {
     siret: identifier.siret,
     name,
+    address,
+    siteWeb,
     latitude: hasCoordinates ? latitude : null,
     longitude: hasCoordinates ? longitude : null,
   };
@@ -110,8 +119,9 @@ function refreshAvailability() {
   }
 }
 
-function confidenceText(candidate) {
-  return isExactSiretCandidate(candidate) ? "Correspondance SIRET" : "Correspondance probable";
+function confidenceClass(candidate, context) {
+  const confidence = contactConfidence(candidate, context);
+  return confidence.level === CONTACT_CONFIDENCE.VERY_RELIABLE ? "exact" : "nearby";
 }
 
 function candidateContact(candidate, key) {
@@ -159,7 +169,7 @@ function selectedChangesForCard(card, candidate) {
   return changes;
 }
 
-function renderCandidates(candidates) {
+function renderCandidates(candidates, context) {
   clearNode(ui.results);
   if (!candidates.length) return;
 
@@ -173,8 +183,8 @@ function renderCandidates(candidates) {
     name.className = "contact-card-name";
     name.textContent = candidate.identity?.name || String(valueOf("NomCommercial") || "Structure");
     const confidence = document.createElement("span");
-    confidence.className = `contact-confidence ${isExactSiretCandidate(candidate) ? "exact" : "nearby"}`;
-    confidence.textContent = confidenceText(candidate);
+    confidence.className = `contact-confidence ${confidenceClass(candidate, context)}`;
+    confidence.textContent = contactConfidence(candidate, context).label;
     heading.append(name, confidence);
 
     const source = document.createElement("div");
@@ -240,11 +250,12 @@ async function searchContacts() {
 
     const result = await CONTACT_SOURCE.search(context, { signal: controller.signal });
     if (requestGeneration !== generation) return;
-    renderCandidates(result.candidates);
+    const candidates = resolveContactCandidates(result.candidates, context);
+    renderCandidates(candidates, context);
 
-    if (result.candidates.some(isExactSiretCandidate)) {
+    if (candidates.some(isExactSiretCandidate)) {
       setStatus("Contact public trouvé avec le même SIRET. Les champs vides modifiables sont présélectionnés.", "success");
-    } else if (result.candidates.some(isNearbyNameCandidate)) {
+    } else if (candidates.some(isNearbyNameCandidate)) {
       setStatus("Contact possible trouvé par proximité et similitude du nom. Rien n’est présélectionné : vérifie avant d’appliquer.");
     } else {
       setStatus(`Aucun contact public suffisamment fiable trouvé dans ${CONTACT_SOURCE.label}.`);
