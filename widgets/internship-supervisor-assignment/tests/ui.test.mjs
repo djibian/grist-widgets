@@ -4,14 +4,16 @@ import test from 'node:test';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const css = await readFile(new URL('../style.css', import.meta.url), 'utf8');
+const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
 const structureCss = await readFile(new URL('../../../shared/ui/structure.css', import.meta.url), 'utf8');
 const tokensCss = await readFile(new URL('../../../shared/ui/tokens.css', import.meta.url), 'utf8');
 
 const requiredIds = [
-  'config-status', 'refresh', 'settings-toggle', 'settings-panel', 'settings-backdrop',
-  'settings-close', 'settings-save', 'mapping-auto', 'mapping-fields', 'mapping-status',
-  'criterion-diversity', 'priority-diversity', 'class-name', 'periods', 'analysis',
-  'stage-creation', 'stage-creation-title', 'create-stages', 'generate', 'proposal-card',
+  'config-status', 'refresh', 'settings-toggle', 'settings-panel', 'settings-close',
+  'settings-save', 'mapping-details', 'mapping-summary', 'mapping-summary-meta',
+  'mapping-auto', 'mapping-fields', 'mapping-status', 'criterion-diversity',
+  'priority-diversity', 'class-name', 'periods', 'analysis', 'stage-creation',
+  'stage-creation-title', 'create-stages', 'generate', 'proposal-card',
   'proposal-periods', 'proposal-summary', 'proposal-details', 'quota-details', 'apply',
 ];
 
@@ -20,7 +22,7 @@ test('charge tout le socle Grist Studio avant la feuille locale', () => {
   const base = html.indexOf('../../shared/ui/base.css');
   const components = html.indexOf('../../shared/ui/components.css');
   const structure = html.indexOf('../../shared/ui/structure.css');
-  const local = html.indexOf('style.css?v=1.4.0');
+  const local = html.indexOf('style.css?v=1.5.0');
   assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
 });
 
@@ -43,16 +45,35 @@ test('utilise les pictogrammes validés Actualiser et Paramétrage', () => {
   assert.match(html, /aria-controls="settings-panel"/);
 });
 
-test('ouvre le paramétrage dans le flux juste sous le contexte', () => {
+test('ouvre un paramétrage hiérarchisé dans le flux juste sous le contexte', () => {
   const context = html.indexOf('class="gw-context-strip"');
   const settings = html.indexOf('id="settings-panel"');
   const prepare = html.indexOf('class="gw-work-section prepare-section"');
   assert.ok(context >= 0 && context < settings && settings < prepare);
-  assert.match(html, /id="settings-panel" class="settings-panel gw-work-grid" hidden/);
-  assert.match(html, /class="gw-work-main settings-main"/);
-  assert.match(html, /class="gw-decision-panel settings-decision"/);
-  assert.match(html, /id="settings-close"[^>]*>Annuler</);
-  assert.doesNotMatch(css, /\.settings-panel\s*\{[^}]*position:\s*fixed/s);
+  assert.match(html, /id="settings-panel" class="settings-panel" hidden/);
+  assert.match(html, />Règles de répartition</);
+  assert.match(html, /id="mapping-details" class="settings-data"/);
+  assert.match(html, />Configuration des données</);
+  assert.match(html, />Détecter automatiquement les colonnes</);
+  assert.doesNotMatch(html, /settings-backdrop/);
+  assert.doesNotMatch(html, /gw-work-main settings-main|gw-decision-panel settings-decision/);
+});
+
+test('rend la configuration des colonnes secondaire mais automatiquement visible en cas de problème', () => {
+  assert.match(app, /mappingDetails: \$\("#mapping-details"\)/);
+  assert.match(app, /mappingSummary: \$\("#mapping-summary"\)/);
+  assert.match(app, /✓ Colonnes Grist correctement configurées/);
+  assert.match(app, /point\(s\) à vérifier/);
+  assert.match(app, /el\.mappingDetails\.open = true/);
+  assert.match(app, /validateMappings\(state\.metadata, state\.mappings\)\.length > 0/);
+  assert.doesNotMatch(app, /settingsBackdrop|settings-backdrop/);
+});
+
+test('présente les mappings en grille seulement lorsqu ils sont développés', () => {
+  assert.match(css, /\.mapping-fields\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.settings-data-status\.success/);
+  assert.match(css, /\.settings-data-status\.warning/);
+  assert.doesNotMatch(css, /\.settings-panel\s*\{[^}]*grid-template-columns/s);
   assert.doesNotMatch(css, /backdrop-filter/);
 });
 
