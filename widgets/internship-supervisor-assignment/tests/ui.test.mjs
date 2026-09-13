@@ -20,7 +20,7 @@ test('charge tout le socle Grist Studio avant la feuille locale', () => {
   const base = html.indexOf('../../shared/ui/base.css');
   const components = html.indexOf('../../shared/ui/components.css');
   const structure = html.indexOf('../../shared/ui/structure.css');
-  const local = html.indexOf('style.css?v=1.3.0');
+  const local = html.indexOf('style.css?v=1.4.0');
   assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
 });
 
@@ -40,6 +40,20 @@ test('utilise les pictogrammes validés Actualiser et Paramétrage', () => {
   assert.match(html, /class="gw-icon--accented"/);
   assert.match(html, /gw-tool-button__label">Actualiser/);
   assert.match(html, /gw-tool-button__label">Paramétrage/);
+  assert.match(html, /aria-controls="settings-panel"/);
+});
+
+test('ouvre le paramétrage dans le flux juste sous le contexte', () => {
+  const context = html.indexOf('class="gw-context-strip"');
+  const settings = html.indexOf('id="settings-panel"');
+  const prepare = html.indexOf('class="gw-work-section prepare-section"');
+  assert.ok(context >= 0 && context < settings && settings < prepare);
+  assert.match(html, /id="settings-panel" class="settings-panel gw-work-grid" hidden/);
+  assert.match(html, /class="gw-work-main settings-main"/);
+  assert.match(html, /class="gw-decision-panel settings-decision"/);
+  assert.match(html, /id="settings-close"[^>]*>Annuler</);
+  assert.doesNotMatch(css, /\.settings-panel\s*\{[^}]*position:\s*fixed/s);
+  assert.doesNotMatch(css, /backdrop-filter/);
 });
 
 test('matérialise la grammaire contexte travail validation', () => {
