@@ -12,6 +12,7 @@ function clean(value) {
 }
 
 function finite(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
