@@ -18,17 +18,43 @@ function normalizeMatchKind(value) {
   return Object.values(CONTACT_MATCH_KINDS).includes(value) ? value : CONTACT_MATCH_KINDS.UNKNOWN;
 }
 
+function sourceReference(source = {}) {
+  return Object.freeze({
+    id: clean(source.id),
+    label: clean(source.label),
+    recordType: clean(source.recordType),
+    recordId: source.recordId ?? null,
+  });
+}
+
+function sourceReferenceKey(source) {
+  return [source.id, source.label, source.recordType, String(source.recordId ?? "")].join("\u0000");
+}
+
+function canonicalProvenance(source, primary) {
+  const references = [primary, ...(Array.isArray(source?.provenance) ? source.provenance.map(sourceReference) : [])];
+  const seen = new Set();
+  const result = [];
+  for (const reference of references) {
+    if (!reference.id && !reference.label && !reference.recordType && reference.recordId === null) continue;
+    const key = sourceReferenceKey(reference);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(reference);
+  }
+  return Object.freeze(result);
+}
+
 export function createContactCandidate({
   source = {},
   identity = {},
   contacts = {},
   match = {},
 } = {}) {
+  const primarySource = sourceReference(source);
   const canonicalSource = Object.freeze({
-    id: clean(source.id),
-    label: clean(source.label),
-    recordType: clean(source.recordType),
-    recordId: source.recordId ?? null,
+    ...primarySource,
+    provenance: canonicalProvenance(source, primarySource),
   });
 
   const canonicalIdentity = Object.freeze({
@@ -69,13 +95,19 @@ export function isNearbyNameCandidate(candidate) {
 }
 
 export function contactSourceSummary(candidate) {
-  const label = clean(candidate?.source?.label) || clean(candidate?.source?.id) || "Source publique";
-  if (isExactSiretCandidate(candidate)) return `${label} · SIRET identique`;
+  const provenance = Array.isArray(candidate?.source?.provenance) ? candidate.source.provenance : [];
+  const labels = [...new Set(provenance
+    .map(source => clean(source?.label) || clean(source?.id))
+    .filter(Boolean))];
+  const primaryLabel = clean(candidate?.source?.label) || clean(candidate?.source?.id) || "Source publique";
+  const label = labels.length > 1 ? labels.join(" + ") : (labels[0] || primaryLabel);
+  const referenceSuffix = provenance.length > 1 && labels.length <= 1 ? ` · ${provenance.length} références` : "";
+  if (isExactSiretCandidate(candidate)) return `${label}${referenceSuffix} · SIRET identique`;
   if (isNearbyNameCandidate(candidate)) {
     const distance = finiteOrNull(candidate?.match?.distanceMeters);
     return Number.isFinite(distance)
-      ? `${label} · proximité + nom · ${Math.round(distance)} m`
-      : `${label} · proximité + nom`;
+      ? `${label}${referenceSuffix} · proximité + nom · ${Math.round(distance)} m`
+      : `${label}${referenceSuffix} · proximité + nom`;
   }
-  return label;
+  return `${label}${referenceSuffix}`;
 }
