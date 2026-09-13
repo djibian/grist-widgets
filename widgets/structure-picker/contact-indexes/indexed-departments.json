@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": null,
+  "sources": {
+    "all-the-places": {
+      "label": "All The Places",
+      "pathTemplate": "all-the-places/{department}.json",
+      "departments": []
+    },
+    "overture": {
+      "label": "Overture Places",
+      "pathTemplate": "overture/{department}.json",
+      "departments": []
+    },
+    "fsq-os-places": {
+      "label": "FSQ OS Places",
+      "pathTemplate": "fsq-os-places/{department}.json",
+      "departments": []
+    },
+    "banco": {
+      "label": "BANCO",
+      "pathTemplate": "banco/{department}.json",
+      "departments": []
+    }
+  }
+}
