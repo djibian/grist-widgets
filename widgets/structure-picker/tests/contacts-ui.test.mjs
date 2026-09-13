@@ -11,16 +11,20 @@ test("experimental contact UI stays inside the completion tab", () => {
   assert.match(html, /src="contacts-experiment\.js"/);
 });
 
-test("experimental contact lookup uses the source adapter, canonical model and safe Grist writes", () => {
+test("experimental contact lookup resolves canonical candidates before safe Grist writes", () => {
   assert.match(script, /applyEnrichmentChanges/);
   assert.match(script, /fetchFullSnapshot/);
   assert.match(script, /osmContactSource/);
   assert.match(script, /CONTACT_SOURCE\.search/);
+  assert.match(script, /resolveContactCandidates/);
+  assert.match(script, /contactConfidence/);
+  assert.match(script, /CONTACT_CONFIDENCE/);
   assert.match(script, /isExactSiretCandidate/);
   assert.match(script, /isNearbyNameCandidate/);
   assert.match(script, /candidate\.contacts/);
   assert.match(script, /candidate\.identity/);
   assert.match(script, /contactSourceSummary/);
+  assert.match(script, /Très fiable|contactConfidence/);
   assert.doesNotMatch(script, /findOsmContacts/);
   assert.doesNotMatch(script, /candidate\.confidence/);
   assert.match(script, /proximité et similitude du nom/);
