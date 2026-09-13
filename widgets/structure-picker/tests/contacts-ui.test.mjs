@@ -11,10 +11,12 @@ test("experimental contact UI stays inside the completion tab", () => {
   assert.match(html, /src="contacts-experiment\.js"/);
 });
 
-test("experimental contact lookup uses safe Grist enrichment writes", () => {
+test("experimental contact lookup uses the source adapter and safe Grist enrichment writes", () => {
   assert.match(script, /applyEnrichmentChanges/);
   assert.match(script, /fetchFullSnapshot/);
-  assert.match(script, /findOsmContacts/);
+  assert.match(script, /osmContactSource/);
+  assert.match(script, /CONTACT_SOURCE\.search/);
+  assert.doesNotMatch(script, /findOsmContacts/);
   assert.match(script, /candidate\.confidence === "siret"/);
   assert.match(script, /proximité et similitude du nom/);
 });

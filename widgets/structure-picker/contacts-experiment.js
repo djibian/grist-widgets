@@ -1,6 +1,8 @@
 import { applyEnrichmentChanges, fetchFullSnapshot } from "./grist.js";
-import { findOsmContacts } from "./osm.js";
+import { osmContactSource } from "./contact-sources/osm.js";
 import { identifierParts } from "./search.js";
+
+const CONTACT_SOURCE = osmContactSource;
 
 const FIELD_CONFIG = Object.freeze([
   { logical: "Telephone", key: "telephone", label: "Téléphone" },
@@ -66,10 +68,6 @@ function currentContext() {
   };
 }
 
-function canSearch(context) {
-  return Boolean(context.siret || (context.name && Number.isFinite(context.latitude) && Number.isFinite(context.longitude)));
-}
-
 function renderCurrentContacts() {
   clearNode(ui.current);
   if (!currentRecord || currentRecord.id === "new") return;
@@ -95,7 +93,7 @@ function refreshAvailability() {
   clearNode(ui.results);
   writableMappings = {};
   const context = currentContext();
-  const available = Boolean(currentRecord && currentRecord.id !== "new" && canSearch(context));
+  const available = Boolean(currentRecord && currentRecord.id !== "new" && CONTACT_SOURCE.canSearch(context));
   if (ui.searchButton) ui.searchButton.disabled = !available;
 
   if (!currentRecord || currentRecord.id === "new") {
@@ -215,7 +213,7 @@ function renderCandidates(candidates) {
 async function searchContacts() {
   if (!currentRecord || currentRecord.id === "new") return;
   const context = currentContext();
-  if (!canSearch(context)) return;
+  if (!CONTACT_SOURCE.canSearch(context)) return;
 
   generation += 1;
   const requestGeneration = generation;
@@ -223,14 +221,14 @@ async function searchContacts() {
   controller = new AbortController();
   ui.searchButton.disabled = true;
   clearNode(ui.results);
-  setStatus("Recherche de contacts publics dans OpenStreetMap…");
+  setStatus(`Recherche de contacts publics dans ${CONTACT_SOURCE.label}…`);
 
   try {
     const snapshot = await fetchFullSnapshot(currentMappings);
     if (requestGeneration !== generation) return;
     writableMappings = snapshot.writableMappings ?? {};
 
-    const result = await findOsmContacts({ ...context, signal: controller.signal });
+    const result = await CONTACT_SOURCE.search(context, { signal: controller.signal });
     if (requestGeneration !== generation) return;
     renderCandidates(result.candidates);
 
@@ -239,14 +237,14 @@ async function searchContacts() {
     } else if (result.mode === "nearby") {
       setStatus("Contact possible trouvé par proximité et similitude du nom. Rien n’est présélectionné : vérifie avant d’appliquer.");
     } else {
-      setStatus("Aucun contact public suffisamment fiable trouvé dans OpenStreetMap.");
+      setStatus(`Aucun contact public suffisamment fiable trouvé dans ${CONTACT_SOURCE.label}.`);
     }
   } catch (error) {
     if (error?.name === "AbortError") return;
     console.error(error);
     setStatus(error.message || "Recherche de contacts indisponible.", "error");
   } finally {
-    if (requestGeneration === generation) ui.searchButton.disabled = !canSearch(currentContext());
+    if (requestGeneration === generation) ui.searchButton.disabled = !CONTACT_SOURCE.canSearch(currentContext());
   }
 }
 
