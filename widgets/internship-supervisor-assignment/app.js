@@ -27,9 +27,11 @@ const el = {
   refresh: $("#refresh"),
   settingsToggle: $("#settings-toggle"),
   settingsPanel: $("#settings-panel"),
-  settingsBackdrop: $("#settings-backdrop"),
   settingsClose: $("#settings-close"),
   settingsSave: $("#settings-save"),
+  mappingDetails: $("#mapping-details"),
+  mappingSummary: $("#mapping-summary"),
+  mappingSummaryMeta: $("#mapping-summary-meta"),
   mappingAuto: $("#mapping-auto"),
   mappingFields: $("#mapping-fields"),
   mappingStatus: $("#mapping-status"),
@@ -244,6 +246,14 @@ function columnOptionLabel(column) {
   return column.label === column.colId ? column.colId : `${column.label} · ${column.colId}`;
 }
 
+function mappingStats() {
+  const groups = mappingGroups();
+  return {
+    tables: groups.length,
+    fields: groups.reduce((count, group) => count + group.fields.length, 0),
+  };
+}
+
 function renderMappingFields(mappings = state.mappings) {
   el.mappingFields.replaceChildren();
   for (const group of mappingGroups()) {
@@ -295,32 +305,41 @@ function collectMappingDraft() {
 function renderMappingDraftStatus() {
   const mappings = el.mappingFields.querySelector("select[data-mapping-key]") ? collectMappingDraft() : state.mappings;
   const issues = validateMappings(state.metadata, mappings);
+  const stats = mappingStats();
+
   if (!issues.length) {
-    el.mappingStatus.className = "settings-message";
-    el.mappingStatus.textContent = "✓ Paramétrage des colonnes valide.";
+    el.mappingSummary.className = "settings-data-status success";
+    el.mappingSummary.textContent = "✓ Colonnes Grist correctement configurées";
+    el.mappingSummaryMeta.textContent = `${stats.fields} champs reconnus dans ${stats.tables} tables.`;
+    el.mappingStatus.className = "settings-message success";
+    el.mappingStatus.textContent = "Aucune correction nécessaire.";
   } else {
+    el.mappingSummary.className = "settings-data-status warning";
+    el.mappingSummary.textContent = `⚠ ${issues.length} point(s) à vérifier`;
+    el.mappingSummaryMeta.textContent = "Ouvre cette section pour corriger les colonnes concernées.";
     el.mappingStatus.className = "settings-message error";
     el.mappingStatus.innerHTML = issues.map(row => `• ${esc(row.message)}`).join("<br>");
+    el.mappingDetails.open = true;
   }
+  return issues;
 }
 
 function renderSettings() {
   el.diversity.checked = state.optimization?.diversity?.enabled !== false;
   el.priority.value = state.optimization?.diversity?.priority ?? "moyenne";
   el.priority.disabled = !el.diversity.checked;
+  el.mappingDetails.open = validateMappings(state.metadata, state.mappings).length > 0;
   renderMappingFields(state.mappings);
 }
 
 function openSettings() {
   renderSettings();
   el.settingsPanel.hidden = false;
-  el.settingsBackdrop.hidden = false;
   el.settingsToggle.setAttribute("aria-expanded", "true");
 }
 
 function closeSettings() {
   el.settingsPanel.hidden = true;
-  el.settingsBackdrop.hidden = true;
   el.settingsToggle.setAttribute("aria-expanded", "false");
 }
 
@@ -452,6 +471,7 @@ async function saveSettings() {
   const mappings = collectMappingDraft();
   const issues = validateMappings(state.metadata, mappings);
   if (issues.length) {
+    el.mappingDetails.open = true;
     renderMappingDraftStatus();
     el.mappingStatus.scrollIntoView({ block: "nearest" });
     return;
@@ -485,7 +505,6 @@ async function saveSettings() {
 
 el.settingsToggle.addEventListener("click", () => el.settingsPanel.hidden ? openSettings() : closeSettings());
 el.settingsClose.addEventListener("click", closeSettings);
-el.settingsBackdrop.addEventListener("click", closeSettings);
 el.refresh.addEventListener("click", () => {
   invalidatePlan();
   refreshData({ preservePeriods: true, announce: true });
@@ -494,7 +513,10 @@ el.createStages.addEventListener("click", createStages);
 el.generate.addEventListener("click", generate);
 el.apply.addEventListener("click", apply);
 el.diversity.addEventListener("change", () => { el.priority.disabled = !el.diversity.checked; });
-el.mappingAuto.addEventListener("click", () => renderMappingFields(inferMappings(state.metadata, {})));
+el.mappingAuto.addEventListener("click", () => {
+  el.mappingDetails.open = true;
+  renderMappingFields(inferMappings(state.metadata, {}));
+});
 el.settingsSave.addEventListener("click", saveSettings);
 
 document.addEventListener("keydown", event => {
