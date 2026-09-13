@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { CONTACT_MATCH_KINDS } from "../contact-model.js";
 import { osmContactSource } from "../contact-sources/osm.js";
 
 test("OSM exposes the minimal contact-source interface", () => {
@@ -19,7 +20,7 @@ test("OSM availability preserves the current SIRET or name-plus-coordinates rule
   assert.equal(osmContactSource.canSearch({ name: "Garage Martin", latitude: "", longitude: "" }), false);
 });
 
-test("OSM source preserves exact-SIRET short-circuit behavior", async () => {
+test("OSM source preserves exact-SIRET short-circuit and maps it to the common model", async () => {
   let calls = 0;
   const fetchImpl = async () => {
     calls += 1;
@@ -47,12 +48,16 @@ test("OSM source preserves exact-SIRET short-circuit behavior", async () => {
     longitude: -1.8,
   }, { fetchImpl });
 
-  assert.equal(result.mode, "siret");
-  assert.equal(result.candidates[0]?.confidence, "siret");
+  assert.deepEqual(result.source, { id: "osm", label: "OpenStreetMap" });
+  assert.equal(result.candidates[0]?.source.recordType, "node");
+  assert.equal(result.candidates[0]?.source.recordId, 1);
+  assert.equal(result.candidates[0]?.identity.siret, "12345678900011");
+  assert.equal(result.candidates[0]?.contacts.telephone, "02 40 00 00 00");
+  assert.equal(result.candidates[0]?.match.kind, CONTACT_MATCH_KINDS.EXACT_SIRET);
   assert.equal(calls, 1);
 });
 
-test("OSM source preserves nearby fallback behavior", async () => {
+test("OSM source preserves nearby fallback and maps its evidence to the common model", async () => {
   let calls = 0;
   const fetchImpl = async () => {
     calls += 1;
@@ -79,16 +84,21 @@ test("OSM source preserves nearby fallback behavior", async () => {
     longitude: -1.8,
   }, { fetchImpl });
 
-  assert.equal(result.mode, "nearby");
-  assert.equal(result.candidates[0]?.confidence, "nearby");
-  assert.equal(result.candidates[0]?.courriel, "contact@example.fr");
+  assert.equal(result.candidates[0]?.match.kind, CONTACT_MATCH_KINDS.NEARBY_NAME);
+  assert.equal(result.candidates[0]?.contacts.courriel, "contact@example.fr");
+  assert.equal(result.candidates[0]?.identity.name, "Garage Martin");
+  assert.ok(Number.isFinite(result.candidates[0]?.match.distanceMeters));
   assert.equal(calls, 2);
 });
 
-test("contact UI depends on the source adapter, not directly on the OSM engine", async () => {
+test("contact UI depends on the source adapter and canonical model, not directly on the OSM engine", async () => {
   const source = await readFile(new URL("../contacts-experiment.js", import.meta.url), "utf8");
   assert.match(source, /import \{ osmContactSource \} from "\.\/contact-sources\/osm\.js"/);
+  assert.match(source, /contactSourceSummary/);
+  assert.match(source, /candidate\.contacts/);
+  assert.match(source, /candidate\.identity/);
   assert.match(source, /CONTACT_SOURCE\.canSearch/);
   assert.match(source, /CONTACT_SOURCE\.search/);
   assert.doesNotMatch(source, /findOsmContacts/);
+  assert.doesNotMatch(source, /candidate\.confidence/);
 });
