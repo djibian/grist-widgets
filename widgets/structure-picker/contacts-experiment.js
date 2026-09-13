@@ -115,7 +115,7 @@ function confidenceText(candidate) {
 }
 
 function candidateContact(candidate, key) {
-  return candidate?.contacts?.[key] ?? "";
+  return candidate.contacts?.[key] ?? "";
 }
 
 function makeContactLine(field, candidate, cardIndex) {
