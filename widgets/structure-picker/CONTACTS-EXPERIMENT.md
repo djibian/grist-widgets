@@ -16,6 +16,23 @@ Endpoint Overpass :
 
 Les requêtes sont envoyées en POST et restent bornées à une structure ou à un rayon local de 300 m.
 
+## Index statiques par département
+
+Les futures sources volumineuses (All The Places, Overture Places, FSQ OS Places et BANCO) seront préparées hors navigateur sous forme d'index JSON statiques par département.
+
+Le fichier `contact-indexes/indexed-departments.json` est le contrat de disponibilité : pour chaque source, il contient un patron de chemin relatif et la liste des départements effectivement publiés. Une source ne doit tenter de charger que l'intersection entre cette liste et les départements actifs du widget Grist.
+
+Contraintes du contrat V1 :
+
+- schéma versionné (`schemaVersion: 1`) ;
+- chemins relatifs au répertoire du manifest, sans URL externe ni traversée `..` ;
+- aucun département n'est supposé disponible tant qu'il n'est pas déclaré dans le manifest ;
+- chargement du manifest avec `cache: "no-store"` pour éviter un état de disponibilité obsolète ;
+- aucun cache applicatif ou service worker ajouté à ce stade ;
+- les fichiers d'index eux-mêmes seront introduits par les générateurs des étapes suivantes.
+
+Le manifest initialise actuellement les quatre sources avec une liste de départements vide : il prépare l'architecture sans modifier le comportement fonctionnel du widget.
+
 ## Confiance
 
 Les candidats utilisent trois niveaux communs à toutes les sources :
