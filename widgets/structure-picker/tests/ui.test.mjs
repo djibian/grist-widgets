@@ -12,8 +12,8 @@ const requiredIds = [
   "local-count", "external-count", "enrich-button", "selected-summary",
   "enrich-status", "enterprise-choices", "geocode-choices", "proposal-panel",
   "tab-search", "tab-enrich", "enrich-badge", "panel-search", "panel-enrich",
-  "contact-experiment", "contact-search", "contact-current", "contact-status",
-  "contact-results",
+  "contact-experiment", "contact-search", "contact-current", "contact-sources",
+  "contact-status", "contact-results",
 ];
 
 test("charge le socle Grist Studio complet avant la feuille locale", () => {
@@ -21,7 +21,7 @@ test("charge le socle Grist Studio complet avant la feuille locale", () => {
   const base = html.indexOf("../../shared/ui/base.css");
   const components = html.indexOf("../../shared/ui/components.css");
   const structure = html.indexOf("../../shared/ui/structure.css");
-  const local = html.indexOf("style.css?v=1.3.0");
+  const local = html.indexOf("style.css?v=");
   assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
   assert.doesNotMatch(html, /studio\.css/);
 });
@@ -82,12 +82,14 @@ test("APE NAF n'est plus présenté par l'interface", () => {
   assert.doesNotMatch(app, /addMeta\([^\n]*"APE"/);
 });
 
-test("conserve explicitement l’expérimentation Contacts publics", () => {
+test("conserve explicitement l’expérimentation Contacts publics et son interface multi-source", () => {
   assert.match(html, /Contacts publics/);
   assert.match(html, /Expérimental/);
-  assert.match(html, /src="contacts-experiment\.js"/);
+  assert.match(html, /src="contacts-experiment\.js(?:\?[^\"]*)?"/);
+  assert.match(html, /id="contact-sources"/);
   assert.match(css, /\.contact-experiment/);
-  assert.match(css, /--gw-color-experimental-border/);
+  assert.match(css, /\.contact-source-state/);
+  assert.match(css, /\.contact-provenance-badge/);
 });
 
 test("applique la composition Grist Studio sans supprimer les composants métier", () => {

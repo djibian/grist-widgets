@@ -5,27 +5,30 @@ import test from "node:test";
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const script = await readFile(new URL("../contacts-experiment.js", import.meta.url), "utf8");
 
-test("experimental contact UI stays inside the completion tab", () => {
+test("experimental contact UI stays inside the completion tab and exposes source status", () => {
   assert.match(html, /id="panel-enrich"[\s\S]*id="contact-experiment"[\s\S]*Contacts publics[\s\S]*Expérimental/);
   assert.match(html, /id="contact-search"/);
-  assert.match(html, /src="contacts-experiment\.js"/);
+  assert.match(html, /id="contact-sources"/);
+  assert.match(html, /Croise les sources publiques disponibles/);
+  assert.match(html, /Rechercher les contacts/);
+  assert.match(html, /src="contacts-experiment\.js\?v=1\.1\.0"/);
 });
 
-test("experimental contact lookup resolves canonical candidates before safe Grist writes", () => {
+test("contact lookup resolves multi-source canonical candidates before safe Grist writes", () => {
   assert.match(script, /applyEnrichmentChanges/);
   assert.match(script, /fetchFullSnapshot/);
-  assert.match(script, /osmContactSource/);
-  assert.match(script, /CONTACT_SOURCE\.search/);
+  assert.match(script, /availableContactSources/);
+  assert.match(script, /searchContactSources/);
   assert.match(script, /resolveContactCandidates/);
   assert.match(script, /contactConfidence/);
   assert.match(script, /CONTACT_CONFIDENCE/);
   assert.match(script, /isExactSiretCandidate/);
-  assert.match(script, /isNearbyNameCandidate/);
   assert.match(script, /candidate\.contacts/);
   assert.match(script, /candidate\.identity/);
   assert.match(script, /contactSourceSummary/);
-  assert.match(script, /Très fiable|contactConfidence/);
+  assert.match(script, /contact-source-state/);
+  assert.match(script, /contact-provenance-badge/);
+  assert.doesNotMatch(script, /osmContactSource/);
   assert.doesNotMatch(script, /findOsmContacts/);
   assert.doesNotMatch(script, /candidate\.confidence/);
-  assert.match(script, /proximité et similitude du nom/);
 });

@@ -91,14 +91,14 @@ test("OSM source preserves nearby fallback and maps its evidence to the common m
   assert.equal(calls, 2);
 });
 
-test("contact UI depends on the source adapter and canonical model, not directly on the OSM engine", async () => {
+test("contact UI depends on the multi-source orchestrator and canonical model, not directly on OSM", async () => {
   const source = await readFile(new URL("../contacts-experiment.js", import.meta.url), "utf8");
-  assert.match(source, /import \{ osmContactSource \} from "\.\/contact-sources\/osm\.js"/);
+  assert.match(source, /availableContactSources/);
+  assert.match(source, /searchContactSources/);
   assert.match(source, /contactSourceSummary/);
   assert.match(source, /candidate\.contacts/);
   assert.match(source, /candidate\.identity/);
-  assert.match(source, /CONTACT_SOURCE\.canSearch/);
-  assert.match(source, /CONTACT_SOURCE\.search/);
+  assert.doesNotMatch(source, /osmContactSource/);
   assert.doesNotMatch(source, /findOsmContacts/);
   assert.doesNotMatch(source, /candidate\.confidence/);
 });
