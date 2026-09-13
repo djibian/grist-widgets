@@ -29,12 +29,16 @@ test("canonical contact candidate separates provenance, identity, contacts and m
     },
   });
 
-  assert.deepEqual(candidate.source, {
+  assert.equal(candidate.source.id, "osm");
+  assert.equal(candidate.source.label, "OpenStreetMap");
+  assert.equal(candidate.source.recordType, "node");
+  assert.equal(candidate.source.recordId, 42);
+  assert.deepEqual(candidate.source.provenance, [{
     id: "osm",
     label: "OpenStreetMap",
     recordType: "node",
     recordId: 42,
-  });
+  }]);
   assert.equal(candidate.identity.name, "Garage Martin");
   assert.equal(candidate.identity.latitude, 47.1);
   assert.equal(candidate.contacts.telephone, "02 40 00 00 00");
@@ -43,6 +47,7 @@ test("canonical contact candidate separates provenance, identity, contacts and m
   assert.equal(isNearbyNameCandidate(candidate), false);
   assert.equal(Object.isFrozen(candidate), true);
   assert.equal(Object.isFrozen(candidate.source), true);
+  assert.equal(Object.isFrozen(candidate.source.provenance), true);
   assert.equal(Object.isFrozen(candidate.identity), true);
   assert.equal(Object.isFrozen(candidate.contacts), true);
   assert.equal(Object.isFrozen(candidate.match), true);
@@ -67,10 +72,18 @@ test("canonical model keeps matching evidence distinct from source provenance", 
   assert.equal(contactSourceSummary(candidate), "OpenStreetMap · proximité + nom · 126 m");
 });
 
-test("source summary preserves the existing exact-SIRET wording", () => {
+test("source summary preserves every provenance after exact deduplication", () => {
   const candidate = createContactCandidate({
-    source: { id: "osm", label: "OpenStreetMap" },
+    source: {
+      id: "osm",
+      label: "OpenStreetMap",
+      provenance: [
+        { id: "osm", label: "OpenStreetMap", recordType: "node", recordId: 1 },
+        { id: "overture", label: "Overture", recordType: "place", recordId: "abc" },
+      ],
+    },
     match: { kind: CONTACT_MATCH_KINDS.EXACT_SIRET },
   });
-  assert.equal(contactSourceSummary(candidate), "OpenStreetMap · SIRET identique");
+  assert.equal(candidate.source.provenance.length, 3);
+  assert.equal(contactSourceSummary(candidate), "OpenStreetMap + Overture · SIRET identique");
 });
