@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../../shared/ui/base.css">
   <link rel="stylesheet" href="../../shared/ui/components.css">
   <link rel="stylesheet" href="../../shared/ui/structure.css">
-  <link rel="stylesheet" href="style.css?v=1.3.0">
+  <link rel="stylesheet" href="style.css?v=1.4.0">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
@@ -27,7 +27,7 @@
           <svg class="gw-icon--accented" viewBox="0 0 24 24" aria-hidden="true"><path class="gw-icon-main-stroke" d="M13.663 4.175A8 8 0 1 0 19.417 14.997"/><circle class="gw-icon-accent" cx="18.128" cy="6.858" r="2.1"/></svg>
           <span class="gw-tool-button__label">Actualiser</span>
         </button>
-        <button id="settings-toggle" class="gw-tool-button icon-button" type="button" title="Paramétrage" aria-label="Paramétrage" aria-expanded="false">
+        <button id="settings-toggle" class="gw-tool-button icon-button" type="button" title="Paramétrage" aria-label="Paramétrage" aria-controls="settings-panel" aria-expanded="false">
           <svg class="gw-icon--accented" viewBox="0 0 24 24" aria-hidden="true"><rect class="gw-icon-main" x="2.5" y="4.5" width="10.5" height="3.4" rx="1.7"/><rect class="gw-icon-main" x="11" y="10.3" width="10.5" height="3.4" rx="1.7"/><rect class="gw-icon-main" x="2.5" y="16.1" width="10.5" height="3.4" rx="1.7"/><circle class="gw-icon-accent" cx="17.2" cy="6.2" r="2.3"/><circle class="gw-icon-accent" cx="7" cy="12" r="2.3"/><circle class="gw-icon-accent" cx="17.2" cy="17.8" r="2.3"/></svg>
           <span class="gw-tool-button__label">Paramétrage</span>
         </button>
@@ -47,6 +47,61 @@
         <span class="gw-context-label">État</span>
         <div id="config-status" class="gw-context-status status pending" role="status" aria-live="polite">Connexion à Grist…</div>
       </div>
+    </section>
+
+    <section id="settings-panel" class="settings-panel gw-work-grid" hidden aria-labelledby="settings-title">
+      <section class="gw-work-main settings-main">
+        <div class="gw-step-heading">
+          <span class="gw-step-heading__index">Configuration</span>
+          <h2 id="settings-title" class="gw-step-heading__title">Optimisation</h2>
+          <p class="gw-step-heading__help">Ces paramètres sont mémorisés pour ce widget.</p>
+        </div>
+
+        <div class="settings-section settings-section--plain">
+          <div class="criterion compact-criterion">
+            <label class="criterion-main">
+              <input id="criterion-diversity" type="checkbox" checked>
+              <span><strong>Diversifier les enseignants</strong><small>Évite autant que possible qu'un enseignant suive plusieurs périodes du même élève.</small></span>
+            </label>
+            <label class="priority"><span>Priorité</span>
+              <select id="priority-diversity" class="gw-select">
+                <option value="faible">Faible</option>
+                <option value="moyenne" selected>Moyenne</option>
+                <option value="forte">Forte</option>
+              </select>
+            </label>
+          </div>
+          <div class="criterion compact-criterion disabled" aria-disabled="true">
+            <label class="criterion-main">
+              <input type="checkbox" disabled>
+              <span><strong>Proximité géographique <span class="badge gw-badge">plus tard</span></strong><small>Prévue pour une évolution ultérieure.</small></span>
+            </label>
+            <label class="priority"><span>Priorité</span><select class="gw-select" disabled><option>Forte</option></select></label>
+          </div>
+        </div>
+      </section>
+
+      <aside class="gw-decision-panel settings-decision">
+        <div class="gw-step-heading">
+          <span class="gw-step-heading__index">Colonnes</span>
+          <h2 class="gw-step-heading__title">Tables secondaires</h2>
+          <p class="gw-step-heading__help">Les champs de la source <strong>Classe</strong> se règlent nativement dans le panneau de droite de Grist.</p>
+        </div>
+
+        <section class="settings-section settings-section--plain">
+          <div class="section-heading settings-mapping-heading">
+            <h3>Associer les colonnes</h3>
+            <button id="mapping-auto" class="text-button" type="button">Détection automatique</button>
+          </div>
+          <div id="mapping-fields" class="mapping-fields"></div>
+          <div id="mapping-status" class="settings-message" role="status" aria-live="polite"></div>
+        </section>
+
+        <div class="settings-footer">
+          <button id="settings-cancel" class="gw-button gw-button--secondary" type="button">Annuler</button>
+          <button id="settings-save" class="primary gw-button gw-button--primary" type="button">Enregistrer les réglages</button>
+        </div>
+      </aside>
     </section>
 
     <section class="gw-work-section prepare-section" aria-labelledby="prepare-title">
@@ -120,56 +175,6 @@
     </section>
   </main>
 
-  <div id="settings-backdrop" class="settings-backdrop" hidden></div>
-  <aside id="settings-panel" class="settings-panel" hidden aria-label="Réglages du widget">
-    <div class="settings-header">
-      <div>
-        <div class="app-kicker">Configuration</div>
-        <h2>Réglages</h2>
-        <p>Ces paramètres sont mémorisés pour ce widget.</p>
-      </div>
-      <button id="settings-close" class="gw-icon-button icon-button compact" type="button" aria-label="Fermer" title="Fermer">×</button>
-    </div>
-
-    <section class="settings-section">
-      <h3>Optimisation</h3>
-      <div class="criterion compact-criterion">
-        <label class="criterion-main">
-          <input id="criterion-diversity" type="checkbox" checked>
-          <span><strong>Diversifier les enseignants</strong><small>Évite autant que possible qu'un enseignant suive plusieurs périodes du même élève.</small></span>
-        </label>
-        <label class="priority"><span>Priorité</span>
-          <select id="priority-diversity" class="gw-select">
-            <option value="faible">Faible</option>
-            <option value="moyenne" selected>Moyenne</option>
-            <option value="forte">Forte</option>
-          </select>
-        </label>
-      </div>
-      <div class="criterion compact-criterion disabled" aria-disabled="true">
-        <label class="criterion-main">
-          <input type="checkbox" disabled>
-          <span><strong>Proximité géographique <span class="badge gw-badge">plus tard</span></strong><small>Prévue pour une évolution ultérieure.</small></span>
-        </label>
-        <label class="priority"><span>Priorité</span><select class="gw-select" disabled><option>Forte</option></select></label>
-      </div>
-    </section>
-
-    <section class="settings-section">
-      <div class="section-heading">
-        <h3>Colonnes des tables secondaires</h3>
-        <button id="mapping-auto" class="text-button" type="button">Détection automatique</button>
-      </div>
-      <p class="settings-help">Les champs de la source <strong>Classe</strong> se règlent nativement dans le panneau de droite de Grist. Ici, choisis seulement les colonnes des tables secondaires.</p>
-      <div id="mapping-fields" class="mapping-fields"></div>
-      <div id="mapping-status" class="settings-message"></div>
-    </section>
-
-    <div class="settings-footer">
-      <button id="settings-save" class="primary gw-button gw-button--primary" type="button">Enregistrer les réglages</button>
-    </div>
-  </aside>
-
-  <script type="module" src="app.js?v=1.3.0"></script>
+  <script type="module" src="app.js?v=1.4.0"></script>
 </body>
 </html>
