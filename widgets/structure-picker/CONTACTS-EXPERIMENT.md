@@ -80,6 +80,33 @@ Les coordonnées sont présentes sur environ 97 à 98 % des fiches indexées et 
 
 Le détail de la mesure, ses limites et sa méthode sont consignés dans `CONTACTS-ATP-COVERAGE.md`. Cette mesure évalue la densité de contacts disponible dans ATP ; elle ne mesure pas encore le taux de correspondance avec les structures effectivement présentes dans un document Grist.
 
+## Générateur et mesure Overture Places
+
+`scripts/generate-overture-index.mjs` consomme les exports GeoJSON ou GeoJSONSeq du client officiel Overture et produit le même type d'index JSON départemental. Il conserve le GERS ID, les coordonnées, l'adresse retenue, tous les téléphones/courriels/sites web, le score `confidence`, le statut d'exploitation, la catégorie et la provenance `sources[]`.
+
+Le générateur :
+
+1. sélectionne une adresse française appartenant aux départements demandés ;
+2. exclut les établissements `permanently_closed` ;
+3. écarte les fiches sans téléphone, courriel ni site web ;
+4. préserve l'ensemble des contacts tout en fournissant un contact principal compatible avec le modèle commun ;
+5. déduplique seulement un même GERS ID et conserve la variante la plus riche ;
+6. met à jour uniquement la disponibilité `overture` du manifest lorsqu'il est utilisé pour une publication réelle.
+
+La mesure du 14 septembre 2026 utilise la release Overture `2026-08-19.0` (`v1.18.0`) et le client officiel `overturemaps 1.0.2`. Une extraction spatiale couvrant le 44 et le 85 contenait 104 780 places ; après filtrage départemental et présence d'au moins un contact, **64 151 fiches** sont indexables :
+
+- **59 823 avec téléphone (93,2 %)** ;
+- **40 666 avec courriel (63,4 %)** ;
+- **53 177 avec site web (82,9 %)** ;
+- **26 878 avec un score `confidence` ≥ 0,80 (41,9 %)** ;
+- **13 538 avec un score `confidence` ≥ 0,95 (21,1 %)**.
+
+Overture agrège plusieurs fournisseurs. Dans cette mesure, les principales provenances amont sont `meta`, `Foursquare`, `AllThePlaces`, `PinMeTo` et `DAC`. **1 625 fiches (2,5 %) portent explicitement une lignée All The Places.** Une concordance entre ATP et Overture ne doit donc pas être comptée comme deux preuves indépendantes si la fiche Overture contient cette lignée. La provenance conservée permet d'appliquer cette règle plus tard dans le classement.
+
+La release mesurée n'expose pas, dans notre extraction, une attribution suffisamment fiable de chaque téléphone/courriel/site à un fournisseur précis. Le score `confidence` Overture mesure par ailleurs l'existence du lieu et non l'exactitude d'un contact particulier.
+
+**Décision : Overture Places est retenu comme source complémentaire majeure**, mais pas comme source d'identité équivalente au SIRET. Le détail est consigné dans `CONTACTS-OVERTURE-COVERAGE.md`.
+
 ## Confiance
 
 Les candidats utilisent trois niveaux communs à toutes les sources :
@@ -94,6 +121,7 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 
 - chaque proposition conserve la ou les sources qui l'ont produite ;
 - les doublons exacts peuvent regrouper plusieurs provenances sans fusionner arbitrairement leurs champs ;
+- une provenance agrégée n'est pas automatiquement une preuve indépendante d'une autre source ;
 - l'état de chaque source interrogée est visible dans l'interface ;
 - l'échec d'une source n'empêche pas d'utiliser les résultats des autres sources disponibles.
 
@@ -107,6 +135,8 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 
 ## Limites restantes
 
-All The Places montre une densité de contacts suffisante pour être conservé dans l'architecture. La prochaine comparaison devra vérifier si Overture Places élargit la couverture ou apporte une corroboration utile, avant de brancher les sources indexées dans l'interface.
+All The Places et Overture Places montrent une densité de contacts suffisante pour rester dans l'architecture. Overture élargit fortement le réservoir de candidats, mais la qualité du rapprochement avec les structures Grist devra rester fondée sur adresse + coordonnées + nom et tenir compte du score d'existence et de la provenance amont.
+
+L'étape suivante ajoute FSQ OS Places avant les sources directes DILA/Wikidata. Les sources indexées ne sont pas encore branchées dans l'interface ; cette activation et la publication périodique des index restent séparées.
 
 La fonctionnalité conserve explicitement le statut **Expérimental** tant que sa pertinence n'a pas été vérifiée sur des structures réelles.
