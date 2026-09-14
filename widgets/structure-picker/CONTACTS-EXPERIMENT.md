@@ -48,9 +48,11 @@ Contraintes du contrat V1 :
 - chargement du manifest avec `cache: "no-store"` ;
 - aucun cache applicatif ou service worker.
 
+Le périmètre et le mécanisme de génération/publication périodique sont documentés dans `CONTACTS-INDEX-PUBLICATION.md`.
+
 ## Générateur All The Places
 
-`scripts/generate-all-the-places-index.mjs` est le premier générateur réel. Il lit les `FeatureCollection` GeoJSON de l'export officiel All The Places, puis :
+`scripts/generate-all-the-places-index.mjs` lit les `FeatureCollection` GeoJSON de l'export officiel All The Places, puis :
 
 1. retient les POI français appartenant aux départements demandés ;
 2. écarte les POI ne fournissant ni téléphone, ni courriel, ni site web ;
@@ -67,7 +69,7 @@ unzip -q /tmp/alltheplaces.zip -d /tmp/alltheplaces
 npm run generate:contacts:atp -- --input /tmp/alltheplaces --departments 44,85
 ```
 
-On peut ajouter `--run-id <identifiant>` pour conserver l'identifiant du run ATP dans chaque index. Le téléchargement et l'exécution périodique seront automatisés seulement à l'étape de publication périodique.
+On peut ajouter `--run-id <identifiant>` pour conserver l'identifiant du run ATP dans chaque index. Le workflow de publication résout et télécharge automatiquement le dernier run ATP avant d'exécuter ce générateur.
 
 Format produit :
 
@@ -129,6 +131,14 @@ La release mesurée n'expose pas, dans notre extraction, une attribution suffisa
 
 **Décision : Overture Places est retenu comme source complémentaire majeure**, mais pas comme source d'identité équivalente au SIRET. Le détail est consigné dans `CONTACTS-OVERTURE-COVERAGE.md`.
 
+## Publication périodique ATP + Overture
+
+Le script `scripts/build-contact-index-snapshot.sh` construit un snapshot cohérent des deux sources pour le périmètre déclaré dans `contact-indexes/publication-config.json`. Le workflow `Publish contact indexes` l'exécute mensuellement et à la demande, lance ensuite tous les tests puis conserve le résultat sous forme d'un artefact GitHub Actions `contact-indexes` pendant 90 jours.
+
+Les gros JSON ne sont jamais committés dans `main`. Le workflow Pages récupère le dernier artefact réussi et le superpose à la production ainsi qu'aux previews. En l'absence d'artefact valide, le manifest vide de `main` reste servi et les sources directes continuent de fonctionner.
+
+Le pipeline complet a été vérifié le 14 septembre 2026 sur le run ATP `2026-09-05-13-32-25` et la release Overture `2026-08-19.0` : **63 MiB** de JSON non compressés, environ **10,4 MiB** sous forme d'artefact, génération et suite de tests réussies. Les détails et tailles par département sont consignés dans `CONTACTS-INDEX-PUBLICATION.md`.
+
 ## Confiance
 
 Les candidats utilisent trois niveaux communs à toutes les sources :
@@ -158,8 +168,8 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 
 ## Limites restantes
 
-Les trois sources directes OSM, DILA et Wikidata sont maintenant raccordées à l'orchestrateur expérimental. DILA apporte une identité SIRET particulièrement forte pour les administrations ; Wikidata reste volontairement conservateur et sert surtout de complément ou de corroboration.
+Les trois sources directes OSM, DILA et Wikidata sont raccordées à l'orchestrateur expérimental. DILA apporte une identité SIRET particulièrement forte pour les administrations ; Wikidata reste volontairement conservateur et sert surtout de complément ou de corroboration.
 
-All The Places et Overture Places ont une densité de contacts suffisante pour rester dans l'architecture, mais leurs index ne sont pas encore publiés ni chargés dans l'interface. **BANCO a été évalué puis retiré de l'architecture : son export est intégralement adossé à des objets OpenStreetMap (`osm_id` présent sur 100 % des lignes mesurées) et n'apporte donc pas de source indépendante justifiant la complexité supplémentaire.**
+All The Places et Overture Places disposent maintenant d'une mécanique de génération et de publication périodique validée. **Ils ne sont toutefois pas encore raccordés au runtime du résolveur** : publier les JSON les rend disponibles sur Pages, mais le widget ne les interroge pas encore.
 
-La prochaine étape porte sur la génération et la publication périodiques des seuls index ATP et Overture. La validation finale devra ensuite se faire sur des structures réelles dans Grist. La fonctionnalité conserve explicitement le statut **Expérimental** tant que cette pertinence n'a pas été vérifiée.
+BANCO et FSQ ont été retirés de l'architecture après évaluation. La prochaine étape fonctionnelle est donc le chargement et le matching des index ATP + Overture dans l'orchestrateur, puis la validation sur des structures réelles dans Grist. La fonctionnalité conserve explicitement le statut **Expérimental** tant que cette pertinence n'a pas été vérifiée.

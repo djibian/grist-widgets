@@ -5,8 +5,16 @@ on:
     branches:
       - main
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Publish contact indexes
+    branches:
+      - main
+    types:
+      - completed
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -17,6 +25,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main and all branches
@@ -25,6 +34,36 @@ jobs:
           ref: main
           fetch-depth: 0
           path: source
+
+      - name: Download latest contact index snapshot when available
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id="$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow publish-contact-indexes.yml \
+            --branch main \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')"
+
+          if [[ -z "$run_id" ]]; then
+            echo "No published contact index snapshot is available yet"
+            exit 0
+          fi
+
+          echo "Trying contact index snapshot from workflow run $run_id"
+          mkdir -p contact-index-snapshot
+          if ! gh run download "$run_id" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name contact-indexes \
+            --dir contact-index-snapshot; then
+            echo "Contact index artifact is unavailable; deploying the repository manifest instead"
+            rm -rf contact-index-snapshot
+          fi
 
       - name: Assemble production and previews
         shell: bash
@@ -60,6 +99,23 @@ jobs:
             mkdir -p "site/previews/$slug"
             git -C source archive "$ref" | tar -x -C "site/previews/$slug"
           done
+
+          snapshot="$GITHUB_WORKSPACE/contact-index-snapshot"
+          if [[ -f "$snapshot/indexed-departments.json" ]]; then
+            overlay_snapshot() {
+              root="$1"
+              target="$root/widgets/structure-picker/contact-indexes"
+              rm -rf "$target"
+              mkdir -p "$target"
+              cp -a "$snapshot/." "$target/"
+            }
+
+            overlay_snapshot site
+            for preview in site/previews/*; do
+              [[ -d "$preview" ]] || continue
+              overlay_snapshot "$preview"
+            done
+          fi
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
