@@ -63,6 +63,23 @@ Format produit :
 
 La Corse reste volontairement non déduite à partir d'un seul code postal `20xxx`, car ce code ne permet pas de distinguer sûrement `2A` de `2B`.
 
+## Mesure All The Places — 44 / 85
+
+Une mesure complète a été effectuée sur le run ATP `2026-09-05-13-32-25` en parcourant l'archive officielle puis en appliquant le générateur réel aux POI des départements 44 et 85.
+
+Résultat : **5 483 enregistrements uniques avec au moins un contact**, dont :
+
+- **4 675 avec téléphone (85,3 %)** ;
+- **1 546 avec courriel (28,2 %)** ;
+- **4 198 avec site web (76,6 %)** ;
+- **0 avec SIRET** parmi les enregistrements retenus.
+
+Les coordonnées sont présentes sur environ 97 à 98 % des fiches indexées et l'adresse est exploitable sur toutes les fiches retenues. La couverture est particulièrement forte sur les enseignes et réseaux disposant de localisateurs publics.
+
+**Décision : All The Places est retenu comme source complémentaire**, mais pas comme source d'identité primaire. En l'absence de SIRET, le rapprochement devra principalement s'appuyer sur adresse + coordonnées + nom et produire généralement un niveau de confiance `Probable`. Les autres sources indexées restent nécessaires pour élargir la couverture et corroborer les propositions.
+
+Le détail de la mesure, ses limites et sa méthode sont consignés dans `CONTACTS-ATP-COVERAGE.md`. Cette mesure évalue la densité de contacts disponible dans ATP ; elle ne mesure pas encore le taux de correspondance avec les structures effectivement présentes dans un document Grist.
+
 ## Confiance
 
 Les candidats utilisent trois niveaux communs à toutes les sources :
@@ -88,8 +105,8 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 - si Téléphone, Courriel ou Site web n'est pas mappé ou modifiable, le champ est désactivé ;
 - une indisponibilité d'une source de contacts n'empêche pas les fonctions DINUM/IGN.
 
-## Limites à mesurer
+## Limites restantes
 
-L'étape suivante doit mesurer la **couverture réelle** d'All The Places sur les structures de stage avant de brancher cette source dans l'interface. L'absence de résultat n'est pas une erreur : de nombreux établissements ne publient pas leurs contacts dans les sources interrogées.
+All The Places montre une densité de contacts suffisante pour être conservé dans l'architecture. La prochaine comparaison devra vérifier si Overture Places élargit la couverture ou apporte une corroboration utile, avant de brancher les sources indexées dans l'interface.
 
 La fonctionnalité conserve explicitement le statut **Expérimental** tant que sa pertinence n'a pas été vérifiée sur des structures réelles.
