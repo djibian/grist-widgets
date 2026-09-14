@@ -1,4 +1,10 @@
-.route-shell { margin-top: 0; }
+.route-shell.gw-widget-frame {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
 .route-header { padding-bottom: 18px; }
 .route-header .gw-kicker { color: var(--gw-color-workflow); }
 
