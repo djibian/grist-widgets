@@ -23,7 +23,7 @@ function statement(property, content, { rank = "normal", servicePublic = false }
 
 function item(overrides = {}) {
   return {
-    id: "QTEST",
+    id: "Q123",
     labels: { fr: "Structure exemple" },
     statements: {
       P1329: [statement("P1329", "+33-2-40-41-90-00", { servicePublic: true })],
@@ -87,11 +87,11 @@ test("Wikidata exact SIREN lookup fetches only resolved items", async () => {
       return {
         ok: true,
         async json() {
-          return { results: { bindings: [{ item: { value: "http://www.wikidata.org/entity/QTEST" } }] } };
+          return { results: { bindings: [{ item: { value: "http://www.wikidata.org/entity/Q123" } }] } };
         },
       };
     }
-    if (String(url).endsWith("/entities/items/QTEST")) {
+    if (String(url).endsWith("/entities/items/Q123")) {
       return { ok: true, async json() { return item(); } };
     }
     throw new Error(`unexpected URL ${url}`);
@@ -104,7 +104,7 @@ test("Wikidata exact SIREN lookup fetches only resolved items", async () => {
   assert.equal(result.candidates.length, 1);
   assert.equal(calls.length, 2);
   assert.ok(calls[0].startsWith("https://query.wikidata.org/"));
-  assert.ok(calls[1].endsWith("/entities/items/QTEST"));
+  assert.ok(calls[1].endsWith("/entities/items/Q123"));
 });
 
 test("Wikidata falls back to text search when exact SIREN finds nothing", async () => {
@@ -118,11 +118,11 @@ test("Wikidata falls back to text search when exact SIREN finds nothing", async 
       return {
         ok: true,
         async json() {
-          return { results: [{ id: "QTEST", "display-label": { value: "Structure exemple" } }] };
+          return { results: [{ id: "Q123", "display-label": { value: "Structure exemple" } }] };
         },
       };
     }
-    if (String(url).endsWith("/entities/items/QTEST")) {
+    if (String(url).endsWith("/entities/items/Q123")) {
       return { ok: true, async json() { return item(); } };
     }
     throw new Error(`unexpected URL ${url}`);
