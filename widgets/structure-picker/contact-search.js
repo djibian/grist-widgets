@@ -1,11 +1,15 @@
+import { allThePlacesContactSource } from "./contact-sources/all-the-places.js";
 import { dilaContactSource } from "./contact-sources/dila.js";
 import { osmContactSource } from "./contact-sources/osm.js";
+import { overtureContactSource } from "./contact-sources/overture.js";
 import { wikidataContactSource } from "./contact-sources/wikidata.js";
 
 export const CONTACT_SOURCES = Object.freeze([
   osmContactSource,
   dilaContactSource,
   wikidataContactSource,
+  allThePlacesContactSource,
+  overtureContactSource,
 ]);
 
 export function availableContactSources(context, sources = CONTACT_SOURCES) {

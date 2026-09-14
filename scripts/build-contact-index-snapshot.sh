@@ -24,7 +24,7 @@ work_dir="$(mktemp -d)"
 trap 'rm -rf "$work_dir"' EXIT
 
 rm -rf "$output_root"
-mkdir -p "$output_root/all-the-places" "$output_root/overture"
+mkdir -p "$output_root/all-the-places" "$output_root/overture" "$work_dir/raw-atp" "$work_dir/raw-overture"
 cp "$repo_root/widgets/structure-picker/contact-indexes/indexed-departments.json" "$output_root/indexed-departments.json"
 cp "$config" "$output_root/publication-config.json"
 
@@ -51,11 +51,18 @@ python3 "$repo_root/scripts/measure-all-the-places-coverage.py" \
 node "$repo_root/scripts/generate-all-the-places-index.mjs" \
   --input "$work_dir/atp-selected" \
   --departments "$departments" \
-  --output "$output_root/all-the-places" \
+  --output "$work_dir/raw-atp" \
   --manifest "$output_root/indexed-departments.json" \
   --run-id "$atp_run_id" \
   --generated-at "$generated_at" \
   > "$work_dir/atp-generator-report.json"
+node "$repo_root/scripts/build-contact-runtime-shards.mjs" \
+  --source all-the-places \
+  --input "$work_dir/raw-atp" \
+  --output "$output_root/all-the-places" \
+  --manifest "$output_root/indexed-departments.json" \
+  --departments "$departments" \
+  > "$work_dir/atp-shard-report.json"
 
 echo "Resolving Overture release..."
 curl --fail --location --retry 4 --retry-delay 5 \
@@ -73,11 +80,18 @@ overturemaps download \
 node "$repo_root/scripts/generate-overture-index.mjs" \
   --input "$work_dir/overture-places.geojsonseq" \
   --departments "$departments" \
-  --output "$output_root/overture" \
+  --output "$work_dir/raw-overture" \
   --manifest "$output_root/indexed-departments.json" \
   --release "$overture_release" \
   --generated-at "$generated_at" \
   > "$work_dir/overture-generator-report.json"
+node "$repo_root/scripts/build-contact-runtime-shards.mjs" \
+  --source overture \
+  --input "$work_dir/raw-overture" \
+  --output "$output_root/overture" \
+  --manifest "$output_root/indexed-departments.json" \
+  --departments "$departments" \
+  > "$work_dir/overture-shard-report.json"
 
 CONTACT_INDEX_ROOT="$output_root" CONTACT_INDEX_DEPARTMENTS="$departments" python3 - <<'PY'
 import json
@@ -91,19 +105,34 @@ if manifest.get('schemaVersion') != 1:
     raise SystemExit('Unexpected manifest schema version')
 
 for source in ('all-the-places', 'overture'):
-    published = manifest.get('sources', {}).get(source, {}).get('departments', [])
+    config = manifest.get('sources', {}).get(source, {})
+    published = config.get('departments', [])
     if published != departments:
         raise SystemExit(f'{source}: manifest departments {published!r} != {departments!r}')
+    if config.get('shardBy') != 'postcode' or '{postcode}' not in config.get('pathTemplate', ''):
+        raise SystemExit(f'{source}: invalid postcode shard contract')
+
     for department in departments:
-        path = root / source / f'{department}.json'
-        if not path.is_file():
-            raise SystemExit(f'Missing {path}')
-        data = json.loads(path.read_text())
-        if data.get('schemaVersion') != 1 or data.get('source') != source or data.get('department') != department:
-            raise SystemExit(f'Invalid metadata in {path}')
-        if data.get('recordCount', 0) <= 0 or data.get('recordCount') != len(data.get('records', [])):
-            raise SystemExit(f'Invalid record count in {path}')
-        print(f"{source} {department}: {data['recordCount']} records; {path.stat().st_size / 1024 / 1024:.2f} MiB")
+        directory = root / source / department
+        paths = sorted(directory.glob('*.json')) if directory.is_dir() else []
+        if not paths:
+            raise SystemExit(f'{source} {department}: no postcode shards')
+        records = 0
+        size = 0
+        for path in paths:
+            data = json.loads(path.read_text())
+            if (
+                data.get('schemaVersion') != 1
+                or data.get('source') != source
+                or data.get('department') != department
+                or data.get('postcode') != path.stem
+            ):
+                raise SystemExit(f'Invalid metadata in {path}')
+            if data.get('recordCount', 0) <= 0 or data.get('recordCount') != len(data.get('records', [])):
+                raise SystemExit(f'Invalid record count in {path}')
+            records += data['recordCount']
+            size += path.stat().st_size
+        print(f"{source} {department}: {records} records in {len(paths)} shards; {size / 1024 / 1024:.2f} MiB")
 PY
 
 echo "Snapshot generated at $generated_at"
