@@ -91,14 +91,14 @@ test("index entries resolve relative to the manifest and only for indexed depart
 test("Corsican department codes remain valid index keys", () => {
   const normalized = normalizeContactIndexManifest(manifest({
     sources: {
-      banco: {
-        label: "BANCO",
-        pathTemplate: "banco/{department}.json",
+      sample: {
+        label: "Sample",
+        pathTemplate: "sample/{department}.json",
         departments: ["2B", "2A"],
       },
     },
   }));
-  assert.deepEqual(normalized.sources.banco.departments, ["2A", "2B"]);
+  assert.deepEqual(normalized.sources.sample.departments, ["2A", "2B"]);
 });
 
 test("manifest loading bypasses browser cache and forwards abort signal", async () => {
