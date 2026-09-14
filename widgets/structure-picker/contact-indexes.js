@@ -122,7 +122,7 @@ export function resolveContactIndexEntries(manifest, sourceId, requestedDepartme
       availability.source.pathTemplate,
       { department },
       manifestUrl,
-      manifest?.generatedAt,
+      null,
     ),
   })));
 }
