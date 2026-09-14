@@ -1,7 +1,11 @@
+import { dilaContactSource } from "./contact-sources/dila.js";
 import { osmContactSource } from "./contact-sources/osm.js";
+import { wikidataContactSource } from "./contact-sources/wikidata.js";
 
 export const CONTACT_SOURCES = Object.freeze([
   osmContactSource,
+  dilaContactSource,
+  wikidataContactSource,
 ]);
 
 export function availableContactSources(context, sources = CONTACT_SOURCES) {
