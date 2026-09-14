@@ -63,7 +63,7 @@ function ensureSettingsUi() {
   }
 
   if (!document.getElementById("department-settings")) {
-    const panel = node("section", { id: "department-settings", className: "gw-work-grid" });
+    const panel = node("section", { id: "department-settings", className: "gw-work-grid gw-work-grid--balanced" });
     panel.hidden = true;
     panel.setAttribute("aria-labelledby", "department-settings-title");
 

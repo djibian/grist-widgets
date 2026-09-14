@@ -88,8 +88,8 @@ test('matérialise la grammaire contexte travail validation', () => {
   assert.match(html, /class="gw-validation-bar proposal-validation"/);
 });
 
-test('partage le mark, le bleu workflow et le cadre commun', () => {
-  assert.match(structureCss, /\.gw-widget-frame[\s\S]*width: min\(100% - 32px, 920px\)[\s\S]*margin: 0 auto 32px/);
+test('partage le mark, le bleu workflow et le cadre fluide commun', () => {
+  assert.match(structureCss, /\.gw-widget-frame[\s\S]*width: calc\(100% - 32px\)[\s\S]*max-width: none[\s\S]*container-name: gw-widget/);
   assert.match(structureCss, /\.gw-widget-icon[\s\S]*linear-gradient\(#79d4b7 0 0\)/);
   assert.match(structureCss, /\.gw-widget-header \.app-kicker,[\s\S]*color: var\(--gw-color-workflow\)/);
   assert.match(structureCss, /\.gw-step-heading__index[\s\S]*color: var\(--gw-color-workflow\)/);

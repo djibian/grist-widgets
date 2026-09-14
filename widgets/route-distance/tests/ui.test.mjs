@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const app = await readFile(new URL('../app.js', import.meta.url), 'utf8');
 const style = await readFile(new URL('../style.css', import.meta.url), 'utf8');
+const structureCss = await readFile(new URL('../../../shared/ui/structure.css', import.meta.url), 'utf8');
 
 test('charge le socle Grist Studio complet dans le bon ordre', () => {
   const tokens = html.indexOf('../../shared/ui/tokens.css');
@@ -35,8 +36,11 @@ test('matérialise le flux contexte calcul vérification', () => {
   assert.match(html, /Calcul sans écriture/);
 });
 
-test('utilise le contrat visuel définitif Grist Studio', () => {
-  assert.match(style, /\.route-shell \{[\s\S]*width: min\(100% - 32px, 920px\)[\s\S]*margin-top: 0/);
+test('utilise un cadre fluide et une zone résultat responsive', () => {
+  assert.match(structureCss, /\.gw-widget-frame[\s\S]*width: calc\(100% - 32px\)[\s\S]*max-width: none/);
+  assert.doesNotMatch(style, /920px/);
+  assert.match(style, /\.route-work-grid[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(320px, 32%\)/);
+  assert.match(style, /@container gw-widget \(max-width: 760px\)[\s\S]*\.route-work-grid \{ grid-template-columns: 1fr; \}/);
   assert.match(style, /\.route-header \.gw-kicker \{ color: var\(--gw-color-workflow\); \}/);
   assert.doesNotMatch(style, /gw-color-geography/);
 });

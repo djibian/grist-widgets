@@ -5,6 +5,7 @@ import test from "node:test";
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../style.css", import.meta.url), "utf8");
 const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
+const structureCss = await readFile(new URL("../../../shared/ui/structure.css", import.meta.url), "utf8");
 
 const requiredIds = [
   "search", "manual-create", "config-status", "table-counter", "table-count",
@@ -39,20 +40,29 @@ test("conserve exactement les deux modes principaux", () => {
   assert.match(html, /ArrowLeft/);
 });
 
-test("compose le mode recherche en travail puis décision", () => {
-  assert.match(html, /<section id="panel-search"[\s\S]*class="gw-work-grid search-work-grid"/);
+test("compose le mode recherche en travail puis décision avec une grille équilibrée", () => {
+  assert.match(html, /<section id="panel-search"[\s\S]*class="gw-work-grid gw-work-grid--balanced search-work-grid"/);
   assert.match(html, /01 · Rechercher/);
   assert.match(html, /02 · Vérifier \/ ajouter/);
   assert.match(html, /id="search"[\s\S]*id="local-results"[\s\S]*id="external-results"[\s\S]*id="manual-create"/);
 });
 
-test("compose l'enrichissement en examiner puis vérifier", () => {
+test("compose l'enrichissement avec davantage de largeur pour la vérification", () => {
   assert.match(html, /<section id="panel-enrich"[^>]*hidden/);
+  assert.match(html, /class="gw-work-grid gw-work-grid--decision-wide enrich-work-grid"/);
   assert.match(html, /01 · Examiner/);
   assert.match(html, /02 · Vérifier/);
   assert.match(html, /class="gw-decision-panel enrich-decision"/);
   assert.match(html, /id="selected-summary"/);
   assert.match(html, /id="proposal-panel"/);
+});
+
+test("utilise un cadre fluide et des variantes qui se replient selon la largeur du widget", () => {
+  assert.match(structureCss, /\.gw-widget-frame[\s\S]*width: calc\(100% - 32px\)[\s\S]*max-width: none[\s\S]*container-name: gw-widget/);
+  assert.match(structureCss, /\.gw-work-grid--balanced \{ grid-template-columns: minmax\(0, 1fr\) minmax\(320px, 1fr\); \}/);
+  assert.match(structureCss, /\.gw-work-grid--decision-wide \{ grid-template-columns: minmax\(300px, \.72fr\) minmax\(0, 1\.28fr\); \}/);
+  assert.match(structureCss, /@container gw-widget \(max-width: 860px\)[\s\S]*\.gw-work-grid--balanced,[\s\S]*\.gw-work-grid--decision-wide \{ grid-template-columns: 1fr; \}/);
+  assert.doesNotMatch(structureCss, /920px/);
 });
 
 test("utilise une seule feuille locale et le contrat couleur définitif", () => {
