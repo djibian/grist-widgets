@@ -35,8 +35,7 @@ jobs:
           fetch-depth: 0
           path: source
 
-      - name: Find latest contact index snapshot
-        id: contact_indexes
+      - name: Download latest contact index snapshot when available
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -50,21 +49,21 @@ jobs:
             --limit 1 \
             --json databaseId \
             --jq '.[0].databaseId // empty')"
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          if [[ -n "$run_id" ]]; then
-            echo "Using contact index snapshot from workflow run $run_id"
-          else
+
+          if [[ -z "$run_id" ]]; then
             echo "No published contact index snapshot is available yet"
+            exit 0
           fi
 
-      - name: Download latest contact index snapshot
-        if: steps.contact_indexes.outputs.run_id != ''
-        uses: actions/download-artifact@v4
-        with:
-          name: contact-indexes
-          path: contact-index-snapshot
-          github-token: ${{ github.token }}
-          run-id: ${{ steps.contact_indexes.outputs.run_id }}
+          echo "Trying contact index snapshot from workflow run $run_id"
+          mkdir -p contact-index-snapshot
+          if ! gh run download "$run_id" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name contact-indexes \
+            --dir contact-index-snapshot; then
+            echo "Contact index artifact is unavailable; deploying the repository manifest instead"
+            rm -rf contact-index-snapshot
+          fi
 
       - name: Assemble production and previews
         shell: bash
