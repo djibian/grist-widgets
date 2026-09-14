@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "source": "all-the-places",
+  "measuredAt": "2026-09-14T11:13:58Z",
+  "actionRunId": 34836687724,
+  "upstream": {
+    "runId": "2026-09-05-13-32-25",
+    "startTime": "2026-09-05T13:32:25Z",
+    "endTime": "2026-09-09T08:16:19Z",
+    "archiveSizeBytes": 2773305780
+  },
+  "scan": {
+    "geojsonFiles": 5074,
+    "invalidGeojsonFiles": 479,
+    "featuresScanned": 40320302,
+    "targetFeatures": 8815
+  },
+  "departments": {
+    "44": {
+      "rawFeatures": 5553,
+      "rawWithAnyContact": 3508,
+      "indexedRecords": 3508,
+      "indexedTelephone": 2914,
+      "indexedEmail": 862,
+      "indexedWebsite": 2732,
+      "indexedSiret": 0,
+      "indexedCoordinates": 3413,
+      "indexedAddress": 3508,
+      "spiderCount": 250
+    },
+    "85": {
+      "rawFeatures": 3262,
+      "rawWithAnyContact": 1975,
+      "indexedRecords": 1975,
+      "indexedTelephone": 1761,
+      "indexedEmail": 684,
+      "indexedWebsite": 1466,
+      "indexedSiret": 0,
+      "indexedCoordinates": 1936,
+      "indexedAddress": 1975,
+      "spiderCount": 184
+    }
+  },
+  "totals": {
+    "indexedRecords": 5483,
+    "indexedTelephone": 4675,
+    "indexedEmail": 1546,
+    "indexedWebsite": 4198,
+    "indexedSiret": 0,
+    "indexedTelephoneRate": 0.8526,
+    "indexedEmailRate": 0.282,
+    "indexedWebsiteRate": 0.7656,
+    "indexedSiretRate": 0.0
+  }
+}
