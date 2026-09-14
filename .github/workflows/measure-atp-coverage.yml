@@ -1,13 +1,7 @@
 name: Measure ATP coverage
 
 on:
-  push:
-    branches:
-      - contacts-resolver
-    paths:
-      - ".github/workflows/measure-atp-coverage.yml"
-      - "scripts/measure-all-the-places-coverage.py"
-      - "scripts/generate-all-the-places-index.mjs"
+  workflow_dispatch:
 
 permissions:
   contents: read
