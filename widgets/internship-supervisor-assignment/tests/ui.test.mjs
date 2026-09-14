@@ -90,6 +90,7 @@ test('matérialise la grammaire contexte travail validation', () => {
 
 test('partage le mark, le bleu workflow et le cadre fluide commun', () => {
   assert.match(structureCss, /\.gw-widget-frame[\s\S]*width: calc\(100% - 32px\)[\s\S]*max-width: none[\s\S]*container-name: gw-widget/);
+  assert.match(css, /\.app\.gw-widget-frame \{[\s\S]*width: 100%;[\s\S]*margin: 0;[\s\S]*border: 0;[\s\S]*border-radius: 0;[\s\S]*box-shadow: none;/);
   assert.match(structureCss, /\.gw-widget-icon[\s\S]*linear-gradient\(#79d4b7 0 0\)/);
   assert.match(structureCss, /\.gw-widget-header \.app-kicker,[\s\S]*color: var\(--gw-color-workflow\)/);
   assert.match(structureCss, /\.gw-step-heading__index[\s\S]*color: var\(--gw-color-workflow\)/);
