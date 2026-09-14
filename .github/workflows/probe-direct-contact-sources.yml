@@ -1,0 +1,34 @@
+name: Probe direct contact sources
+
+on:
+  push:
+    branches:
+      - contacts-resolver-direct-sources
+    paths:
+      - ".github/workflows/probe-direct-contact-sources.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe DILA annuaire
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://api-lannuaire.service-public.gouv.fr/api/explore/v2.1/catalog/datasets/api-lannuaire-administration/records?limit=1'
+          curl -fsSL "$url" -o /tmp/dila.json
+          jq '{total_count, first: .results[0]}' /tmp/dila.json
+      - name: Probe Wikidata REST
+        shell: bash
+        run: |
+          set -euo pipefail
+          ua='grist-widgets-contact-probe/1.0 (https://github.com/djibian/grist-widgets)'
+          curl -fsSL -H "User-Agent: $ua" 'https://www.wikidata.org/w/rest.php/wikibase/v1/search/items?q=Nantes&language=fr&limit=3' -o /tmp/wd-search.json
+          jq '.' /tmp/wd-search.json
+          curl -fsSL -H "User-Agent: $ua" 'https://www.wikidata.org/w/rest.php/wikibase/v1/items/Q12191' -o /tmp/wd-item.json
+          jq '{id, labels: .labels.fr, descriptions: .descriptions.fr, statements: {P1329: .statements.P1329, P968: .statements.P968, P856: .statements.P856, P1616: .statements.P1616, P625: .statements.P625, P281: .statements.P281}}' /tmp/wd-item.json
