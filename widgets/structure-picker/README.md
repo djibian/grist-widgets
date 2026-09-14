@@ -13,9 +13,11 @@ Le périmètre géographique du widget est configurable. Par défaut, un documen
 
 Le bouton **Départements** dans l’en-tête permet de rechercher un département par numéro ou par nom, puis de l’ajouter ou de le retirer. Au moins un département doit rester sélectionné.
 
-La liste est enregistrée dans les **options natives du Custom Widget Grist**. Elle est immédiatement utilisée par les recherches dans l’Annuaire des Entreprises et par leur filtrage. Elle servira également de périmètre aux futurs index de contacts, sans que cette étape ne génère encore ces index.
+La liste est enregistrée dans les **options natives du Custom Widget Grist**. Elle est utilisée immédiatement par les recherches dans l’Annuaire des Entreprises et pour déterminer quels index de contacts peuvent être interrogés.
 
-## APIs publiques utilisées
+Les index publiés couvrent actuellement les départements **44 et 85** pour All The Places et Overture Places. Les sources directes OSM, DILA et Wikidata ne dépendent pas de ces index.
+
+## APIs et sources publiques utilisées
 
 ### Annuaire des Entreprises
 
@@ -32,15 +34,23 @@ La liste est enregistrée dans les **options natives du Custom Widget Grist**. E
 - latitude et longitude ;
 - le code postal et la commune sont dérivés en mémoire de l’adresse afin d’améliorer la recherche Annuaire.
 
-### OpenStreetMap / Overpass — expérimental
+### Contacts publics — expérimental
 
-`https://overpass-api.de/api/interpreter`
+La zone **Contacts publics** recherche facultativement Téléphone, Courriel et Site web à partir de cinq sources :
 
-La zone **Contacts publics** recherche facultativement Téléphone, Courriel et Site web. Elle privilégie une correspondance exacte par SIRET ; à défaut, elle peut proposer une correspondance par proximité géographique et similitude du nom.
+- **OpenStreetMap / Overpass** — interrogation directe, avec priorité au SIRET exact puis proximité + nom ;
+- **Service-Public.fr (DILA)** — interrogation directe de l’Annuaire de l’administration ;
+- **Wikidata** — interrogation directe par SIREN lorsque possible, sinon par nom ;
+- **All The Places** — index statique publié avec le widget ;
+- **Overture Places** — index statique publié avec le widget.
 
-Cette fonction reste explicitement **expérimentale** tant que sa couverture et la qualité de ses correspondances n’ont pas été évaluées sur des structures réelles. Elle ne bloque jamais les fonctions stables Annuaire/IGN et n’écrit aucune donnée sans validation explicite.
+ATP et Overture sont préparés hors navigateur puis découpés par code postal. Une recherche ne charge que les shards nécessaires à la structure sélectionnée.
 
-Voir `CONTACTS-EXPERIMENT.md` pour le détail.
+Les résultats passent tous par le même modèle canonique, la même déduplication et le même classement. Les provenances sont conservées, et les lignées connues entre sources ne sont pas comptées comme des preuves indépendantes.
+
+Cette fonction reste explicitement **expérimentale** tant que la qualité de ses correspondances n’a pas été suffisamment évaluée sur des structures réelles. Elle ne bloque jamais les fonctions stables Annuaire/IGN et n’écrit aucune donnée sans validation explicite.
+
+Voir `CONTACTS-EXPERIMENT.md` pour l’architecture et `CONTACTS-INDEX-PUBLICATION.md` pour la publication des index.
 
 ## Mappings Grist
 
@@ -70,6 +80,8 @@ Il n’existe pas de mapping séparé `Adresse normalisée`, `Code postal` ou `C
 ## Interface
 
 Lorsque la configuration est valide, aucun grand message de confirmation n’est affiché. Un petit compteur numérique en haut à droite indique le nombre de structures présentes dans la table ; son infobulle en donne le sens. Les messages de configuration restent visibles uniquement lorsqu’une intervention est utile.
+
+L’interface applique l’identité commune **Grist Studio** et les layouts responsive partagés du dépôt.
 
 ## Rechercher / ajouter
 
