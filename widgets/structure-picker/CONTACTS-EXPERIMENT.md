@@ -160,6 +160,6 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 
 Les trois sources directes OSM, DILA et Wikidata sont maintenant raccordées à l'orchestrateur expérimental. DILA apporte une identité SIRET particulièrement forte pour les administrations ; Wikidata reste volontairement conservateur et sert surtout de complément ou de corroboration.
 
-All The Places et Overture Places ont une densité de contacts suffisante pour rester dans l'architecture mais leurs index ne sont pas encore publiés et chargés dans l'interface. La prochaine étape porte sur la génération/publication périodique des index ; la validation finale devra ensuite se faire sur des structures réelles dans Grist.
+All The Places et Overture Places ont une densité de contacts suffisante pour rester dans l'architecture mais leurs index ne sont pas encore publiés et chargés dans l'interface. **BANCO reste à ce stade un simple emplacement réservé dans le manifest, sans générateur ni mesure validée.** Avant d'automatiser la publication périodique, il faudra décider explicitement de conserver BANCO et l'implémenter, ou de le retirer de l'architecture.
 
-La fonctionnalité conserve explicitement le statut **Expérimental** tant que sa pertinence n'a pas été vérifiée sur des structures réelles.
+La validation finale devra ensuite se faire sur des structures réelles dans Grist. La fonctionnalité conserve explicitement le statut **Expérimental** tant que cette pertinence n'a pas été vérifiée.
