@@ -1,17 +1,7 @@
 import { applyEnrichmentChanges, fetchFullSnapshot } from "./grist.js";
-import {
-  availableContactSources,
-  searchContactSources,
-} from "./contact-search.js";
-import {
-  contactSourceSummary,
-  isExactSiretCandidate,
-} from "./contact-model.js";
-import {
-  CONTACT_CONFIDENCE,
-  contactConfidence,
-  resolveContactCandidates,
-} from "./contact-ranking.js";
+import { availableContactSources, searchContactSources } from "./contact-search.js";
+import { isExactSiretCandidate } from "./contact-model.js";
+import { selectContactSuggestions } from "./contact-presentation.js";
 import { identifierParts } from "./search.js";
 
 const FIELD_CONFIG = Object.freeze([
@@ -21,11 +11,10 @@ const FIELD_CONFIG = Object.freeze([
 ]);
 
 const ui = {
-  panel: document.getElementById("contact-experiment"),
   searchButton: document.getElementById("contact-search"),
+  applyButton: document.getElementById("contact-apply"),
   current: document.getElementById("contact-current"),
   status: document.getElementById("contact-status"),
-  sources: document.getElementById("contact-sources"),
   results: document.getElementById("contact-results"),
 };
 
@@ -34,6 +23,7 @@ let currentMappings = {};
 let controller = null;
 let generation = 0;
 let writableMappings = {};
+let currentSuggestions = [];
 
 function clearNode(node) {
   node?.replaceChildren();
@@ -103,39 +93,18 @@ function renderCurrentContacts() {
   ui.current.appendChild(list);
 }
 
-function renderSourceStates(states = []) {
-  clearNode(ui.sources);
-  if (!ui.sources || !states.length) return;
-
-  const list = document.createElement("div");
-  list.className = "contact-source-list";
-  for (const state of states) {
-    const item = document.createElement("span");
-    const empty = state.status === "success" && state.candidateCount === 0;
-    item.className = `contact-source-state ${state.status}${empty ? " empty" : ""}`;
-
-    const label = document.createElement("strong");
-    label.textContent = state.label;
-    const detail = document.createElement("span");
-    if (state.status === "error") {
-      detail.textContent = "indisponible";
-      if (state.error) item.title = state.error;
-    } else if (state.candidateCount === 0) {
-      detail.textContent = "aucun résultat";
-    } else {
-      detail.textContent = `${state.candidateCount} résultat${state.candidateCount > 1 ? "s" : ""}`;
-    }
-    item.append(label, detail);
-    list.appendChild(item);
-  }
-  ui.sources.appendChild(list);
+function refreshApplyButton() {
+  if (!ui.applyButton) return;
+  ui.applyButton.disabled = !ui.results?.querySelector('input[data-contact-field]:checked:not(:disabled)');
 }
 
 function refreshAvailability() {
   renderCurrentContacts();
   clearNode(ui.results);
-  clearNode(ui.sources);
+  currentSuggestions = [];
   writableMappings = {};
+  refreshApplyButton();
+
   const context = currentContext();
   const sources = currentRecord && currentRecord.id !== "new" ? availableContactSources(context) : [];
   const available = sources.length > 0;
@@ -146,67 +115,22 @@ function refreshAvailability() {
   } else if (!available) {
     setStatus("Complète d’abord le SIRET ou les coordonnées de la structure avec l’analyse ci-dessus.");
   } else {
-    setStatus(`${sources.length} source${sources.length > 1 ? "s" : ""} publique${sources.length > 1 ? "s" : ""} disponible${sources.length > 1 ? "s" : ""}.`);
+    setStatus("Prêt à rechercher les contacts publics.");
   }
 }
 
-function confidenceClass(candidate, context) {
-  const confidence = contactConfidence(candidate, context);
-  if (confidence.level === CONTACT_CONFIDENCE.VERY_RELIABLE) return "exact";
-  if (confidence.level === CONTACT_CONFIDENCE.PROBABLE) return "probable";
-  return "verify";
+function fieldConfig(key) {
+  return FIELD_CONFIG.find(field => field.key === key);
 }
 
-function candidateContact(candidate, key) {
-  return candidate.contacts?.[key] ?? "";
+function confidenceClass(confidence) {
+  return confidence?.level === "very-reliable" ? "exact" : "probable";
 }
 
-function makeContactLine(field, candidate, cardIndex) {
-  const proposed = candidateContact(candidate, field.key);
-  if (!proposed) return null;
-
-  const current = valueOf(field.logical);
-  const writable = Boolean(writableMappings[field.logical]);
-  const row = document.createElement("label");
-  row.className = "contact-field-row";
-
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.dataset.contactField = field.logical;
-  checkbox.dataset.contactCard = String(cardIndex);
-  checkbox.checked = Boolean(isExactSiretCandidate(candidate) && !hasText(current) && writable);
-  checkbox.disabled = !writable;
-
-  const content = document.createElement("div");
-  const title = document.createElement("div");
-  title.className = "contact-field-label";
-  title.textContent = writable ? field.label : `${field.label} — non mappé ou non modifiable`;
-  const currentNode = document.createElement("div");
-  currentNode.className = "contact-field-current";
-  currentNode.textContent = `Actuel : ${hasText(current) ? current : "—"}`;
-  const proposedNode = document.createElement("div");
-  proposedNode.className = "contact-field-proposed";
-  proposedNode.textContent = `Proposé : ${proposed}`;
-  content.append(title, currentNode, proposedNode);
-  row.append(checkbox, content);
-  return row;
-}
-
-function selectedChangesForCard(card, candidate) {
-  const changes = {};
-  for (const field of FIELD_CONFIG) {
-    const checkbox = card.querySelector(`input[data-contact-field="${field.logical}"]:checked:not(:disabled)`);
-    const proposed = candidateContact(candidate, field.key);
-    if (checkbox && proposed) changes[field.logical] = proposed;
-  }
-  return changes;
-}
-
-function renderCandidateProvenance(candidate) {
-  const provenance = Array.isArray(candidate?.source?.provenance) ? candidate.source.provenance : [];
-  const labels = [...new Set(provenance.map(source => source?.label || source?.id).filter(Boolean))];
+function renderProvenance(provenance = []) {
   const row = document.createElement("div");
   row.className = "contact-provenance";
+  const labels = [...new Set(provenance.map(source => source?.label || source?.id).filter(Boolean))];
   for (const labelText of labels) {
     const badge = document.createElement("span");
     badge.className = "contact-provenance-badge";
@@ -216,86 +140,100 @@ function renderCandidateProvenance(candidate) {
   return row;
 }
 
-function renderCandidates(candidates, context) {
+function renderSuggestions(suggestions) {
   clearNode(ui.results);
-  if (!candidates.length) return;
+  currentSuggestions = suggestions;
 
-  candidates.forEach((candidate, index) => {
-    const card = document.createElement("article");
-    card.className = "contact-card";
-
-    const heading = document.createElement("div");
-    heading.className = "contact-card-heading";
-    const nameBlock = document.createElement("div");
-    nameBlock.className = "contact-card-identity";
-    const name = document.createElement("div");
-    name.className = "contact-card-name";
-    name.textContent = candidate.identity?.name || String(valueOf("NomCommercial") || "Structure");
-    nameBlock.append(name, renderCandidateProvenance(candidate));
-
-    const confidence = document.createElement("span");
-    confidence.className = `contact-confidence ${confidenceClass(candidate, context)}`;
-    confidence.textContent = contactConfidence(candidate, context).label;
-    heading.append(nameBlock, confidence);
-
-    const source = document.createElement("div");
-    source.className = "contact-source";
-    source.textContent = contactSourceSummary(candidate);
-    card.append(heading, source);
-
-    const fields = document.createElement("div");
-    fields.className = "contact-fields";
-    for (const field of FIELD_CONFIG) {
-      const line = makeContactLine(field, candidate, index);
-      if (line) fields.appendChild(line);
-    }
-    card.appendChild(fields);
-
-    const actions = document.createElement("div");
-    actions.className = "contact-actions";
-    const apply = document.createElement("button");
-    apply.type = "button";
-    apply.className = "button button-secondary";
-    apply.textContent = "Appliquer les contacts cochés";
-    apply.addEventListener("click", async () => {
-      const changes = selectedChangesForCard(card, candidate);
-      if (!Object.keys(changes).length) {
-        setStatus("Coche au moins une information à appliquer.");
-        return;
-      }
-      apply.disabled = true;
-      setStatus("Mise à jour des contacts dans Grist…");
-      try {
-        await applyEnrichmentChanges(currentRecord.id, changes, currentMappings);
-        setStatus("Contacts mis à jour. Vérifie les valeurs dans Grist.", "success");
-      } catch (error) {
-        console.error(error);
-        setStatus(error.message || "Impossible de mettre à jour les contacts.", "error");
-      } finally {
-        apply.disabled = false;
-      }
-    });
-    actions.appendChild(apply);
-    card.appendChild(actions);
-    ui.results.appendChild(card);
-  });
-}
-
-function finalSearchStatus(candidates, states, context) {
-  const failures = states.filter(state => state.status === "error").length;
-  const successful = states.length - failures;
-  const suffix = failures ? ` ${failures} source${failures > 1 ? "s" : ""} indisponible${failures > 1 ? "s" : ""}.` : "";
-
-  if (candidates.length) {
-    const best = contactConfidence(candidates[0], context);
-    if (best.level === CONTACT_CONFIDENCE.VERY_RELIABLE) {
-      return { message: `Contact très fiable trouvé. Les champs vides modifiables du meilleur candidat sont présélectionnés.${suffix}`, type: "success" };
-    }
-    return { message: `${candidates.length} proposition${candidates.length > 1 ? "s" : ""} classée${candidates.length > 1 ? "s" : ""} par fiabilité. Vérifie avant d’appliquer.${suffix}`, type: "" };
+  if (!suggestions.length) {
+    const empty = document.createElement("div");
+    empty.className = "contact-empty";
+    empty.textContent = "Aucun téléphone, courriel ou site web suffisamment fiable n’a été trouvé.";
+    ui.results.appendChild(empty);
+    refreshApplyButton();
+    return;
   }
 
-  if (!successful && failures) return { message: "Les sources publiques disponibles sont temporairement indisponibles.", type: "error" };
-  return { message: `Aucun contact public suffisamment fiable trouvé.${suffix}`, type: "" };
+  for (const suggestion of suggestions) {
+    const field = fieldConfig(suggestion.key);
+    if (!field) continue;
+
+    const row = document.createElement("label");
+    row.className = "contact-result-row";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.contactField = field.logical;
+    checkbox.dataset.contactKey = field.key;
+    const writable = Boolean(writableMappings[field.logical]);
+    checkbox.disabled = !writable;
+    checkbox.checked = Boolean(isExactSiretCandidate(suggestion.candidate) && !hasText(valueOf(field.logical)) && writable);
+    checkbox.addEventListener("change", refreshApplyButton);
+
+    const main = document.createElement("div");
+    main.className = "contact-result-main";
+
+    const heading = document.createElement("div");
+    heading.className = "contact-result-heading";
+    const label = document.createElement("div");
+    label.className = "contact-result-label";
+    label.textContent = writable ? field.label : `${field.label} — non mappé ou non modifiable`;
+    const confidence = document.createElement("span");
+    confidence.className = `contact-confidence ${confidenceClass(suggestion.confidence)}`;
+    confidence.textContent = suggestion.confidence.label;
+    heading.append(label, confidence);
+
+    const value = document.createElement("div");
+    value.className = "contact-result-value";
+    value.textContent = suggestion.value;
+
+    main.append(heading, value, renderProvenance(suggestion.provenance));
+    row.append(checkbox, main);
+    ui.results.appendChild(row);
+  }
+
+  refreshApplyButton();
+}
+
+function selectedChanges() {
+  const changes = {};
+  for (const checkbox of ui.results?.querySelectorAll('input[data-contact-field]:checked:not(:disabled)') ?? []) {
+    const suggestion = currentSuggestions.find(item => item.key === checkbox.dataset.contactKey);
+    if (suggestion) changes[checkbox.dataset.contactField] = suggestion.value;
+  }
+  return changes;
+}
+
+function finalSearchStatus(suggestions, states) {
+  const failures = states.filter(state => state.status === "error").length;
+  if (suggestions.length) {
+    return {
+      message: failures ? "Contacts suffisamment fiables trouvés. Certaines sources sont indisponibles." : "Contacts suffisamment fiables trouvés.",
+      type: "success",
+    };
+  }
+  if (failures === states.length && states.length) {
+    return { message: "Les sources publiques disponibles sont temporairement indisponibles.", type: "error" };
+  }
+  return {
+    message: failures ? "Aucun contact suffisamment fiable trouvé. Certaines sources sont indisponibles." : "Aucun contact suffisamment fiable trouvé.",
+    type: "",
+  };
+}
+
+async function applySelectedContacts() {
+  const changes = selectedChanges();
+  if (!Object.keys(changes).length) return;
+  ui.applyButton.disabled = true;
+  setStatus("Mise à jour des contacts dans Grist…");
+  try {
+    await applyEnrichmentChanges(currentRecord.id, changes, currentMappings);
+    setStatus("Contacts mis à jour. Vérifie les valeurs dans Grist.", "success");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Impossible de mettre à jour les contacts.", "error");
+  } finally {
+    refreshApplyButton();
+  }
 }
 
 async function searchContacts() {
@@ -310,8 +248,9 @@ async function searchContacts() {
   controller = new AbortController();
   ui.searchButton.disabled = true;
   clearNode(ui.results);
-  clearNode(ui.sources);
-  setStatus(`Recherche dans ${sources.length} source${sources.length > 1 ? "s" : ""} publique${sources.length > 1 ? "s" : ""}…`);
+  currentSuggestions = [];
+  refreshApplyButton();
+  setStatus("Recherche des contacts publics…");
 
   try {
     const snapshot = await fetchFullSnapshot(currentMappings);
@@ -320,11 +259,10 @@ async function searchContacts() {
 
     const result = await searchContactSources(context, { signal: controller.signal, sources });
     if (requestGeneration !== generation) return;
-    renderSourceStates(result.states);
 
-    const candidates = resolveContactCandidates(result.candidates, context);
-    renderCandidates(candidates, context);
-    const finalStatus = finalSearchStatus(candidates, result.states, context);
+    const suggestions = selectContactSuggestions(result.candidates, context);
+    renderSuggestions(suggestions);
+    const finalStatus = finalSearchStatus(suggestions, result.states);
     setStatus(finalStatus.message, finalStatus.type);
   } catch (error) {
     if (error?.name === "AbortError") return;
@@ -336,6 +274,7 @@ async function searchContacts() {
 }
 
 ui.searchButton?.addEventListener("click", searchContacts);
+ui.applyButton?.addEventListener("click", applySelectedContacts);
 
 grist.onRecord((record, mappings) => {
   generation += 1;
