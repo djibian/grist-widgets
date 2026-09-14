@@ -1,13 +1,6 @@
 name: Measure Overture coverage
 
 on:
-  push:
-    branches:
-      - contacts-resolver
-    paths:
-      - ".github/workflows/measure-overture-coverage.yml"
-      - "scripts/generate-overture-index.mjs"
-      - "widgets/structure-picker/tests/overture-index.test.mjs"
   workflow_dispatch:
 
 permissions:
