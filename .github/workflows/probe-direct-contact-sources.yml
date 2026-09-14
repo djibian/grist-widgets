@@ -42,5 +42,15 @@ jobs:
           curl -fsSL -H "User-Agent: $ua" "$search" -o /tmp/wd-search.json
           jq '.' /tmp/wd-search.json
           curl -fsSL -H "User-Agent: $ua" "$item" -o /tmp/wd-item.json
-          jq '{id, labels: .labels.fr, descriptions: .descriptions.fr, statements: {P1329: .statements.P1329, P968: .statements.P968, P856: .statements.P856, P1616: .statements.P1616, P625: .statements.P625, P281: .statements.P281}}' /tmp/wd-item.json
+          jq '{id, labels: .labels.fr, descriptions: .descriptions.fr, statements: {P1329: .statements.P1329, P968: .statements.P968, P856: .statements.P856, P1616: .statements.P1616, P625: .statements.P625, P281: .statements.P281, P6375: .statements.P6375}}' /tmp/wd-item.json
           curl -sS -D - -o /dev/null -H "User-Agent: $ua" "$search" | grep -iE 'access-control|content-type|HTTP/' || true
+      - name: Probe Wikidata exact SIREN query
+        shell: bash
+        run: |
+          set -euo pipefail
+          ua='grist-widgets-contact-probe/1.0 (https://github.com/djibian/grist-widgets)'
+          endpoint='https://query.wikidata.org/sparql'
+          query='SELECT ?item WHERE { ?item wdt:P1616 "775670417". } LIMIT 3'
+          curl -fsSL -H "User-Agent: $ua" -H 'Accept: application/sparql-results+json' --get "$endpoint" --data-urlencode "query=$query" -o /tmp/wd-siren.json
+          jq '.' /tmp/wd-siren.json
+          curl -sS -D - -o /dev/null -H "User-Agent: $ua" -H 'Accept: application/sparql-results+json' --get "$endpoint" --data-urlencode "query=$query" | grep -iE 'access-control|content-type|HTTP/' || true
