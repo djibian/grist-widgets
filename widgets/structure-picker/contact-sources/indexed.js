@@ -45,24 +45,26 @@ function contactVariants(record = {}) {
   const telephones = uniqueContacts(record.telephone, record.telephones);
   const courriels = uniqueContacts(record.courriel, record.courriels);
   const sitesWeb = uniqueContacts(record.siteWeb, record.sitesWeb);
-  const count = Math.min(
-    MAX_RECORD_VARIANTS,
-    Math.max(telephones.length, courriels.length, sitesWeb.length, 1),
-  );
+  const base = Object.freeze({
+    telephone: telephones[0] || "",
+    courriel: courriels[0] || "",
+    siteWeb: sitesWeb[0] || "",
+  });
   const variants = [];
   const seen = new Set();
 
-  for (let index = 0; index < count; index += 1) {
-    const contacts = {
-      telephone: telephones[index] || telephones[0] || "",
-      courriel: courriels[index] || courriels[0] || "",
-      siteWeb: sitesWeb[index] || sitesWeb[0] || "",
-    };
+  const add = contacts => {
+    if (variants.length >= MAX_RECORD_VARIANTS) return;
     const key = [contacts.telephone, contacts.courriel, contacts.siteWeb].join("\u0000");
-    if (!key.replaceAll("\u0000", "") || seen.has(key)) continue;
+    if (!key.replaceAll("\u0000", "") || seen.has(key)) return;
     seen.add(key);
-    variants.push(contacts);
-  }
+    variants.push(Object.freeze({ ...contacts }));
+  };
+
+  add(base);
+  for (const telephone of telephones.slice(1)) add({ ...base, telephone });
+  for (const courriel of courriels.slice(1)) add({ ...base, courriel });
+  for (const siteWeb of sitesWeb.slice(1)) add({ ...base, siteWeb });
   return variants;
 }
 
