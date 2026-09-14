@@ -2,7 +2,7 @@
 
 Cette fonctionnalité expérimentale enrichit facultativement les structures avec **Téléphone**, **Courriel** et **Site web** sans modifier le moteur stable de l'Assistant Structures.
 
-L'interface et l'orchestration sont indépendantes des sources : plusieurs sources publiques pourront contribuer à la même recherche, leurs résultats seront classés et dédupliqués, et une source indisponible ne bloquera pas les autres. **OpenStreetMap est actuellement la seule source interrogée par le widget.**
+L'interface et l'orchestration sont indépendantes des sources : plusieurs sources publiques peuvent contribuer à la même recherche, leurs résultats sont classés et dédupliqués, et une source indisponible ne bloque pas les autres. **OpenStreetMap, Service-Public.fr (DILA) et Wikidata sont les sources directes actuellement interrogées par le widget expérimental.**
 
 ## Stratégie actuelle — OpenStreetMap
 
@@ -11,6 +11,28 @@ L'interface et l'orchestration sont indépendantes des sources : plusieurs sourc
 3. Convertir les résultats dans le modèle commun, puis appliquer la déduplication exacte et le classement commun avant affichage.
 
 Endpoint Overpass : `https://overpass-api.de/api/interpreter`.
+
+## Sources directes — Service-Public.fr (DILA) et Wikidata
+
+L'Annuaire de l'administration de Service-Public.fr est interrogé directement via son API publique. Un contrôle réel effectué le 14 septembre 2026 comptait **93 772 entrées** et confirmait la présence de SIREN/SIRET, téléphone, courriel, site web, adresses et coordonnées, avec accès CORS depuis le navigateur.
+
+Stratégie DILA :
+
+1. lorsqu'un SIRET à 14 chiffres est connu, rechercher ce SIRET exact ;
+2. sinon, rechercher le nom de la structure ;
+3. parser défensivement les champs structurés de l'API (`telephone`, `site_internet`, `adresse`) ;
+4. une égalité de SIRET produit une correspondance `exact-siret` et peut donc atteindre **Très fiable** ;
+5. une recherche textuelle reste soumise au classement commun par nom, adresse et coordonnées.
+
+Wikidata est utilisé comme source complémentaire :
+
+1. lorsqu'un SIRET est connu, ses 9 premiers chiffres donnent le SIREN et le Wikidata Query Service recherche les items portant exactement ce SIREN (`P1616`) ;
+2. si aucun item n'est trouvé, ou si aucun SIREN n'est disponible, l'API REST Wikidata recherche le nom ;
+3. les items retenus sont lus via l'API REST actuelle et peuvent fournir téléphone (`P1329`), courriel (`P968`), site officiel (`P856`), coordonnées (`P625`), code postal (`P281`) et adresse (`P6375`) ;
+4. les déclarations `deprecated` sont ignorées ; une déclaration `preferred` est prioritaire sur une déclaration `normal` ;
+5. un SIREN Wikidata n'est **jamais converti en SIRET** : il sert seulement à réduire les faux positifs et à améliorer le classement. Sans autre preuve, il ne suffit pas à produire `Très fiable`.
+
+Certaines déclarations Wikidata citent directement l'Annuaire Service-Public.fr (`Q97451652`) comme référence. Lorsque le téléphone, courriel ou site effectivement retenu porte cette référence, la provenance DILA est conservée dans le candidat Wikidata : une concordance DILA + Wikidata issue de cette même donnée ne doit pas être considérée comme deux preuves indépendantes.
 
 ## Index statiques par département
 
@@ -122,6 +144,7 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 - chaque proposition conserve la ou les sources qui l'ont produite ;
 - les doublons exacts peuvent regrouper plusieurs provenances sans fusionner arbitrairement leurs champs ;
 - une provenance agrégée n'est pas automatiquement une preuve indépendante d'une autre source ;
+- une référence Service-Public conservée dans Wikidata ne compte pas comme une corroboration indépendante de DILA ;
 - l'état de chaque source interrogée est visible dans l'interface ;
 - l'échec d'une source n'empêche pas d'utiliser les résultats des autres sources disponibles.
 
@@ -135,8 +158,8 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 
 ## Limites restantes
 
-All The Places et Overture Places montrent une densité de contacts suffisante pour rester dans l'architecture. Overture élargit fortement le réservoir de candidats, mais la qualité du rapprochement avec les structures Grist devra rester fondée sur adresse + coordonnées + nom et tenir compte du score d'existence et de la provenance amont.
+Les trois sources directes OSM, DILA et Wikidata sont maintenant raccordées à l'orchestrateur expérimental. DILA apporte une identité SIRET particulièrement forte pour les administrations ; Wikidata reste volontairement conservateur et sert surtout de complément ou de corroboration.
 
-La suite ajoute les sources directes DILA/Wikidata. Les sources indexées ne sont pas encore branchées dans l'interface ; cette activation et la publication périodique des index restent séparées.
+All The Places et Overture Places ont une densité de contacts suffisante pour rester dans l'architecture mais leurs index ne sont pas encore publiés et chargés dans l'interface. La prochaine étape porte sur la génération/publication périodique des index ; la validation finale devra ensuite se faire sur des structures réelles dans Grist.
 
 La fonctionnalité conserve explicitement le statut **Expérimental** tant que sa pertinence n'a pas été vérifiée sur des structures réelles.
