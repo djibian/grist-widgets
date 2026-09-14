@@ -41,7 +41,7 @@ Ses limites sont tout aussi importantes :
 - la couverture est orientée vers les enseignes et réseaux disposant d'un localisateur public ;
 - ATP ne doit donc pas être utilisé seul pour identifier une structure.
 
-Le rapprochement ATP devra principalement s'appuyer sur **adresse + coordonnées + nom**, avec un niveau de confiance généralement `Probable`. La provenance ATP doit rester visible. Les autres sources indexées, notamment Overture puis FSQ, restent nécessaires pour élargir la couverture et permettre la corroboration multi-source.
+Le rapprochement ATP devra principalement s'appuyer sur **adresse + coordonnées + nom**, avec un niveau de confiance généralement `Probable`. La provenance ATP doit rester visible. Overture complète cette couverture et permet la corroboration multi-source.
 
 ## Reproductibilité
 

@@ -58,7 +58,7 @@ test("exact deduplication collapses only identical canonical contact sets and pr
     distanceMeters: 20,
   });
   const similarOnly = candidate({
-    source: "fsq",
+    source: "other-source",
     recordId: "xyz",
     telephone: "02 40 12 34 57",
     kind: CONTACT_MATCH_KINDS.NEARBY_NAME,

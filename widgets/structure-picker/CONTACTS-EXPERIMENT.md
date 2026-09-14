@@ -14,7 +14,7 @@ Endpoint Overpass : `https://overpass-api.de/api/interpreter`.
 
 ## Index statiques par département
 
-Les sources volumineuses (All The Places, Overture Places, FSQ OS Places et BANCO) sont préparées hors navigateur sous forme d'index JSON statiques par département.
+Les sources volumineuses (All The Places, Overture Places et BANCO) sont préparées hors navigateur sous forme d'index JSON statiques par département.
 
 Le fichier `contact-indexes/indexed-departments.json` est le contrat de disponibilité : pour chaque source, il contient un patron de chemin relatif et la liste des départements effectivement publiés. Une source ne doit tenter de charger que l'intersection entre cette liste et les départements actifs du widget Grist.
 
@@ -45,7 +45,7 @@ unzip -q /tmp/alltheplaces.zip -d /tmp/alltheplaces
 npm run generate:contacts:atp -- --input /tmp/alltheplaces --departments 44,85
 ```
 
-On peut ajouter `--run-id <identifiant>` pour conserver l'identifiant du run ATP dans chaque index. Le téléchargement et l'exécution périodique seront automatisés seulement à l'étape 12.
+On peut ajouter `--run-id <identifiant>` pour conserver l'identifiant du run ATP dans chaque index. Le téléchargement et l'exécution périodique seront automatisés seulement à l'étape de publication périodique.
 
 Format produit :
 
@@ -137,6 +137,6 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 
 All The Places et Overture Places montrent une densité de contacts suffisante pour rester dans l'architecture. Overture élargit fortement le réservoir de candidats, mais la qualité du rapprochement avec les structures Grist devra rester fondée sur adresse + coordonnées + nom et tenir compte du score d'existence et de la provenance amont.
 
-L'étape suivante ajoute FSQ OS Places avant les sources directes DILA/Wikidata. Les sources indexées ne sont pas encore branchées dans l'interface ; cette activation et la publication périodique des index restent séparées.
+La suite ajoute les sources directes DILA/Wikidata. Les sources indexées ne sont pas encore branchées dans l'interface ; cette activation et la publication périodique des index restent séparées.
 
 La fonctionnalité conserve explicitement le statut **Expérimental** tant que sa pertinence n'a pas été vérifiée sur des structures réelles.
