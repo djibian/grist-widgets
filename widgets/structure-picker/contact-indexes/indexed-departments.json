@@ -12,11 +12,6 @@
       "pathTemplate": "overture/{department}.json",
       "departments": []
     },
-    "fsq-os-places": {
-      "label": "FSQ OS Places",
-      "pathTemplate": "fsq-os-places/{department}.json",
-      "departments": []
-    },
     "banco": {
       "label": "BANCO",
       "pathTemplate": "banco/{department}.json",
