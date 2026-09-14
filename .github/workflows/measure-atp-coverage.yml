@@ -1,0 +1,231 @@
+name: Measure ATP coverage
+
+on:
+  push:
+    branches:
+      - contacts-resolver
+    paths:
+      - ".github/workflows/measure-atp-coverage.yml"
+      - "scripts/measure-all-the-places-coverage.py"
+      - "scripts/generate-all-the-places-index.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Read latest All The Places run metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 4 --retry-delay 5 \
+            --output /tmp/atp-latest.json \
+            https://data.alltheplaces.xyz/runs/latest.json
+
+          run_id="$(jq -r '.run_id' /tmp/atp-latest.json)"
+          output_url="$(jq -r '.output_url' /tmp/atp-latest.json)"
+          size_bytes="$(jq -r '.size_bytes // 0' /tmp/atp-latest.json)"
+          start_time="$(jq -r '.start_time // ""' /tmp/atp-latest.json)"
+          end_time="$(jq -r '.end_time // ""' /tmp/atp-latest.json)"
+
+          test -n "$run_id"
+          test -n "$output_url"
+          test "$output_url" != "null"
+
+          {
+            echo "ATP_RUN_ID=$run_id"
+            echo "ATP_OUTPUT_URL=$output_url"
+            echo "ATP_SIZE_BYTES=$size_bytes"
+            echo "ATP_START_TIME=$start_time"
+            echo "ATP_END_TIME=$end_time"
+          } >> "$GITHUB_ENV"
+
+          echo "All The Places run: $run_id"
+          echo "Archive size: $size_bytes bytes"
+
+      - name: Download latest All The Places archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 4 --retry-delay 5 \
+            --output /tmp/atp-output.zip \
+            "$ATP_OUTPUT_URL"
+          ls -lh /tmp/atp-output.zip
+
+      - name: Extract measurement sample for departments 44 and 85
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atp-selected
+          python3 scripts/measure-all-the-places-coverage.py \
+            --zip /tmp/atp-output.zip \
+            --departments 44,85 \
+            --selected-dir /tmp/atp-selected \
+            --report /tmp/atp-raw-report.json \
+            > /tmp/atp-scan-output.json
+
+      - name: Generate departmental indexes with the production generator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/atp-indexes
+          cp widgets/structure-picker/contact-indexes/indexed-departments.json /tmp/atp-manifest.json
+          node scripts/generate-all-the-places-index.mjs \
+            --input /tmp/atp-selected \
+            --departments 44,85 \
+            --output /tmp/atp-indexes \
+            --manifest /tmp/atp-manifest.json \
+            --run-id "$ATP_RUN_ID" \
+            --generated-at "$ATP_END_TIME" \
+            > /tmp/atp-generator-report.json
+
+      - name: Build coverage report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          raw = json.loads(Path('/tmp/atp-raw-report.json').read_text())
+          generator = json.loads(Path('/tmp/atp-generator-report.json').read_text())
+
+          def ratio(numerator, denominator):
+              return round(numerator / denominator, 4) if denominator else 0
+
+          departments = {}
+          total_indexed = 0
+          total_phone = 0
+          total_email = 0
+          total_website = 0
+          total_siret = 0
+
+          for department in ('44', '85'):
+              source = raw['perDepartment'][department]
+              index_path = Path(f'/tmp/atp-indexes/{department}.json')
+              index = json.loads(index_path.read_text()) if index_path.exists() else {'records': [], 'recordCount': 0}
+              records = index.get('records', [])
+              phone = sum(bool(row.get('telephone')) for row in records)
+              email = sum(bool(row.get('courriel')) for row in records)
+              website = sum(bool(row.get('siteWeb')) for row in records)
+              siret = sum(bool(row.get('siret')) for row in records)
+              coordinates = sum(row.get('latitude') is not None and row.get('longitude') is not None for row in records)
+              address = sum(bool(row.get('address')) for row in records)
+              indexed = len(records)
+
+              total_indexed += indexed
+              total_phone += phone
+              total_email += email
+              total_website += website
+              total_siret += siret
+
+              departments[department] = {
+                  'rawFeatures': source['features'],
+                  'rawWithAnyContact': source['withAnyContact'],
+                  'rawWithTelephone': source['withTelephone'],
+                  'rawWithEmail': source['withEmail'],
+                  'rawWithWebsite': source['withWebsite'],
+                  'generatorEligible': source['generatorEligible'],
+                  'indexedRecords': indexed,
+                  'indexedTelephone': phone,
+                  'indexedEmail': email,
+                  'indexedWebsite': website,
+                  'indexedSiret': siret,
+                  'indexedCoordinates': coordinates,
+                  'indexedAddress': address,
+                  'rawContactRate': ratio(source['withAnyContact'], source['features']),
+                  'indexedTelephoneRate': ratio(phone, indexed),
+                  'indexedEmailRate': ratio(email, indexed),
+                  'indexedWebsiteRate': ratio(website, indexed),
+                  'indexedSiretRate': ratio(siret, indexed),
+                  'indexedCoordinateRate': ratio(coordinates, indexed),
+                  'spiderCount': source['spiderCount'],
+                  'topSpiders': source['topSpiders'],
+              }
+
+          report = {
+              'schemaVersion': 1,
+              'source': 'all-the-places',
+              'run': {
+                  'runId': os.environ['ATP_RUN_ID'],
+                  'startTime': os.environ.get('ATP_START_TIME') or None,
+                  'endTime': os.environ.get('ATP_END_TIME') or None,
+                  'archiveSizeBytes': int(os.environ.get('ATP_SIZE_BYTES') or 0),
+              },
+              'scan': raw['global'],
+              'generator': generator,
+              'departments': departments,
+              'totals': {
+                  'indexedRecords': total_indexed,
+                  'indexedTelephone': total_phone,
+                  'indexedEmail': total_email,
+                  'indexedWebsite': total_website,
+                  'indexedSiret': total_siret,
+                  'indexedTelephoneRate': ratio(total_phone, total_indexed),
+                  'indexedEmailRate': ratio(total_email, total_indexed),
+                  'indexedWebsiteRate': ratio(total_website, total_indexed),
+                  'indexedSiretRate': ratio(total_siret, total_indexed),
+              },
+              'scanErrors': raw.get('errors', []),
+          }
+          Path('/tmp/atp-coverage.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
+
+          lines = [
+              '# All The Places — couverture contacts 44 / 85',
+              '',
+              f"Run ATP : `{report['run']['runId']}`",
+              '',
+              '| Département | POI ATP | Avec contact | Indexés uniques | Téléphone | Courriel | Site web | SIRET |',
+              '|---|---:|---:|---:|---:|---:|---:|---:|',
+          ]
+          for department in ('44', '85'):
+              item = departments[department]
+              lines.append(
+                  f"| {department} | {item['rawFeatures']} | {item['rawWithAnyContact']} "
+                  f"({item['rawContactRate']:.1%}) | {item['indexedRecords']} | "
+                  f"{item['indexedTelephone']} ({item['indexedTelephoneRate']:.1%}) | "
+                  f"{item['indexedEmail']} ({item['indexedEmailRate']:.1%}) | "
+                  f"{item['indexedWebsite']} ({item['indexedWebsiteRate']:.1%}) | "
+                  f"{item['indexedSiret']} ({item['indexedSiretRate']:.1%}) |"
+              )
+          lines.extend([
+              '',
+              f"Total indexé : **{total_indexed}** enregistrements uniques.",
+              f"Téléphone : **{total_phone}** ({report['totals']['indexedTelephoneRate']:.1%}).",
+              f"Courriel : **{total_email}** ({report['totals']['indexedEmailRate']:.1%}).",
+              f"Site web : **{total_website}** ({report['totals']['indexedWebsiteRate']:.1%}).",
+              f"SIRET : **{total_siret}** ({report['totals']['indexedSiretRate']:.1%}).",
+              '',
+              f"Fichiers GeoJSON parcourus : {report['scan']['geojsonFiles']} ; "
+              f"features parcourues : {report['scan']['featuresScanned']} ; "
+              f"fichiers invalides : {report['scan']['invalidGeojsonFiles']}.",
+          ])
+          Path('/tmp/atp-coverage.md').write_text('\n'.join(lines) + '\n')
+          print('\n'.join(lines))
+          PY
+
+          cat /tmp/atp-coverage.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload measurement report
+        uses: actions/upload-artifact@v4
+        with:
+          name: atp-coverage-44-85
+          path: |
+            /tmp/atp-coverage.json
+            /tmp/atp-coverage.md
+            /tmp/atp-raw-report.json
+            /tmp/atp-generator-report.json
+          retention-days: 7
