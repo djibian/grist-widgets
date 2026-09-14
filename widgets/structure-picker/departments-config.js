@@ -239,7 +239,10 @@ async function saveSettings() {
   }
 }
 
-ui.open?.addEventListener("click", openSettings);
+ui.open?.addEventListener("click", () => {
+  if (ui.panel?.hidden) openSettings();
+  else closeSettings();
+});
 ui.cancel?.addEventListener("click", closeSettings);
 ui.save?.addEventListener("click", saveSettings);
 ui.search?.addEventListener("input", renderResults);
