@@ -22,7 +22,7 @@ test('charge tout le socle Grist Studio avant la feuille locale', () => {
   const base = html.indexOf('../../shared/ui/base.css');
   const components = html.indexOf('../../shared/ui/components.css');
   const structure = html.indexOf('../../shared/ui/structure.css');
-  const local = html.indexOf('style.css?v=1.5.0');
+  const local = html.indexOf('style.css?v=1.5.1');
   assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
 });
 
