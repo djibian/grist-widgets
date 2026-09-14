@@ -1,0 +1,38 @@
+name: Probe contact index publication
+
+on:
+  push:
+    branches:
+      - contacts-resolver-publish-indexes
+    paths:
+      - .github/workflows/probe-contact-index-publication.yml
+      - scripts/build-contact-index-snapshot.sh
+      - widgets/structure-picker/contact-indexes/publication-config.json
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Overture client
+        run: pip install --disable-pip-version-check overturemaps==1.0.2
+      - name: Build snapshot
+        run: bash scripts/build-contact-index-snapshot.sh
+      - name: Run tests
+        run: npm test
+      - name: Upload snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: contact-index-publication-probe
+          path: /tmp/contact-index-publication/widgets/structure-picker/contact-indexes
+          retention-days: 7
