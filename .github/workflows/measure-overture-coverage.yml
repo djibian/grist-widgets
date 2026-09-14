@@ -54,9 +54,9 @@ jobs:
           set -euo pipefail
           overturemaps download \
             --bbox=-2.70,46.20,-0.45,47.95 \
-            --format=geojsonseq \
+            -f geojsonseq \
             --type=place \
-            --output=/tmp/overture-44-85.geojsonseq
+            -o /tmp/overture-44-85.geojsonseq
           ls -lh /tmp/overture-44-85.geojsonseq
 
       - name: Generate departmental indexes
