@@ -2,7 +2,7 @@
 
 Cette fonctionnalité expérimentale enrichit facultativement les structures avec **Téléphone**, **Courriel** et **Site web** sans modifier le moteur stable de l'Assistant Structures.
 
-L'interface et l'orchestration sont désormais indépendantes des sources : plusieurs sources publiques pourront contribuer à la même recherche, leurs résultats seront classés et dédupliqués, et une source indisponible ne bloquera pas les autres. **OpenStreetMap est actuellement la seule source active.**
+L'interface et l'orchestration sont indépendantes des sources : plusieurs sources publiques pourront contribuer à la même recherche, leurs résultats seront classés et dédupliqués, et une source indisponible ne bloquera pas les autres. **OpenStreetMap est actuellement la seule source interrogée par le widget.**
 
 ## Stratégie actuelle — OpenStreetMap
 
@@ -10,15 +10,11 @@ L'interface et l'orchestration sont désormais indépendantes des sources : plus
 2. Si aucun contact exploitable n'est trouvé, et si un nom + des coordonnées sont disponibles, chercher dans un rayon de 300 m les objets OSM nommés qui publient au moins un contact.
 3. Convertir les résultats dans le modèle commun, puis appliquer la déduplication exacte et le classement commun avant affichage.
 
-Endpoint Overpass :
-
-`https://overpass-api.de/api/interpreter`
-
-Les requêtes sont envoyées en POST et restent bornées à une structure ou à un rayon local de 300 m.
+Endpoint Overpass : `https://overpass-api.de/api/interpreter`.
 
 ## Index statiques par département
 
-Les futures sources volumineuses (All The Places, Overture Places, FSQ OS Places et BANCO) seront préparées hors navigateur sous forme d'index JSON statiques par département.
+Les sources volumineuses (All The Places, Overture Places, FSQ OS Places et BANCO) sont préparées hors navigateur sous forme d'index JSON statiques par département.
 
 Le fichier `contact-indexes/indexed-departments.json` est le contrat de disponibilité : pour chaque source, il contient un patron de chemin relatif et la liste des départements effectivement publiés. Une source ne doit tenter de charger que l'intersection entre cette liste et les départements actifs du widget Grist.
 
@@ -27,11 +23,45 @@ Contraintes du contrat V1 :
 - schéma versionné (`schemaVersion: 1`) ;
 - chemins relatifs au répertoire du manifest, sans URL externe ni traversée `..` ;
 - aucun département n'est supposé disponible tant qu'il n'est pas déclaré dans le manifest ;
-- chargement du manifest avec `cache: "no-store"` pour éviter un état de disponibilité obsolète ;
-- aucun cache applicatif ou service worker ajouté à ce stade ;
-- les fichiers d'index eux-mêmes seront introduits par les générateurs des étapes suivantes.
+- chargement du manifest avec `cache: "no-store"` ;
+- aucun cache applicatif ou service worker.
 
-Le manifest initialise actuellement les quatre sources avec une liste de départements vide : il prépare l'architecture sans modifier le comportement fonctionnel du widget.
+## Générateur All The Places
+
+`scripts/generate-all-the-places-index.mjs` est le premier générateur réel. Il lit les `FeatureCollection` GeoJSON de l'export officiel All The Places, puis :
+
+1. retient les POI français appartenant aux départements demandés ;
+2. écarte les POI ne fournissant ni téléphone, ni courriel, ni site web ;
+3. conserve l'identité utile (`name`, adresse, SIRET lorsqu'il existe, coordonnées) et la provenance ATP (`id`, spider, ref, URI source) ;
+4. déduplique uniquement les identifiants ATP identiques, en conservant la variante la plus riche en contacts ;
+5. écrit un fichier compact par département ;
+6. met à jour dans le manifest uniquement la disponibilité de `all-the-places`.
+
+Le générateur ne télécharge rien et n'exécute aucune commande système. Pour un export officiel :
+
+```sh
+curl -L https://data.alltheplaces.xyz/runs/latest.zip -o /tmp/alltheplaces.zip
+unzip -q /tmp/alltheplaces.zip -d /tmp/alltheplaces
+npm run generate:contacts:atp -- --input /tmp/alltheplaces --departments 44,85
+```
+
+On peut ajouter `--run-id <identifiant>` pour conserver l'identifiant du run ATP dans chaque index. Le téléchargement et l'exécution périodique seront automatisés seulement à l'étape 12.
+
+Format produit :
+
+```json
+{
+  "schemaVersion": 1,
+  "source": "all-the-places",
+  "department": "44",
+  "generatedAt": "...",
+  "upstream": { "project": "All The Places", "runId": "..." },
+  "recordCount": 123,
+  "records": []
+}
+```
+
+La Corse reste volontairement non déduite à partir d'un seul code postal `20xxx`, car ce code ne permet pas de distinguer sûrement `2A` de `2B`.
 
 ## Confiance
 
@@ -54,12 +84,12 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 
 - aucune écriture automatique ;
 - aucune valeur existante remplacée sans case cochée ;
-- réutilisation de `applyEnrichmentChanges()` pour le contrôle des mappings, des colonnes formule et des écritures Grist ;
+- réutilisation de `applyEnrichmentChanges()` pour les écritures Grist ;
 - si Téléphone, Courriel ou Site web n'est pas mappé ou modifiable, le champ est désactivé ;
-- une indisponibilité d'une source de contacts n'empêche pas les fonctions DINUM/IGN de l'Assistant Structures.
+- une indisponibilité d'une source de contacts n'empêche pas les fonctions DINUM/IGN.
 
 ## Limites à mesurer
 
-Le but est d'évaluer la **couverture réelle** des sources publiques sur les structures de stage. L'absence de résultat n'est pas une erreur : de nombreux établissements ne publient pas de téléphone, courriel ou site web dans les sources interrogées.
+L'étape suivante doit mesurer la **couverture réelle** d'All The Places sur les structures de stage avant de brancher cette source dans l'interface. L'absence de résultat n'est pas une erreur : de nombreux établissements ne publient pas leurs contacts dans les sources interrogées.
 
 La fonctionnalité conserve explicitement le statut **Expérimental** tant que sa pertinence n'a pas été vérifiée sur des structures réelles.
