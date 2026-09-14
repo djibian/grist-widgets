@@ -20,6 +20,7 @@ test("le module monte une configuration dédiée des départements", () => {
     "department-search", "department-results", "department-save", "department-cancel",
   ]) assert.match(config, new RegExp(id), `ID manquant dans le module : ${id}`);
   assert.match(config, /Recherche par numéro ou nom/);
+  assert.match(config, /id: "department-settings", className: "gw-work-grid gw-work-grid--balanced"/);
 });
 
 test("le menu Départements reste concis et reprend l'icône de paramétrage Grist Studio", () => {

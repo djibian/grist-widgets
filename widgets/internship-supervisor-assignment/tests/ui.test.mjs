@@ -22,7 +22,7 @@ test('charge tout le socle Grist Studio avant la feuille locale', () => {
   const base = html.indexOf('../../shared/ui/base.css');
   const components = html.indexOf('../../shared/ui/components.css');
   const structure = html.indexOf('../../shared/ui/structure.css');
-  const local = html.indexOf('style.css?v=1.5.0');
+  const local = html.indexOf('style.css?v=1.5.1');
   assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
 });
 
@@ -88,8 +88,9 @@ test('matérialise la grammaire contexte travail validation', () => {
   assert.match(html, /class="gw-validation-bar proposal-validation"/);
 });
 
-test('partage le mark, le bleu workflow et le cadre commun', () => {
-  assert.match(structureCss, /\.gw-widget-frame[\s\S]*width: min\(100% - 32px, 920px\)[\s\S]*margin: 0 auto 32px/);
+test('partage le mark, le bleu workflow et le cadre fluide commun', () => {
+  assert.match(structureCss, /\.gw-widget-frame[\s\S]*width: calc\(100% - 32px\)[\s\S]*max-width: none[\s\S]*container-name: gw-widget/);
+  assert.match(css, /\.app\.gw-widget-frame \{[\s\S]*width: 100%;[\s\S]*margin: 0;[\s\S]*border: 0;[\s\S]*border-radius: 0;[\s\S]*box-shadow: none;/);
   assert.match(structureCss, /\.gw-widget-icon[\s\S]*linear-gradient\(#79d4b7 0 0\)/);
   assert.match(structureCss, /\.gw-widget-header \.app-kicker,[\s\S]*color: var\(--gw-color-workflow\)/);
   assert.match(structureCss, /\.gw-step-heading__index[\s\S]*color: var\(--gw-color-workflow\)/);

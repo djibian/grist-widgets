@@ -1,6 +1,9 @@
-.route-shell {
-  width: min(100% - 32px, 920px);
-  margin-top: 0;
+.route-shell.gw-widget-frame {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 .route-header { padding-bottom: 18px; }
 .route-header .gw-kicker { color: var(--gw-color-workflow); }
@@ -18,8 +21,11 @@
 .context-state.pending { color: var(--gw-color-workflow); }
 .context-state.error { color: var(--gw-color-danger); }
 
-.route-work-grid { min-height: 420px; }
-.route-path { margin-top: 8px; }
+.route-work-grid {
+  min-height: 420px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 32%);
+}
+.route-path { max-width: 820px; margin-top: 8px; }
 .route-point {
   display: flex;
   gap: 12px;
@@ -133,7 +139,11 @@
   text-align: center;
 }
 
-@media (max-width: 720px) {
-  .route-shell { width: min(100% - 20px, 920px); margin-top: 0; }
-  .route-result { min-height: 330px; }
+@container gw-widget (max-width: 760px) {
+  .route-work-grid { grid-template-columns: 1fr; }
+  .route-result {
+    min-height: 330px;
+    border-left: 0;
+    border-top: 1px solid var(--gw-color-border-subtle);
+  }
 }

@@ -26,6 +26,16 @@ function svgNode(tagName, attributes = {}) {
   return element;
 }
 
+function integrateWidgetFrame() {
+  const frame = document.querySelector(".app.gw-widget-frame");
+  if (!frame) return;
+  frame.style.width = "100%";
+  frame.style.margin = "0";
+  frame.style.border = "0";
+  frame.style.borderRadius = "0";
+  frame.style.boxShadow = "none";
+}
+
 function settingsIcon() {
   const svg = svgNode("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" });
   svg.classList.add("gw-icon--accented");
@@ -63,7 +73,7 @@ function ensureSettingsUi() {
   }
 
   if (!document.getElementById("department-settings")) {
-    const panel = node("section", { id: "department-settings", className: "gw-work-grid" });
+    const panel = node("section", { id: "department-settings", className: "gw-work-grid gw-work-grid--balanced" });
     panel.hidden = true;
     panel.setAttribute("aria-labelledby", "department-settings-title");
 
@@ -108,6 +118,7 @@ function ensureSettingsUi() {
   }
 }
 
+integrateWidgetFrame();
 ensureSettingsUi();
 
 const ui = {
@@ -239,7 +250,10 @@ async function saveSettings() {
   }
 }
 
-ui.open?.addEventListener("click", openSettings);
+ui.open?.addEventListener("click", () => {
+  if (ui.panel?.hidden) openSettings();
+  else closeSettings();
+});
 ui.cancel?.addEventListener("click", closeSettings);
 ui.save?.addEventListener("click", saveSettings);
 ui.search?.addEventListener("input", renderResults);
