@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../../shared/ui/components.css">
   <link rel="stylesheet" href="../../shared/ui/structure.css">
   <link rel="stylesheet" href="style.css?v=1.4.0">
+  <link rel="stylesheet" href="contacts-layout.css?v=1.0.0">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
@@ -71,27 +72,42 @@
           <div id="enterprise-choices" class="choice-block"></div>
           <div id="geocode-choices" class="choice-block"></div>
           <div id="proposal-panel" class="proposal-panel"></div>
-          <section id="contact-experiment" class="contact-experiment" aria-labelledby="contact-experiment-title">
-            <div class="contact-experiment-heading">
-              <div>
-                <h3 id="contact-experiment-title">Contacts publics <span class="experimental-tag gw-badge gw-badge--experimental">Expérimental</span></h3>
-                <p class="help">Croise les sources publiques disponibles et classe les propositions par fiabilité.</p>
-              </div>
-              <button id="contact-search" class="button button-secondary gw-button gw-button--secondary" type="button" disabled>Rechercher les contacts</button>
-            </div>
-            <div id="contact-current"></div>
-            <div id="contact-sources" class="contact-sources" aria-label="Sources publiques interrogées"></div>
-            <div id="contact-status" class="substatus contact-status" role="status" aria-live="polite"></div>
-            <div id="contact-results" class="contact-results"></div>
-          </section>
         </aside>
       </div>
+
+      <section id="contact-experiment" class="contact-experiment" aria-labelledby="contact-experiment-title">
+        <div class="gw-work-grid gw-work-grid--balanced contact-work-grid">
+          <section class="gw-work-main contact-search-pane">
+            <div class="gw-step-heading">
+              <span class="gw-step-heading__index">03 · Rechercher</span>
+              <h2 id="contact-experiment-title" class="gw-step-heading__title">Contacts publics <span class="experimental-tag gw-badge gw-badge--experimental">Expérimental</span></h2>
+              <p class="gw-step-heading__help">Croise les sources publiques pour rechercher les contacts de la structure sélectionnée.</p>
+            </div>
+            <div id="contact-current"></div>
+            <div id="contact-status" class="substatus contact-status" role="status" aria-live="polite"></div>
+            <div class="gw-action-dock contact-action-dock">
+              <div class="gw-action-dock__text"><strong>Recherche multi-source</strong><small>Les propositions de qualité insuffisante ne sont pas affichées.</small></div>
+              <button id="contact-search" class="button button-secondary gw-button gw-button--secondary" type="button" disabled>Rechercher les contacts</button>
+            </div>
+          </section>
+
+          <aside class="gw-decision-panel contact-results-pane">
+            <div class="gw-step-heading">
+              <span class="gw-step-heading__index">04 · Vérifier</span>
+              <h2 class="gw-step-heading__title">Contacts proposés</h2>
+              <p class="gw-step-heading__help">Un seul meilleur résultat par champ, avec son niveau de confiance et ses sources.</p>
+            </div>
+            <div id="contact-results" class="contact-results"></div>
+            <div class="contact-apply-bar"><button id="contact-apply" class="button button-primary gw-button gw-button--primary" type="button" disabled>Appliquer les contacts cochés</button></div>
+          </aside>
+        </div>
+      </section>
     </section>
   </main>
 
   <script type="module" src="departments-config.js?v=1.0.0"></script>
   <script type="module" src="app.js?v=1.3.1"></script>
-  <script type="module" src="contacts-experiment.js?v=1.1.0"></script>
+  <script type="module" src="contacts-experiment.js?v=1.2.0"></script>
   <script>
     (() => {
       const tabs = [...document.querySelectorAll('.tab-button')];
