@@ -1,0 +1,207 @@
+name: Measure Overture coverage
+
+on:
+  push:
+    branches:
+      - contacts-resolver
+    paths:
+      - ".github/workflows/measure-overture-coverage.yml"
+      - "scripts/generate-overture-index.mjs"
+      - "widgets/structure-picker/tests/overture-index.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install official Overture client
+        run: pip install --disable-pip-version-check overturemaps==1.0.2
+
+      - name: Resolve current Overture release
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 4 --retry-delay 5 \
+            https://stac.overturemaps.org/catalog.json \
+            -o /tmp/overture-catalog.json
+          release="$(jq -r '.latest' /tmp/overture-catalog.json)"
+          test -n "$release"
+          test "$release" != "null"
+          echo "OVERTURE_RELEASE=$release" >> "$GITHUB_ENV"
+          echo "Overture release: $release"
+
+      - name: Download Places covering Loire-Atlantique and Vendée
+        shell: bash
+        run: |
+          set -euo pipefail
+          overturemaps download \
+            --bbox=-2.70,46.20,-0.45,47.95 \
+            --format=geojsonseq \
+            --type=place \
+            --output=/tmp/overture-44-85.geojsonseq
+          ls -lh /tmp/overture-44-85.geojsonseq
+
+      - name: Generate departmental indexes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/overture-indexes
+          cp widgets/structure-picker/contact-indexes/indexed-departments.json /tmp/overture-manifest.json
+          node scripts/generate-overture-index.mjs \
+            --input /tmp/overture-44-85.geojsonseq \
+            --departments 44,85 \
+            --output /tmp/overture-indexes \
+            --manifest /tmp/overture-manifest.json \
+            --release "$OVERTURE_RELEASE" \
+            --schema-version v1.18.0 \
+            > /tmp/overture-generator-report.json
+
+      - name: Build coverage and provenance report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import collections
+          import json
+          import os
+          from pathlib import Path
+
+          def ratio(n, d):
+              return round(n / d, 4) if d else 0
+
+          def is_atp(dataset):
+              token = ''.join(ch for ch in (dataset or '').lower() if ch.isalnum())
+              return 'alltheplaces' in token
+
+          departments = {}
+          totals = collections.Counter()
+          datasets = collections.Counter()
+          property_datasets = collections.Counter()
+
+          for department in ('44', '85'):
+              index = json.loads(Path(f'/tmp/overture-indexes/{department}.json').read_text())
+              rows = index.get('records', [])
+              stats = collections.Counter()
+              for row in rows:
+                  stats['records'] += 1
+                  stats['phone'] += bool(row.get('telephone'))
+                  stats['email'] += bool(row.get('courriel'))
+                  stats['website'] += bool(row.get('siteWeb'))
+                  stats['coordinates'] += row.get('latitude') is not None and row.get('longitude') is not None
+                  stats['address'] += bool(row.get('address'))
+                  confidence = row.get('confidence')
+                  stats['confidence_080'] += confidence is not None and confidence >= 0.8
+                  stats['confidence_095'] += confidence is not None and confidence >= 0.95
+                  sources = row.get('sources') or []
+                  has_atp = False
+                  has_non_atp = False
+                  for source in sources:
+                      dataset = source.get('dataset') or ''
+                      prop = source.get('property') or ''
+                      if dataset:
+                          datasets[dataset] += 1
+                          property_datasets[(prop, dataset)] += 1
+                      if is_atp(dataset):
+                          has_atp = True
+                          if prop in ('phones', 'emails', 'websites'):
+                              stats[f'atp_{prop}'] += 1
+                      elif dataset:
+                          has_non_atp = True
+                          if prop in ('phones', 'emails', 'websites'):
+                              stats[f'non_atp_{prop}'] += 1
+                  stats['with_atp_lineage'] += has_atp
+                  stats['with_non_atp_lineage'] += has_non_atp
+
+              totals.update(stats)
+              departments[department] = {
+                  'records': stats['records'],
+                  'phone': stats['phone'],
+                  'email': stats['email'],
+                  'website': stats['website'],
+                  'coordinates': stats['coordinates'],
+                  'address': stats['address'],
+                  'confidenceAtLeast080': stats['confidence_080'],
+                  'confidenceAtLeast095': stats['confidence_095'],
+                  'withAllThePlacesLineage': stats['with_atp_lineage'],
+                  'withNonAllThePlacesLineage': stats['with_non_atp_lineage'],
+              }
+
+          report = {
+              'schemaVersion': 1,
+              'source': 'overture',
+              'release': os.environ['OVERTURE_RELEASE'],
+              'bbox': [-2.70, 46.20, -0.45, 47.95],
+              'departments': departments,
+              'totals': dict(totals),
+              'topDatasets': datasets.most_common(20),
+              'contactPropertyDatasets': [
+                  {'property': prop, 'dataset': dataset, 'count': count}
+                  for (prop, dataset), count in property_datasets.most_common(40)
+                  if prop in ('phones', 'emails', 'websites')
+              ],
+          }
+          Path('/tmp/overture-coverage.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
+
+          lines = [
+              '# Overture Places — couverture contacts 44 / 85',
+              '',
+              f"Release : `{report['release']}`",
+              '',
+              '| Département | Indexés | Téléphone | Courriel | Site web | Conf. ≥ 0,80 | Lignée ATP |',
+              '|---|---:|---:|---:|---:|---:|---:|',
+          ]
+          for department in ('44', '85'):
+              item = departments[department]
+              count = item['records']
+              lines.append(
+                  f"| {department} | {count} | {item['phone']} ({ratio(item['phone'], count):.1%}) | "
+                  f"{item['email']} ({ratio(item['email'], count):.1%}) | "
+                  f"{item['website']} ({ratio(item['website'], count):.1%}) | "
+                  f"{item['confidenceAtLeast080']} ({ratio(item['confidenceAtLeast080'], count):.1%}) | "
+                  f"{item['withAllThePlacesLineage']} ({ratio(item['withAllThePlacesLineage'], count):.1%}) |"
+              )
+          lines.extend([
+              '',
+              f"Total indexé : **{totals['records']}**.",
+              f"Téléphone : **{totals['phone']}** ({ratio(totals['phone'], totals['records']):.1%}).",
+              f"Courriel : **{totals['email']}** ({ratio(totals['email'], totals['records']):.1%}).",
+              f"Site web : **{totals['website']}** ({ratio(totals['website'], totals['records']):.1%}).",
+              f"Avec provenance All The Places : **{totals['with_atp_lineage']}** ({ratio(totals['with_atp_lineage'], totals['records']):.1%}).",
+              '',
+              'Principaux jeux de données amont :',
+          ])
+          for dataset, count in datasets.most_common(12):
+              lines.append(f"- `{dataset}` : {count}")
+          Path('/tmp/overture-coverage.md').write_text('\n'.join(lines) + '\n')
+          print('\n'.join(lines))
+          PY
+
+          cat /tmp/overture-coverage.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload measurement report
+        uses: actions/upload-artifact@v4
+        with:
+          name: overture-coverage-44-85
+          path: |
+            /tmp/overture-coverage.json
+            /tmp/overture-coverage.md
+            /tmp/overture-generator-report.json
+          retention-days: 7
