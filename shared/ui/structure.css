@@ -1,12 +1,15 @@
 /* Grist Studio structural grammar: context -> work -> validation. */
 .gw-widget-frame {
-  width: min(100% - 32px, 920px);
+  width: calc(100% - 32px);
+  max-width: none;
   margin: 0 auto 32px;
   overflow: hidden;
   border: 1px solid var(--gw-color-border);
   border-radius: var(--gw-radius-xl);
   background: var(--gw-color-surface);
   box-shadow: var(--gw-shadow-frame);
+  container-type: inline-size;
+  container-name: gw-widget;
 }
 
 .gw-widget-header {
@@ -14,7 +17,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  padding: 22px 24px 18px;
+  padding: 22px clamp(20px, 2vw, 32px) 18px;
 }
 .gw-widget-heading { display: flex; min-width: 0; gap: 12px; align-items: flex-start; }
 .gw-widget-heading__text { min-width: 0; }
@@ -47,7 +50,7 @@
   border-bottom: 1px solid var(--gw-color-border-subtle);
   background: #fbfcfb;
 }
-.gw-context-item { min-width: 0; padding: 10px 16px; }
+.gw-context-item { min-width: 0; padding: 10px clamp(14px, 1.4vw, 20px); }
 .gw-context-item + .gw-context-item { border-left: 1px solid var(--gw-color-border-subtle); }
 .gw-context-label {
   display: block;
@@ -74,7 +77,7 @@
 .gw-context-item > .status.success { color: var(--gw-color-success); }
 .gw-context-item > .status.error { color: var(--gw-color-danger); }
 
-.gw-work-section { padding: 22px 24px 24px; }
+.gw-work-section { padding: 22px clamp(20px, 2vw, 32px) 24px; }
 .gw-work-section + .gw-work-section { border-top: 1px solid var(--gw-color-border-subtle); }
 .gw-step-heading { margin-bottom: 16px; }
 .gw-step-heading__index {
@@ -93,11 +96,14 @@
   color: var(--gw-color-workflow);
 }
 
+/* Default work/decision split plus explicit variants for widgets whose workflow needs another balance. */
 .gw-work-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .75fr); }
-.gw-work-main { min-width: 0; padding: 22px 24px; }
+.gw-work-grid--balanced { grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr); }
+.gw-work-grid--decision-wide { grid-template-columns: minmax(300px, .72fr) minmax(0, 1.28fr); }
+.gw-work-main { min-width: 0; padding: 22px clamp(20px, 2vw, 32px); }
 .gw-decision-panel {
   min-width: 0;
-  padding: 22px;
+  padding: 22px clamp(20px, 1.8vw, 28px);
   border-left: 1px solid var(--gw-color-border-subtle);
   background: var(--gw-color-surface-subtle);
 }
@@ -120,8 +126,19 @@
 .gw-action-dock small,
 .gw-validation-bar small { display: block; margin-top: 2px; color: var(--gw-color-text-muted); font-size: var(--gw-font-size-sm); }
 
+/* Complex dual-pane workflows stack earlier than the generic layout when their own container gets narrow. */
+@container gw-widget (max-width: 860px) {
+  .gw-work-grid--balanced,
+  .gw-work-grid--decision-wide { grid-template-columns: 1fr; }
+  .gw-work-grid--balanced > .gw-decision-panel,
+  .gw-work-grid--decision-wide > .gw-decision-panel {
+    border-left: 0;
+    border-top: 1px solid var(--gw-color-border-subtle);
+  }
+}
+
 @media (max-width: 720px) {
-  .gw-widget-frame { width: min(100% - 20px, 920px); margin-top: 0; }
+  .gw-widget-frame { width: calc(100% - 20px); margin-top: 0; }
   .gw-widget-header { gap: 12px; padding: 18px 16px 15px; }
   .gw-widget-icon {
     width: 34px;
@@ -139,7 +156,7 @@
   .gw-work-section { padding: 18px 16px; }
   .gw-work-grid { grid-template-columns: 1fr; }
   .gw-work-main { padding: 18px 16px; }
-  .gw-decision-panel { border-left: 0; border-top: 1px solid var(--gw-color-border-subtle); }
+  .gw-decision-panel { padding: 18px 16px; border-left: 0; border-top: 1px solid var(--gw-color-border-subtle); }
   .gw-action-dock,
   .gw-validation-bar { align-items: stretch; flex-direction: column; }
   .gw-action-dock .gw-button,
