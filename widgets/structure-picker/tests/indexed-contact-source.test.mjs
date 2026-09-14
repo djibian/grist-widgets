@@ -111,7 +111,7 @@ test("missing postcode shards are an empty source result, not a global search fa
   assert.deepEqual(result.candidates, []);
 });
 
-test("Overture exposes alternate contacts and records ATP lineage as non-independent provenance", async () => {
+test("Overture exposes alternate contacts independently and records ATP lineage", async () => {
   const result = await overtureContactSource.search(context({ siret: "" }), {
     manifest: manifest("overture"),
     manifestUrl,
@@ -131,8 +131,8 @@ test("Overture exposes alternate contacts and records ATP lineage as non-indepen
           courriel: "contact@example.test",
           siteWeb: "https://example.test",
           telephones: ["02 40 00 00 00", "02 40 00 00 01"],
-          courriels: ["contact@example.test"],
-          sitesWeb: ["https://example.test"],
+          courriels: ["contact@example.test", "direction@example.test"],
+          sitesWeb: ["https://example.test", "https://second.example.test"],
           confidence: 0.93,
           datasets: ["meta", "AllThePlaces"],
           hasAllThePlacesLineage: true,
@@ -141,10 +141,15 @@ test("Overture exposes alternate contacts and records ATP lineage as non-indepen
     }),
   });
 
-  assert.equal(result.candidates.length, 2);
+  assert.equal(result.candidates.length, 4);
   assert.deepEqual(
-    result.candidates.map(candidate => candidate.contacts.telephone),
-    ["02 40 00 00 00", "02 40 00 00 01"],
+    result.candidates.map(candidate => candidate.contacts),
+    [
+      { telephone: "02 40 00 00 00", courriel: "contact@example.test", siteWeb: "https://example.test" },
+      { telephone: "02 40 00 00 01", courriel: "contact@example.test", siteWeb: "https://example.test" },
+      { telephone: "02 40 00 00 00", courriel: "direction@example.test", siteWeb: "https://example.test" },
+      { telephone: "02 40 00 00 00", courriel: "contact@example.test", siteWeb: "https://second.example.test" },
+    ],
   );
   for (const candidate of result.candidates) {
     assert.deepEqual(
