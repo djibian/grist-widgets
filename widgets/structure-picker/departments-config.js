@@ -26,6 +26,16 @@ function svgNode(tagName, attributes = {}) {
   return element;
 }
 
+function integrateWidgetFrame() {
+  const frame = document.querySelector(".app.gw-widget-frame");
+  if (!frame) return;
+  frame.style.width = "100%";
+  frame.style.margin = "0";
+  frame.style.border = "0";
+  frame.style.borderRadius = "0";
+  frame.style.boxShadow = "none";
+}
+
 function settingsIcon() {
   const svg = svgNode("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" });
   svg.classList.add("gw-icon--accented");
@@ -108,6 +118,7 @@ function ensureSettingsUi() {
   }
 }
 
+integrateWidgetFrame();
 ensureSettingsUi();
 
 const ui = {
