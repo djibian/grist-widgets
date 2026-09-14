@@ -38,6 +38,7 @@ test('matérialise le flux contexte calcul vérification', () => {
 
 test('utilise un cadre fluide et une zone résultat responsive', () => {
   assert.match(structureCss, /\.gw-widget-frame[\s\S]*width: calc\(100% - 32px\)[\s\S]*max-width: none/);
+  assert.match(style, /\.route-shell\.gw-widget-frame \{[\s\S]*width: 100%;[\s\S]*margin: 0;[\s\S]*border: 0;[\s\S]*border-radius: 0;[\s\S]*box-shadow: none;/);
   assert.doesNotMatch(style, /920px/);
   assert.match(style, /\.route-work-grid[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(320px, 32%\)/);
   assert.match(style, /@container gw-widget \(max-width: 760px\)[\s\S]*\.route-work-grid \{ grid-template-columns: 1fr; \}/);
