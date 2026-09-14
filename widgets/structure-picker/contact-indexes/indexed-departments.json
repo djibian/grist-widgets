@@ -11,11 +11,6 @@
       "label": "Overture Places",
       "pathTemplate": "overture/{department}.json",
       "departments": []
-    },
-    "banco": {
-      "label": "BANCO",
-      "pathTemplate": "banco/{department}.json",
-      "departments": []
     }
   }
 }
