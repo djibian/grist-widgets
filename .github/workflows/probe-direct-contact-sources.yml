@@ -20,15 +20,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url='https://api-lannuaire.service-public.gouv.fr/api/explore/v2.1/catalog/datasets/api-lannuaire-administration/records?limit=1'
-          curl -fsSL "$url" -o /tmp/dila.json
-          jq '{total_count, first: .results[0]}' /tmp/dila.json
+          base='https://api-lannuaire.service-public.gouv.fr/api/explore/v2.1/catalog/datasets/api-lannuaire-administration/records'
+          curl -fsSL --get "$base" \
+            --data-urlencode 'where=siret="26770048200016"' \
+            --data-urlencode 'limit=3' \
+            -o /tmp/dila-siret.json
+          jq '{total_count, results}' /tmp/dila-siret.json
+          curl -fsSL --get "$base" \
+            --data-urlencode 'where=search(nom,"mairie nantes")' \
+            --data-urlencode 'limit=5' \
+            -o /tmp/dila-name.json
+          jq '{total_count, results: [.results[] | {id, nom, siren, siret, telephone, adresse_courriel, site_internet, adresse, url_service_public}]}' /tmp/dila-name.json
+          curl -sS -D - -o /dev/null --get "$base" --data-urlencode 'limit=1' | grep -iE 'access-control|content-type|HTTP/' || true
       - name: Probe Wikidata REST
         shell: bash
         run: |
           set -euo pipefail
           ua='grist-widgets-contact-probe/1.0 (https://github.com/djibian/grist-widgets)'
-          curl -fsSL -H "User-Agent: $ua" 'https://www.wikidata.org/w/rest.php/wikibase/v1/search/items?q=Nantes&language=fr&limit=3' -o /tmp/wd-search.json
+          search='https://www.wikidata.org/w/rest.php/wikibase/v1/search/items?q=Nantes&language=fr&limit=3'
+          item='https://www.wikidata.org/w/rest.php/wikibase/v1/entities/items/Q12191'
+          curl -fsSL -H "User-Agent: $ua" "$search" -o /tmp/wd-search.json
           jq '.' /tmp/wd-search.json
-          curl -fsSL -H "User-Agent: $ua" 'https://www.wikidata.org/w/rest.php/wikibase/v1/items/Q12191' -o /tmp/wd-item.json
+          curl -fsSL -H "User-Agent: $ua" "$item" -o /tmp/wd-item.json
           jq '{id, labels: .labels.fr, descriptions: .descriptions.fr, statements: {P1329: .statements.P1329, P968: .statements.P968, P856: .statements.P856, P1616: .statements.P1616, P625: .statements.P625, P281: .statements.P281}}' /tmp/wd-item.json
+          curl -sS -D - -o /dev/null -H "User-Agent: $ua" "$search" | grep -iE 'access-control|content-type|HTTP/' || true
