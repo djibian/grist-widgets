@@ -36,7 +36,7 @@ Certaines déclarations Wikidata citent directement l'Annuaire Service-Public.fr
 
 ## Index statiques par département
 
-Les sources volumineuses (All The Places, Overture Places et BANCO) sont préparées hors navigateur sous forme d'index JSON statiques par département.
+Les sources volumineuses **All The Places** et **Overture Places** sont préparées hors navigateur sous forme d'index JSON statiques par département.
 
 Le fichier `contact-indexes/indexed-departments.json` est le contrat de disponibilité : pour chaque source, il contient un patron de chemin relatif et la liste des départements effectivement publiés. Une source ne doit tenter de charger que l'intersection entre cette liste et les départements actifs du widget Grist.
 
@@ -160,6 +160,6 @@ Les champs actuellement vides et modifiables ne sont présélectionnés que pour
 
 Les trois sources directes OSM, DILA et Wikidata sont maintenant raccordées à l'orchestrateur expérimental. DILA apporte une identité SIRET particulièrement forte pour les administrations ; Wikidata reste volontairement conservateur et sert surtout de complément ou de corroboration.
 
-All The Places et Overture Places ont une densité de contacts suffisante pour rester dans l'architecture mais leurs index ne sont pas encore publiés et chargés dans l'interface. **BANCO reste à ce stade un simple emplacement réservé dans le manifest, sans générateur ni mesure validée.** Avant d'automatiser la publication périodique, il faudra décider explicitement de conserver BANCO et l'implémenter, ou de le retirer de l'architecture.
+All The Places et Overture Places ont une densité de contacts suffisante pour rester dans l'architecture, mais leurs index ne sont pas encore publiés ni chargés dans l'interface. **BANCO a été évalué puis retiré de l'architecture : son export est intégralement adossé à des objets OpenStreetMap (`osm_id` présent sur 100 % des lignes mesurées) et n'apporte donc pas de source indépendante justifiant la complexité supplémentaire.**
 
-La validation finale devra ensuite se faire sur des structures réelles dans Grist. La fonctionnalité conserve explicitement le statut **Expérimental** tant que cette pertinence n'a pas été vérifiée.
+La prochaine étape porte sur la génération et la publication périodiques des seuls index ATP et Overture. La validation finale devra ensuite se faire sur des structures réelles dans Grist. La fonctionnalité conserve explicitement le statut **Expérimental** tant que cette pertinence n'a pas été vérifiée.
