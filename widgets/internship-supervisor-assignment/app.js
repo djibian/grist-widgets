@@ -59,8 +59,8 @@ const state = {
   metadata: null,
   mappings: {},
   optimization: {
+    geography: { enabled: true, priority: "forte" },
     diversity: { enabled: true, priority: "moyenne" },
-    geography: { enabled: false, priority: "moyenne" },
   },
   selectedClassId: null,
   plan: null,
@@ -188,7 +188,7 @@ function renderAnalysis() {
   }
 
   const periods = selectedPeriods();
-  const analysis = analyzeClass(state.snapshot, cls.id, periods, state.optimization);
+  const analysis = analyzeClass(state.snapshot, cls.id, periods);
   const nonMissingErrors = analysis.errors.filter(row => row.code !== "MISSING_STAGES");
   const periodText = analysis.periods.length ? analysis.periods.map(period => `P${period}`).join(", ") : "—";
 
@@ -207,7 +207,7 @@ function renderAnalysis() {
 
   if (!analysis.errors.length) {
     const geographyNote = state.optimization?.geography?.enabled
-      ? " La proximité domicile–structure sera prise en compte."
+      ? " Les adresses des enseignants seront géocodées lors du calcul et la proximité domicile–structure sera prise en compte."
       : "";
     html += `<div class="success-line">✓ Stages présents et quotas cohérents : la répartition peut être calculée.${geographyNote}</div>`;
     el.generate.disabled = state.busy;
@@ -220,7 +220,7 @@ function renderAnalysis() {
     el.stageCreation.style.display = "";
     el.stageCreationTitle.textContent = `${analysis.missingCount} stage(s) manquant(s) sur ${analysis.expectedCount} attendu(s)`;
     el.createStages.textContent = `Créer les ${analysis.missingCount} stage(s) manquant(s)`;
-    const coverageErrors = analysis.errors.filter(row => row.code !== "MISSING_STAGES" && row.code !== "QUOTA_TOTAL_MISMATCH" && row.code !== "DUPLICATE_QUOTA" && row.code !== "INVALID_QUOTA_TARGET" && row.code !== "INVALID_QUOTA_TEACHER" && row.code !== "EXISTING_ASSIGNMENT_NOT_ALLOWED" && row.code !== "EXISTING_ASSIGNMENT_OVER_QUOTA" && row.code !== "MISSING_TEACHER_COORDINATES" && row.code !== "MISSING_STAGE_COORDINATES");
+    const coverageErrors = analysis.errors.filter(row => row.code !== "MISSING_STAGES" && row.code !== "QUOTA_TOTAL_MISMATCH" && row.code !== "DUPLICATE_QUOTA" && row.code !== "INVALID_QUOTA_TARGET" && row.code !== "INVALID_QUOTA_TEACHER" && row.code !== "EXISTING_ASSIGNMENT_NOT_ALLOWED" && row.code !== "EXISTING_ASSIGNMENT_OVER_QUOTA");
     el.createStages.disabled = state.busy || coverageErrors.length > 0;
   }
 }
@@ -342,12 +342,12 @@ function renderMappingDraftStatus() {
 }
 
 function renderSettings() {
+  el.geography.checked = state.optimization?.geography?.enabled !== false;
+  el.geographyPriority.value = state.optimization?.geography?.priority ?? "forte";
+  el.geographyPriority.disabled = !el.geography.checked;
   el.diversity.checked = state.optimization?.diversity?.enabled !== false;
   el.priority.value = state.optimization?.diversity?.priority ?? "moyenne";
   el.priority.disabled = !el.diversity.checked;
-  el.geography.checked = state.optimization?.geography?.enabled === true;
-  el.geographyPriority.value = state.optimization?.geography?.priority ?? "moyenne";
-  el.geographyPriority.disabled = !el.geography.checked;
   el.mappingDetails.open = validateMappings(state.metadata, state.mappings).length > 0;
   renderMappingFields(state.mappings);
 }
@@ -435,9 +435,11 @@ async function generate() {
   if (!classId || !periods.length) return;
   invalidatePlan();
   setBusy(true);
-  status("Vérification et calcul de la répartition…", "pending");
+  status(state.optimization?.geography?.enabled ? "Géocodage des enseignants et calcul de la répartition…" : "Vérification et calcul de la répartition…", "pending");
   try {
-    const snapshot = await fetchSnapshot(state.mappings);
+    const snapshot = await fetchSnapshot(state.mappings, {
+      geography: state.optimization?.geography?.enabled === true,
+    });
     if (state.selectedClassId !== classId) throw new Error("La classe sélectionnée a changé. Relance le calcul.");
     state.snapshot = snapshot;
     state.metadata = snapshot.configuration.metadata;
@@ -497,13 +499,13 @@ async function saveSettings() {
     return;
   }
   const optimization = {
-    diversity: {
-      enabled: el.diversity.checked,
-      priority: el.priority.value,
-    },
     geography: {
       enabled: el.geography.checked,
       priority: el.geographyPriority.value,
+    },
+    diversity: {
+      enabled: el.diversity.checked,
+      priority: el.priority.value,
     },
   };
 
