@@ -60,6 +60,12 @@ test('ouvre un paramétrage hiérarchisé dans le flux juste sous le contexte', 
   assert.doesNotMatch(html, /gw-work-main settings-main|gw-decision-panel settings-decision/);
 });
 
+test('distingue application locale et enregistrement persistant des options Grist', () => {
+  assert.match(html, />Appliquer les réglages</);
+  assert.match(html, /utilise aussi le bouton <strong>Enregistrer<\/strong> de la vue Grist/);
+  assert.match(html, /conserver ces réglages après rechargement/);
+});
+
 test('rend la configuration des colonnes secondaire mais automatiquement visible en cas de problème', () => {
   assert.match(app, /mappingDetails: \$\("#mapping-details"\)/);
   assert.match(app, /mappingSummary: \$\("#mapping-summary"\)/);
