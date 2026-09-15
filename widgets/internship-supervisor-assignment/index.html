@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../../shared/ui/base.css">
   <link rel="stylesheet" href="../../shared/ui/components.css">
   <link rel="stylesheet" href="../../shared/ui/structure.css">
-  <link rel="stylesheet" href="style.css?v=1.5.1">
+  <link rel="stylesheet" href="style.css?v=1.6.0">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
@@ -59,6 +59,19 @@
       <section class="settings-rules" aria-label="Règles de répartition">
         <div class="criterion compact-criterion">
           <label class="criterion-main">
+            <input id="criterion-geography" type="checkbox" checked>
+            <span><strong>Proximité géographique</strong><small>Privilégie les enseignants dont le domicile est proche des structures de stage.</small></span>
+          </label>
+          <label class="priority"><span>Priorité</span>
+            <select id="priority-geography" class="gw-select">
+              <option value="faible">Faible</option>
+              <option value="moyenne">Moyenne</option>
+              <option value="forte" selected>Forte</option>
+            </select>
+          </label>
+        </div>
+        <div class="criterion compact-criterion">
+          <label class="criterion-main">
             <input id="criterion-diversity" type="checkbox" checked>
             <span><strong>Diversifier les enseignants</strong><small>Évite autant que possible qu'un enseignant suive plusieurs périodes du même élève.</small></span>
           </label>
@@ -69,13 +82,6 @@
               <option value="forte">Forte</option>
             </select>
           </label>
-        </div>
-        <div class="criterion compact-criterion disabled" aria-disabled="true">
-          <label class="criterion-main">
-            <input type="checkbox" disabled>
-            <span><strong>Proximité géographique <span class="badge gw-badge">À venir</span></strong><small>Privilégiera les enseignants proches des structures lorsque cette règle sera disponible.</small></span>
-          </label>
-          <label class="priority"><span>Priorité</span><select class="gw-select" disabled><option>Forte</option></select></label>
         </div>
       </section>
 
@@ -128,7 +134,7 @@
       <div class="gw-validation-bar prepare-validation">
         <div class="gw-validation-bar__text">
           <strong>Préparation de la répartition</strong>
-          <small>Le bouton devient disponible lorsque les données et quotas sont cohérents.</small>
+          <small>Le bouton devient disponible lorsque les données, quotas et localisations nécessaires sont cohérents.</small>
         </div>
         <button id="generate" class="primary gw-button gw-button--primary" type="button" disabled>Calculer une proposition</button>
       </div>
@@ -153,7 +159,7 @@
           <summary>Voir le détail des affectations proposées</summary>
           <div class="table-wrap gw-table-wrap">
             <table class="gw-table">
-              <thead><tr><th>Période</th><th>Élève</th><th>Enseignant</th></tr></thead>
+              <thead><tr><th>Période</th><th>Élève</th><th>Enseignant</th><th>Distance</th></tr></thead>
               <tbody id="proposal-details"></tbody>
             </table>
           </div>
@@ -179,6 +185,6 @@
     </section>
   </main>
 
-  <script type="module" src="app.js?v=1.5.0"></script>
+  <script type="module" src="app.js?v=1.7.0"></script>
 </body>
 </html>

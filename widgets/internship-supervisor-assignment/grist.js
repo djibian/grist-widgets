@@ -5,6 +5,7 @@ import { DOCUMENT_TABLES, inferMappings, mappingSignature, validateMappings } fr
 
 const OPTION_KEY = "internshipSupervisorAssignmentV11";
 const DEFAULT_OPTIMIZATION = Object.freeze({
+  geography: { enabled: true, priority: "forte" },
   diversity: { enabled: true, priority: "moyenne" },
 });
 
@@ -27,6 +28,19 @@ function integer(value) {
   return Number.isInteger(number) ? number : null;
 }
 
+function finiteNumber(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function boolValue(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return ["1", "true", "yes", "oui", "vrai"].includes(normalized);
+}
+
 function display(value, fallback) {
   const text = String(value ?? "").trim();
   return text || fallback;
@@ -37,6 +51,14 @@ async function fetchRawTable(tableId) {
     return await grist.docApi.fetchTable(tableId);
   } catch {
     throw new Error(`Table Grist introuvable : ${tableId}.`);
+  }
+}
+
+async function fetchOptionalRawTable(tableId) {
+  try {
+    return await grist.docApi.fetchTable(tableId);
+  } catch {
+    return null;
   }
 }
 
@@ -143,12 +165,19 @@ async function readStoredOptions() {
   }
 }
 
+function normalizedCriterion(value, fallback, { defaultEnabled } = {}) {
+  const enabled = value?.enabled === undefined ? defaultEnabled : value.enabled !== false;
+  const priority = ["faible", "moyenne", "forte"].includes(value?.priority)
+    ? value.priority
+    : fallback.priority;
+  return { enabled, priority };
+}
+
 function normalizedOptimization(value) {
-  const enabled = value?.diversity?.enabled !== false;
-  const priority = ["faible", "moyenne", "forte"].includes(value?.diversity?.priority)
-    ? value.diversity.priority
-    : DEFAULT_OPTIMIZATION.diversity.priority;
-  return { diversity: { enabled, priority } };
+  return {
+    geography: normalizedCriterion(value?.geography, DEFAULT_OPTIMIZATION.geography, { defaultEnabled: true }),
+    diversity: normalizedCriterion(value?.diversity, DEFAULT_OPTIMIZATION.diversity, { defaultEnabled: true }),
+  };
 }
 
 export async function loadConfiguration() {
@@ -159,20 +188,21 @@ export async function loadConfiguration() {
     getSourceMappings(),
   ]);
   const mappings = inferMappings(metadata, stored?.mappings ?? {});
+  const optimization = normalizedOptimization(stored?.optimization);
   return {
     metadata,
     mappings,
     sourceMappings,
-    optimization: normalizedOptimization(stored?.optimization),
+    optimization,
     selectedTableId,
-    mappingIssues: validateMappings(metadata, mappings),
+    mappingIssues: validateMappings(metadata, mappings, { geography: optimization.geography.enabled }),
     sourceMappingProblems: sourceMappingProblems(metadata, selectedTableId, sourceMappings),
   };
 }
 
 export async function saveConfiguration(mappings, optimization) {
   const value = {
-    version: 2,
+    version: 4,
     mappings: { ...mappings },
     optimization: normalizedOptimization(optimization),
   };
@@ -203,8 +233,9 @@ export function initializeGrist(onClassSelection) {
   }
 }
 
-export async function fetchSnapshot(mappings) {
-  const [metadata, selectedTableId, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw] = await Promise.all([
+export async function fetchSnapshot(mappings, { geography = false } = {}) {
+  const structuresPromise = geography ? fetchRawTable("Structures_de_stage") : fetchOptionalRawTable("Structures_de_stage");
+  const [metadata, selectedTableId, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
     fetchMetadata(),
     getSelectedTableId(),
     getSourceMappings(),
@@ -213,8 +244,9 @@ export async function fetchSnapshot(mappings) {
     fetchRawTable("Enseignant"),
     fetchRawTable("Affectation"),
     fetchRawTable("Stage"),
+    structuresPromise,
   ]);
-  const mappingIssues = validateMappings(metadata, mappings);
+  const mappingIssues = validateMappings(metadata, mappings, { geography });
   const sourceProblems = sourceMappingProblems(metadata, selectedTableId, sourceMappings);
   const readSecondary = (row, key) => {
     const columnId = mappings?.[key];
@@ -241,6 +273,9 @@ export async function fetchSnapshot(mappings) {
   const teachers = rowsFromTable(teachersRaw).map(row => ({
     id: row.id,
     label: display(readSecondary(row, "teacherLabel"), `Enseignant #${row.id}`),
+    latitude: finiteNumber(readSecondary(row, "teacherLatitude")),
+    longitude: finiteNumber(readSecondary(row, "teacherLongitude")),
+    locationValidated: boolValue(readSecondary(row, "teacherLocationValidated")),
   }));
 
   const quotas = rowsFromTable(quotasRaw).map(row => ({
@@ -251,9 +286,18 @@ export async function fetchSnapshot(mappings) {
     target: integer(readSecondary(row, "quotaTarget")),
   }));
 
+  const structures = structuresRaw ? rowsFromTable(structuresRaw).map(row => ({
+    id: row.id,
+    latitude: finiteNumber(readSecondary(row, "structureLatitude")),
+    longitude: finiteNumber(readSecondary(row, "structureLongitude")),
+  })) : [];
+  const structureById = new Map(structures.map(row => [row.id, row]));
+
   const stages = rowsFromTable(stagesRaw).map(row => {
     const studentId = ref(readSecondary(row, "stageStudent"));
     const student = studentById.get(studentId);
+    const structureId = ref(readSecondary(row, "stageStructure"));
+    const structure = structureById.get(structureId);
     return {
       id: row.id,
       studentId,
@@ -261,6 +305,9 @@ export async function fetchSnapshot(mappings) {
       classId: student?.classId ?? null,
       period: integer(readSecondary(row, "stagePeriod")),
       teacherId: ref(readSecondary(row, "stageSupervisor")),
+      structureId,
+      latitude: structure?.latitude ?? null,
+      longitude: structure?.longitude ?? null,
     };
   });
 
@@ -270,6 +317,7 @@ export async function fetchSnapshot(mappings) {
     teachers,
     quotas,
     stages,
+    structures,
     configuration: {
       metadata,
       mappings: { ...mappings },
@@ -277,6 +325,7 @@ export async function fetchSnapshot(mappings) {
       selectedTableId,
       sourceMappings,
       sourceMappingProblems: sourceProblems,
+      geography,
     },
   };
 }
@@ -311,7 +360,7 @@ export function buildAssignmentActions(assignments, mappings) {
 }
 
 export async function createMissingStages(classId, periods, mappings) {
-  const fresh = await fetchSnapshot(mappings);
+  const fresh = await fetchSnapshot(mappings, { geography: false });
   const problems = configurationProblems(fresh);
   if (problems.length) throw new Error(problems.join(" "));
 
@@ -323,7 +372,7 @@ export async function createMissingStages(classId, periods, mappings) {
 
   await grist.docApi.applyUserActions([buildStageCreationAction(coverage.missing, mappings)]);
 
-  const after = await fetchSnapshot(mappings);
+  const after = await fetchSnapshot(mappings, { geography: false });
   const afterCoverage = stageCoverage(after, classId, periods);
   if (afterCoverage.errors.some(row => row.code === "DUPLICATE_STAGE")) {
     throw new Error("Des doublons de stages ont été détectés après la création. Vérifie la table Stage avant de poursuivre.");
@@ -340,7 +389,8 @@ export async function applyPlan(plan, mappings) {
     throw new Error("Le paramétrage des tables secondaires a changé. Génère une nouvelle proposition.");
   }
 
-  const fresh = await fetchSnapshot(mappings);
+  const geography = plan.criteria?.geography?.enabled === true;
+  const fresh = await fetchSnapshot(mappings, { geography });
   const problems = configurationProblems(fresh);
   if (problems.length) throw new Error(problems.join(" "));
 
@@ -348,7 +398,7 @@ export async function applyPlan(plan, mappings) {
     throw new Error("Le mapping de la source Classe a changé. Génère une nouvelle proposition.");
   }
 
-  const currentFingerprint = configurationFingerprint(fresh, plan.classId);
+  const currentFingerprint = configurationFingerprint(fresh, plan.classId, plan.criteria);
   if (currentFingerprint !== plan.fingerprint) {
     throw new Error("Les données ont changé depuis la génération de la proposition. Actualise puis génère une nouvelle proposition.");
   }
@@ -362,5 +412,5 @@ export async function applyPlan(plan, mappings) {
 
   if (!plan.assignments.length) return fresh;
   await grist.docApi.applyUserActions(buildAssignmentActions(plan.assignments, mappings));
-  return fetchSnapshot(mappings);
+  return fetchSnapshot(mappings, { geography });
 }

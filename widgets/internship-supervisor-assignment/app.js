@@ -37,6 +37,8 @@ const el = {
   mappingStatus: $("#mapping-status"),
   diversity: $("#criterion-diversity"),
   priority: $("#priority-diversity"),
+  geography: $("#criterion-geography"),
+  geographyPriority: $("#priority-geography"),
   className: $("#class-name"),
   periods: $("#periods"),
   analysis: $("#analysis"),
@@ -56,7 +58,10 @@ const state = {
   snapshot: null,
   metadata: null,
   mappings: {},
-  optimization: { diversity: { enabled: true, priority: "moyenne" } },
+  optimization: {
+    geography: { enabled: true, priority: "forte" },
+    diversity: { enabled: true, priority: "moyenne" },
+  },
   selectedClassId: null,
   plan: null,
   busy: false,
@@ -183,7 +188,7 @@ function renderAnalysis() {
   }
 
   const periods = selectedPeriods();
-  const analysis = analyzeClass(state.snapshot, cls.id, periods);
+  const analysis = analyzeClass(state.snapshot, cls.id, periods, state.optimization);
   const nonMissingErrors = analysis.errors.filter(row => row.code !== "MISSING_STAGES");
   const periodText = analysis.periods.length ? analysis.periods.map(period => `P${period}`).join(", ") : "—";
 
@@ -196,12 +201,20 @@ function renderAnalysis() {
 
   html += `<div class="control-line"><strong>${esc(periodText)}</strong> : ${analysis.existingSelectedCount ?? 0} déjà affecté(s), ${analysis.unassignedSelectedCount ?? 0} présent(s) sans enseignant.</div>`;
 
+  if (state.optimization?.geography?.enabled && analysis.geography) {
+    const geoClass = analysis.geography.ready ? "geo-readiness ready" : "geo-readiness warning";
+    html += `<div class="${geoClass}"><strong>Géographie</strong> : ${analysis.geography.validTeacherCount}/${analysis.geography.requiredTeacherCount} enseignant(s) localisé(s) et validé(s) · ${analysis.geography.validStageCount}/${analysis.geography.requiredStageCount} structure(s) exploitable(s).</div>`;
+  }
+
   if (nonMissingErrors.length) {
     html += `<ul class="issues">${nonMissingErrors.map(row => `<li>${esc(row.message)}</li>`).join("")}</ul>`;
   }
 
   if (!analysis.errors.length) {
-    html += '<div class="success-line">✓ Stages présents et quotas cohérents : la répartition peut être calculée.</div>';
+    const geographyNote = state.optimization?.geography?.enabled
+      ? " Les coordonnées validées seront utilisées pour optimiser la proximité domicile–structure."
+      : "";
+    html += `<div class="success-line">✓ Stages présents et quotas cohérents : la répartition peut être calculée.${geographyNote}</div>`;
     el.generate.disabled = state.busy;
   }
   el.analysis.className = "analysis";
@@ -212,9 +225,27 @@ function renderAnalysis() {
     el.stageCreation.style.display = "";
     el.stageCreationTitle.textContent = `${analysis.missingCount} stage(s) manquant(s) sur ${analysis.expectedCount} attendu(s)`;
     el.createStages.textContent = `Créer les ${analysis.missingCount} stage(s) manquant(s)`;
-    const coverageErrors = analysis.errors.filter(row => row.code !== "MISSING_STAGES" && row.code !== "QUOTA_TOTAL_MISMATCH" && row.code !== "DUPLICATE_QUOTA" && row.code !== "INVALID_QUOTA_TARGET" && row.code !== "INVALID_QUOTA_TEACHER" && row.code !== "EXISTING_ASSIGNMENT_NOT_ALLOWED" && row.code !== "EXISTING_ASSIGNMENT_OVER_QUOTA");
+    const ignoredForCreation = new Set([
+      "MISSING_STAGES",
+      "QUOTA_TOTAL_MISMATCH",
+      "DUPLICATE_QUOTA",
+      "INVALID_QUOTA_TARGET",
+      "INVALID_QUOTA_TEACHER",
+      "EXISTING_ASSIGNMENT_NOT_ALLOWED",
+      "EXISTING_ASSIGNMENT_OVER_QUOTA",
+      "TEACHER_LOCATION_NOT_VALIDATED",
+      "MISSING_TEACHER_COORDINATES",
+      "MISSING_STAGE_STRUCTURE",
+      "MISSING_STAGE_COORDINATES",
+    ]);
+    const coverageErrors = analysis.errors.filter(row => !ignoredForCreation.has(row.code));
     el.createStages.disabled = state.busy || coverageErrors.length > 0;
   }
+}
+
+function formatDistance(value) {
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
 }
 
 function renderPlan(plan) {
@@ -225,15 +256,23 @@ function renderPlan(plan) {
   const diversityLine = plan.metrics.newCount
     ? `${plan.metrics.diversifiedAssignments}/${plan.metrics.newCount} nouvelle(s) affectation(s) sans répétition enseignant–élève.`
     : "Aucune nouvelle affectation nécessaire.";
+  const geographyLine = plan.criteria?.geography?.enabled && plan.metrics.geographicAssignments
+    ? `<div class="summary-line">Distance directe totale : <strong>${esc(formatDistance(plan.metrics.totalDistanceKm))}</strong> · moyenne : ${esc(formatDistance(plan.metrics.averageDistanceKm))} · maximum : ${esc(formatDistance(plan.metrics.maxDistanceKm))}.</div>`
+    : "";
+  const tradeoffLine = plan.scoring?.geography && plan.scoring?.diversity && Number.isFinite(plan.scoring.repeatEquivalentKm)
+    ? `<div class="summary-line">Avec ces priorités, éviter une répétition enseignant–élève pèse autant qu’environ <strong>${esc(formatDistance(plan.scoring.repeatEquivalentKm))}</strong> de distance directe.</div>`
+    : "";
   el.proposalSummary.innerHTML = [
     '<div class="summary-line"><strong>✓ Tous les quotas sélectionnés sont respectés.</strong></div>',
     `<div class="summary-line">${plan.metrics.newCount} nouvelle(s) affectation(s), ${plan.metrics.existingCount} déjà existante(s).</div>`,
     `<div class="summary-line">${esc(diversityLine)}${plan.metrics.introducedRepeats ? ` ${plan.metrics.introducedRepeats} répétition(s) restent nécessaires.` : ""}</div>`,
+    geographyLine,
+    tradeoffLine,
   ].join("");
 
   el.proposalDetails.innerHTML = plan.assignments.map(row => (
-    `<tr><td>P${row.period}</td><td>${esc(row.studentLabel)}</td><td>${esc(row.teacherLabel)}</td></tr>`
-  )).join("") || '<tr><td colspan="3">Aucune nouvelle affectation.</td></tr>';
+    `<tr><td>P${row.period}</td><td>${esc(row.studentLabel)}</td><td>${esc(row.teacherLabel)}</td><td>${esc(formatDistance(row.distanceKm))}</td></tr>`
+  )).join("") || '<tr><td colspan="4">Aucune nouvelle affectation.</td></tr>';
 
   el.quotaDetails.innerHTML = plan.summary.map(row => (
     `<tr><td>P${row.period}</td><td>${esc(row.teacherLabel)}</td><td>${row.target}</td><td>${row.existing}</td><td>${row.proposed}</td><td><strong>${row.total}</strong></td></tr>`
@@ -304,7 +343,8 @@ function collectMappingDraft() {
 
 function renderMappingDraftStatus() {
   const mappings = el.mappingFields.querySelector("select[data-mapping-key]") ? collectMappingDraft() : state.mappings;
-  const issues = validateMappings(state.metadata, mappings);
+  const geography = el.geography?.checked ?? state.optimization?.geography?.enabled !== false;
+  const issues = validateMappings(state.metadata, mappings, { geography });
   const stats = mappingStats();
 
   if (!issues.length) {
@@ -325,10 +365,13 @@ function renderMappingDraftStatus() {
 }
 
 function renderSettings() {
+  el.geography.checked = state.optimization?.geography?.enabled !== false;
+  el.geographyPriority.value = state.optimization?.geography?.priority ?? "forte";
+  el.geographyPriority.disabled = !el.geography.checked;
   el.diversity.checked = state.optimization?.diversity?.enabled !== false;
   el.priority.value = state.optimization?.diversity?.priority ?? "moyenne";
   el.priority.disabled = !el.diversity.checked;
-  el.mappingDetails.open = validateMappings(state.metadata, state.mappings).length > 0;
+  el.mappingDetails.open = validateMappings(state.metadata, state.mappings, { geography: el.geography.checked }).length > 0;
   renderMappingFields(state.mappings);
 }
 
@@ -350,7 +393,9 @@ async function refreshData({ preservePeriods = true, announce = true } = {}) {
   state.busy = true;
   el.refresh.disabled = true;
   try {
-    const snapshot = await fetchSnapshot(state.mappings);
+    const snapshot = await fetchSnapshot(state.mappings, {
+      geography: state.optimization?.geography?.enabled === true,
+    });
     if (serial !== state.refreshSerial) return;
     state.snapshot = snapshot;
     state.metadata = snapshot.configuration.metadata;
@@ -415,9 +460,11 @@ async function generate() {
   if (!classId || !periods.length) return;
   invalidatePlan();
   setBusy(true);
-  status("Vérification et calcul de la répartition…", "pending");
+  status(state.optimization?.geography?.enabled ? "Contrôle géographique et calcul de la répartition…" : "Vérification et calcul de la répartition…", "pending");
   try {
-    const snapshot = await fetchSnapshot(state.mappings);
+    const snapshot = await fetchSnapshot(state.mappings, {
+      geography: state.optimization?.geography?.enabled === true,
+    });
     if (state.selectedClassId !== classId) throw new Error("La classe sélectionnée a changé. Relance le calcul.");
     state.snapshot = snapshot;
     state.metadata = snapshot.configuration.metadata;
@@ -469,19 +516,23 @@ async function apply() {
 
 async function saveSettings() {
   const mappings = collectMappingDraft();
-  const issues = validateMappings(state.metadata, mappings);
+  const optimization = {
+    geography: {
+      enabled: el.geography.checked,
+      priority: el.geographyPriority.value,
+    },
+    diversity: {
+      enabled: el.diversity.checked,
+      priority: el.priority.value,
+    },
+  };
+  const issues = validateMappings(state.metadata, mappings, { geography: optimization.geography.enabled });
   if (issues.length) {
     el.mappingDetails.open = true;
     renderMappingDraftStatus();
     el.mappingStatus.scrollIntoView({ block: "nearest" });
     return;
   }
-  const optimization = {
-    diversity: {
-      enabled: el.diversity.checked,
-      priority: el.priority.value,
-    },
-  };
 
   state.busy = true;
   el.settingsSave.disabled = true;
@@ -513,6 +564,12 @@ el.createStages.addEventListener("click", createStages);
 el.generate.addEventListener("click", generate);
 el.apply.addEventListener("click", apply);
 el.diversity.addEventListener("change", () => { el.priority.disabled = !el.diversity.checked; });
+el.geography.addEventListener("change", () => {
+  el.geographyPriority.disabled = !el.geography.checked;
+  invalidatePlan();
+  renderMappingDraftStatus();
+  renderAnalysis();
+});
 el.mappingAuto.addEventListener("click", () => {
   el.mappingDetails.open = true;
   renderMappingFields(inferMappings(state.metadata, {}));

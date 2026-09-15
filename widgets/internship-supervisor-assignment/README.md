@@ -1,93 +1,123 @@
 # Répartition des suivis de stage
 
-Widget Grist pour affecter automatiquement les stages aux enseignants à partir de quotas exacts définis par enseignant, classe et période.
+Widget Grist pour affecter les stages aux enseignants à partir de quotas exacts définis par enseignant, classe et période.
 
-## État stable
+## V2 — proximité géographique
 
-Les règles métier actuellement en production correspondent à la version fonctionnelle **V1.1.4**. Les évolutions visuelles vers l’identité **Grist Studio** n’ont pas modifié l’algorithme d’affectation ni les règles d’écriture.
+La V2 conserve les invariants de la version stable : quotas exacts, suivis existants préservés, prévisualisation avant écriture et relecture des données avant application. Elle ajoute une optimisation géographique fondée sur des localisations préparées et validées dans Grist.
 
-### Source de données native : Classe
+### Source principale : Classe
 
 Dans le panneau de droite de Grist :
 
-1. choisir **Classe** comme source de données du widget ;
-2. associer le champ **Classe** à la colonne qui contient le libellé de la classe ;
-3. associer le champ **Nombre de périodes de stage** à la colonne correspondante ;
-4. utiliser **Select By / Sélectionner par** avec la vue Classe souhaitée.
+1. sélectionner la table `Classe` comme source du widget ;
+2. associer **Classe** à la colonne de libellé ;
+3. associer **Nombre de périodes de stage** à la colonne correspondante ;
+4. relier le widget à la vue Classe avec **Select By / Sélectionner par**.
 
-Ces deux champs sont déclarés comme mappings obligatoires par le widget via l’API native Grist. Ils ne sont pas configurés dans le panneau **Paramètres** du widget.
+La ligne sélectionnée devient la classe courante. Seules les périodes réellement définies pour cette classe sont proposées.
 
-La ligne sélectionnée dans la vue Classe devient automatiquement la classe courante.
+### Données géographiques
 
-### Périodes
+Le widget Affectation **ne géocode aucune adresse**. Les enseignants sont géolocalisés et contrôlés au préalable dans la page Enseignants, avec le géocodeur dédié du document.
 
-Seules les périodes réellement définies par le champ natif **Nombre de périodes de stage** sont proposées. Une ou plusieurs périodes peuvent être cochées.
+Lorsque la proximité est activée, Affectation utilise :
 
-Toutes les opérations suivantes sont strictement limitées aux périodes cochées :
+- `Enseignant.Latitude` ;
+- `Enseignant.Longitude` ;
+- `Enseignant.Localisation_validee` ;
+- `Stage.Structure_de_stage`, référence vers `Structures_de_stage` ;
+- `Structures_de_stage.Latitude` ;
+- `Structures_de_stage.Longitude`.
 
-- contrôle des stages ;
-- création des stages manquants ;
-- contrôle des quotas ;
-- génération de la proposition ;
-- application des affectations.
+Ces colonnes sont des mappings explicites : leur présence, leur type et la référence `Stage → Structures_de_stage` sont contrôlés par le widget.
 
-### Création des stages manquants
+Une localisation enseignant n'est exploitable que si `Localisation_validee` est vraie et si latitude/longitude sont numériques et dans les bornes géographiques valides. Une structure doit être renseignée sur le stage et posséder elle aussi des coordonnées valides.
 
-Le widget calcule l’ensemble attendu :
+La validation des coordonnées et le calcul Haversine sont mutualisés dans `shared/services/geo.js`, également utilisé par le service de distance routière. Affectation et Distance routière partagent donc le même contrat géographique.
+
+Avant le calcul, le widget affiche un précontrôle du type :
+
+`2/2 enseignants localisés et validés · 20/20 structures exploitables`
+
+Toute incohérence bloque l'optimisation géographique avec un message précis.
+
+### Quotas et stages
+
+Le widget calcule l'ensemble attendu :
 
 `élèves de la classe × périodes sélectionnées`
 
-Il compare cet ensemble aux lignes de la table `Stage`. Les lignes manquantes peuvent être créées explicitement en une opération groupée. Seules les colonnes configurées comme **Élève** et **Période** sont renseignées ; les autres colonnes restent vides ou sont calculées par Grist.
+Les lignes `Stage` manquantes peuvent être créées explicitement. Les doublons élève × période bloquent le calcul.
 
-Les doublons élève × période bloquent la création et l’affectation.
+Pour chaque période sélectionnée :
 
-### Tables secondaires
+- la somme des quotas doit être exactement égale au nombre d'élèves ;
+- les suivis déjà renseignés sont conservés et déduits des quotas restants ;
+- un enseignant déjà au-dessus de son quota ou non autorisé pour la classe bloque le calcul.
 
-Les noms des tables restent fixes :
+### Solveur d'affectation
 
-- `Classe` — source principale native ;
-- `Eleves` ;
-- `Enseignant` ;
-- `Affectation` ;
-- `Stage`.
+L'ancien choix glouton par ordre de lignes est remplacé par un **solveur d'affectation à coût minimal sous capacités**.
 
-Le panneau **Paramètres** sert uniquement à choisir, lorsque nécessaire, les colonnes des tables secondaires :
+Pour chaque période, le solveur recherche globalement l'affectation de coût minimal entre tous les stages non affectés et tous les enseignants ayant encore du quota. Il peut donc faire un choix localement moins avantageux pour un stage si cela améliore fortement la solution de la période.
 
-**Eleves**
-- classe de l’élève ;
-- identité de l’élève.
+Le widget évalue les différents ordres possibles des périodes sélectionnées — au maximum quatre — afin de prendre en compte la diversification entre les périodes d'un même élève.
 
-**Enseignant**
-- identité de l’enseignant.
+Enfin, une passe de **raffinement inter-périodes** réévalue le score global. Elle cherche d'abord des échanges améliorants entre deux stages d'une même période ; si aucun échange isolé ne suffit, elle peut appliquer deux échanges coordonnés dans deux périodes différentes. Ces mouvements conservent exactement, par construction, le nombre de stages attribué à chaque enseignant dans chaque période : les quotas ne peuvent donc pas être modifiés par le raffinement.
 
-**Affectation**
-- enseignant ;
-- classe ;
-- période ;
-- nombre de stages à suivre.
+Le moteur est ainsi exact pour l'affectation à coût minimal **à l'intérieur de chaque période**, puis amélioré globalement entre périodes par une recherche locale déterministe. Il ne prétend pas résoudre exactement le problème combinatoire multi-périodes complet ; les tournées routières et l'optimisation multi-classes restent des évolutions distinctes.
 
-**Stage**
-- élève ;
-- période ;
-- suivi par.
+### Critères et priorités
 
-Ces mappings secondaires sont détectés automatiquement dans le fichier actuel et mémorisés dans les options du widget.
+Deux critères sont activés par défaut :
 
-### Optimisation
+1. **Proximité géographique — Forte** ;
+2. **Diversifier les enseignants — Moyenne**.
 
-Le critère actuellement implémenté est la **diversification des enseignants entre les périodes d’un même élève**, avec une priorité **Faible / Moyenne / Forte**.
+La géographie conserve la magnitude réelle des distances : aucune normalisation « meilleur = 0 / pire = 1 » n'est appliquée. Le coût utilise la distance directe Haversine en kilomètres.
 
-La **proximité géographique** apparaît dans le panneau Paramètres comme évolution prévue mais reste désactivée : aucune donnée de distance n’entre encore dans le calcul.
+Les niveaux de priorité utilisent les facteurs suivants :
+
+- **Faible** : × 0,5 ;
+- **Moyenne** : × 1 ;
+- **Forte** : × 2.
+
+Une répétition enseignant–élève possède une pénalité de base équivalente à 10 unités de coût, modulée par la priorité de diversification. Le widget affiche dans chaque proposition la traduction concrète du compromis dans la configuration courante.
+
+Avec les réglages par défaut — Géographie Forte, Diversification Moyenne — éviter une répétition pèse autant qu'environ **5 km de distance directe**. Au-delà de cet écart, la proximité géographique l'emporte.
+
+Cette équivalence est volontairement explicite afin que le comportement du moteur soit compréhensible et ajustable.
+
+### Résultats
+
+La prévisualisation affiche notamment :
+
+- les affectations proposées ;
+- la distance directe de chaque affectation ;
+- la distance totale, moyenne et maximale ;
+- le nombre de répétitions enseignant–élève ;
+- le contrôle des quotas ;
+- l'équivalence entre diversification et distance correspondant aux priorités choisies.
+
+Le plan conserve également des métriques internes de score avant/après raffinement afin de tester que toute modification inter-périodes améliore strictement l'objectif global.
 
 ### Sécurité des écritures
 
-- les suivis déjà renseignés ne sont jamais écrasés ;
-- les quotas doivent être exacts ;
-- une proposition est prévisualisée avant écriture ;
+- aucun suivi existant n'est écrasé ;
+- le calcul est prévisualisé avant toute écriture ;
 - les données sont relues avant application ;
-- une modification intervenue entre la prévisualisation et l’application invalide la proposition ;
-- un changement du mapping natif de la source `Classe` invalide également la proposition ;
-- les écritures utilisent les colonnes secondaires réellement configurées.
+- une modification des stages, quotas, coordonnées, validation géographique ou mappings invalide la proposition ;
+- seules les colonnes réellement configurées sont écrites.
+
+## Évolutions prévues
+
+Le socle V2 prépare deux évolutions distinctes :
+
+1. **tournées de visites en voiture** : compléter la distance directe par les distances et durées routières GeoPF/IGN, puis favoriser des groupes de structures compacts pour chaque enseignant ;
+2. **plusieurs classes simultanément en stage** : prendre en compte les suivis déjà affectés dans d'autres classes lorsqu'ils peuvent être visités dans la même fenêtre temporelle, notamment à partir des dates de fin de stage.
+
+Ces évolutions devront conserver les quotas et affectations existantes comme contraintes fortes et limiter les appels routiers aux couples réellement pertinents.
 
 ## Version publiée
 
@@ -99,4 +129,4 @@ La **proximité géographique** apparaît dans le panneau Paramètres comme évo
 npm run test:internship-supervisor-assignment
 ```
 
-L’ensemble du dépôt peut également être testé avec `npm test`.
+L'ensemble du dépôt peut également être testé avec `npm test`.
