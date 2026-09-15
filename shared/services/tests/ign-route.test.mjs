@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildIgnRoutePayload,
+  geocodeAddress,
   requestIgnRoute,
   validCoordinates
 } from '../ign-route.js';
@@ -26,6 +27,45 @@ test('validCoordinates accepte uniquement des coordonnées finies dans les borne
   assert.equal(validCoordinates(NaN, -1.5), false);
   assert.equal(validCoordinates(91, -1.5), false);
   assert.equal(validCoordinates(47.1, 181), false);
+});
+
+test('geocodeAddress interroge la BAN Géoplateforme et normalise le meilleur résultat', async () => {
+  let capturedUrl = null;
+  const result = await geocodeAddress('5 rue des Lilas 44000 Nantes', {
+    fetchFn: async (url) => {
+      capturedUrl = url;
+      return response(200, {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [-1.55, 47.22] },
+          properties: { label: '5 Rue des Lilas 44000 Nantes', score: 0.92 }
+        }]
+      });
+    }
+  });
+
+  const url = new URL(capturedUrl);
+  assert.equal(url.origin + url.pathname, 'https://data.geopf.fr/geocodage/search');
+  assert.equal(url.searchParams.get('q'), '5 rue des Lilas 44000 Nantes');
+  assert.equal(url.searchParams.get('index'), 'address');
+  assert.equal(url.searchParams.get('limit'), '1');
+  assert.deepEqual(result, {
+    label: '5 Rue des Lilas 44000 Nantes',
+    latitude: 47.22,
+    longitude: -1.55,
+    score: 0.92
+  });
+});
+
+test('geocodeAddress refuse une saisie trop courte et une réponse sans adresse', async () => {
+  await assert.rejects(geocodeAddress('a'), /adresse de départ suffisamment précise/);
+  await assert.rejects(
+    geocodeAddress('adresse inconnue', {
+      fetchFn: async () => response(200, { type: 'FeatureCollection', features: [] })
+    }),
+    /Aucune adresse exploitable/
+  );
 });
 
 test('buildIgnRoutePayload utilise longitude,latitude et le profil voiture', () => {
