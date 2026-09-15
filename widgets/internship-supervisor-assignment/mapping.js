@@ -15,13 +15,13 @@ export const MAPPING_DEFS = Object.freeze([
     key: "studentLabel",
     table: "Eleves",
     label: "Identité de l'élève",
-    candidates: ["Identite", "Identité", "Nom_complet", "Nom complet", "Nom"],
+    candidates: ["Identite", "Identité", "Nom_complet", "Nom complet", "Nom_Prenom", "Nom Prénom", "Prenom_Nom", "Prénom Nom", "Nom"],
   },
   {
     key: "teacherLabel",
     table: "Enseignant",
     label: "Identité de l'enseignant",
-    candidates: ["Identite", "Identité", "Nom_complet", "Nom complet", "Nom"],
+    candidates: ["Identite", "Identité", "Nom_complet", "Nom complet", "Nom_Prenom", "Nom Prénom", "Prenom_Nom", "Prénom Nom", "Nom"],
   },
   {
     key: "teacherLatitude",
@@ -65,18 +65,24 @@ export const MAPPING_DEFS = Object.freeze([
     key: "quotaPeriod",
     table: "Affectation",
     label: "Période",
-    candidates: ["Periode", "Période"],
+    candidates: ["Periode", "Période", "Periode_de_stage", "Période de stage"],
+    allowedTypes: ["Numeric", "Int"],
   },
   {
     key: "quotaTarget",
     table: "Affectation",
-    label: "Nombre de stages à suivre",
+    label: "Stages à suivre",
     candidates: [
+      "Stage_a_suivre",
+      "Stages_a_suivre",
+      "Stage à suivre",
+      "Stages à suivre",
       "Nombre_de_stage_a_suivre",
       "Nombre_de_stages_a_suivre",
       "Nombre de stage à suivre",
       "Nombre de stages à suivre",
     ],
+    allowedTypes: ["Numeric", "Int"],
   },
   {
     key: "stageStudent",
@@ -90,14 +96,15 @@ export const MAPPING_DEFS = Object.freeze([
     key: "stagePeriod",
     table: "Stage",
     label: "Période",
-    candidates: ["Periode", "Période"],
+    candidates: ["Periode", "Période", "Periode_de_stage", "Période de stage"],
+    allowedTypes: ["Numeric", "Int"],
     writable: true,
   },
   {
     key: "stageSupervisor",
     table: "Stage",
     label: "Suivi par",
-    candidates: ["Suivi_par", "Suivi par"],
+    candidates: ["Suivi_par", "Suivi par", "Enseignant", "Enseignant_de_suivi", "Enseignant de suivi"],
     refTarget: "Enseignant",
     writable: true,
   },
@@ -105,7 +112,7 @@ export const MAPPING_DEFS = Object.freeze([
     key: "stageStructure",
     table: "Stage",
     label: "Structure de stage",
-    candidates: ["Structure_de_stage", "Structure de stage"],
+    candidates: ["Structure_de_stage", "Structure de stage", "Structure"],
     refTarget: "Structures_de_stage",
     scope: "geography",
   },
@@ -142,6 +149,30 @@ function definitionEnabled(definition, { geography = true } = {}) {
   return definition.scope !== "geography" || geography;
 }
 
+function columnMatchesShape(column, definition) {
+  if (definition.refTarget && column.type !== `Ref:${definition.refTarget}`) return false;
+  if (definition.allowedTypes && !definition.allowedTypes.includes(column.type)) return false;
+  if (definition.writable && column.writable === false) return false;
+  return true;
+}
+
+function candidateColumn(columns, definition) {
+  const compatible = columns.filter(column => columnMatchesShape(column, definition));
+  for (const candidate of definition.candidates) {
+    const wanted = normalize(candidate);
+    const found = compatible.find(column => normalize(column.colId) === wanted)
+      ?? compatible.find(column => normalize(column.label) === wanted)
+      ?? null;
+    if (found) return found;
+  }
+  return null;
+}
+
+function uniqueStructuralColumn(columns, definition) {
+  const compatible = columns.filter(column => columnMatchesShape(column, definition));
+  return compatible.length === 1 ? compatible[0] : null;
+}
+
 export function inferMappings(metadata, saved = {}) {
   const result = {};
   for (const definition of MAPPING_DEFS) {
@@ -152,14 +183,8 @@ export function inferMappings(metadata, saved = {}) {
       continue;
     }
 
-    let found = null;
-    for (const candidate of definition.candidates) {
-      const wanted = normalize(candidate);
-      found = columns.find(column => normalize(column.colId) === wanted)
-        ?? columns.find(column => normalize(column.label) === wanted)
-        ?? null;
-      if (found) break;
-    }
+    const found = candidateColumn(columns, definition)
+      ?? uniqueStructuralColumn(columns, definition);
     result[definition.key] = found?.colId ?? "";
   }
   return result;
