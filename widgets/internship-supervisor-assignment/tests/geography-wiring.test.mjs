@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+const assignmentSource = await readFile(new URL("../assignment.js", import.meta.url), "utf8");
 const gristSource = await readFile(new URL("../grist.js", import.meta.url), "utf8");
 const mappingSource = await readFile(new URL("../mapping.js", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const routeSource = await readFile(new URL("../../../shared/services/ign-route.js", import.meta.url), "utf8");
 
 test("geographic criterion is first, enabled by default and stronger than diversity", () => {
   const geography = html.indexOf('id="criterion-geography"');
@@ -26,6 +28,15 @@ test("Affectation consumes persisted validated coordinates and never geocodes te
   assert.match(mappingSource, /key: "teacherLocationValidated"/);
   assert.match(mappingSource, /Localisation_validee/);
   assert.match(gristSource, /locationValidated:\s*boolValue\(readSecondary\(row, "teacherLocationValidated"\)\)/);
+});
+
+test("Affectation and road distance share the same geographic helpers", () => {
+  assert.match(assignmentSource, /from "\.\.\/\.\.\/shared\/services\/geo\.js"/);
+  assert.match(assignmentSource, /export \{ validCoordinates \} from "\.\.\/\.\.\/shared\/services\/geo\.js"/);
+  assert.match(assignmentSource, /geographicDistanceKm = haversineDistanceKm/);
+  assert.doesNotMatch(assignmentSource, /function validCoordinates\(/);
+  assert.doesNotMatch(assignmentSource, /6371\.0088/);
+  assert.match(routeSource, /import \{ validCoordinates \} from '\.\/geo\.js'/);
 });
 
 test("Grist snapshot follows the stage to structure reference through explicit mappings", () => {
