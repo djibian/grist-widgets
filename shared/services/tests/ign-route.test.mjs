@@ -70,14 +70,14 @@ test('geocodeAddress refuse une saisie trop courte et une réponse sans adresse'
 
 test('buildIgnRoutePayload utilise longitude,latitude et le profil voiture', () => {
   const payload = buildIgnRoutePayload({
-    startLatitude: 47.057944,
-    startLongitude: -1.521611,
+    startLatitude: 48.8566,
+    startLongitude: 2.3522,
     endLatitude: 47.2,
     endLongitude: -1.7
   });
 
   assert.equal(payload.resource, 'bdtopo-osrm');
-  assert.equal(payload.start, '-1.521611,47.057944');
+  assert.equal(payload.start, '2.3522,48.8566');
   assert.equal(payload.end, '-1.7,47.2');
   assert.equal(payload.profile, 'car');
   assert.equal(payload.optimization, 'fastest');
@@ -87,8 +87,8 @@ test('requestIgnRoute envoie la requête et arrondit distance et durée', async 
   let capturedUrl = null;
   let capturedOptions = null;
   const result = await requestIgnRoute({
-    startLatitude: 47.057944,
-    startLongitude: -1.521611,
+    startLatitude: 48.8566,
+    startLongitude: 2.3522,
     endLatitude: 47.2,
     endLongitude: -1.7,
     decimals: 2
@@ -103,7 +103,7 @@ test('requestIgnRoute envoie la requête et arrondit distance et durée', async 
   assert.match(capturedUrl, /data\.geopf\.fr\/navigation\/itineraire/);
   assert.equal(capturedOptions.method, 'POST');
   const body = JSON.parse(capturedOptions.body);
-  assert.equal(body.start, '-1.521611,47.057944');
+  assert.equal(body.start, '2.3522,48.8566');
   assert.equal(body.end, '-1.7,47.2');
   assert.deepEqual(result, { distance: 12.35, duration: 17.8 });
 });
