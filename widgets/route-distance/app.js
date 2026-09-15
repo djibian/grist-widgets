@@ -62,17 +62,21 @@ function setContextState(message, type = '') {
   elements.routeContextState.className = 'gw-context-value context-state' + (type ? ' ' + type : '');
 }
 
+function originIsConfigured() {
+  const origin = getRouteOrigin();
+  return validCoordinates(origin.latitude, origin.longitude);
+}
+
 function pendingMatchesSelection() {
   return Boolean(state.pending && state.selected && state.pending.operation.recordId === state.selected.id);
 }
 
 function setBusy(busy) {
   state.busy = busy;
-  const origin = getRouteOrigin();
   const usableSelection = Boolean(
     state.selected &&
     mappingIsComplete() &&
-    validCoordinates(origin.latitude, origin.longitude) &&
+    originIsConfigured() &&
     validCoordinates(state.selected.Latitude, state.selected.Longitude)
   );
   elements.calculateSelected.disabled = busy || !usableSelection;
@@ -128,6 +132,9 @@ function renderSelected() {
   if (!validCoordinates(row.Latitude, row.Longitude)) {
     setContextState('Coordonnées invalides', 'error');
     setStatus('La destination ne possède pas de coordonnées utilisables.', 'error');
+  } else if (!originIsConfigured()) {
+    setContextState('Origine à définir', 'pending');
+    setStatus('Définissez une adresse de départ avant de calculer.');
   } else {
     setContextState('Coordonnées prêtes', 'ready');
     setStatus(isFiniteNumber(row.Distance) ? 'Distance actuellement enregistrée dans Grist.' : 'Prêt à calculer.');
@@ -227,12 +234,17 @@ async function saveSelected() {
 elements.calculateSelected.addEventListener('click', calculateSelected);
 elements.saveSelected.addEventListener('click', saveSelected);
 
-onRouteOriginChange(() => {
+onRouteOriginChange((origin) => {
   clearPending();
   renderStoredResult();
   if (state.selected && validCoordinates(state.selected.Latitude, state.selected.Longitude)) {
-    setContextState('Coordonnées prêtes', 'ready');
-    setStatus('Point de départ mis à jour. Prêt à recalculer.');
+    if (validCoordinates(origin.latitude, origin.longitude)) {
+      setContextState('Coordonnées prêtes', 'ready');
+      setStatus('Point de départ mis à jour. Prêt à recalculer.');
+    } else {
+      setContextState('Origine à définir', 'pending');
+      setStatus('Définissez une adresse de départ avant de calculer.');
+    }
   }
   setBusy(false);
 });
