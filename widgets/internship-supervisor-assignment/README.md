@@ -4,7 +4,7 @@ Widget Grist pour affecter automatiquement les stages aux enseignants à partir 
 
 ## État stable
 
-Les règles métier actuellement en production correspondent à la version fonctionnelle **V1.1.4**. Les évolutions visuelles vers l’identité **Grist Studio** n’ont pas modifié l’algorithme d’affectation ni les règles d’écriture.
+Les règles métier de base correspondent à la version fonctionnelle **V1.1.4**. L’évolution V2 ajoute un critère optionnel de **proximité géographique** sans modifier les invariants de sécurité : quotas exacts, prévisualisation et absence d’écrasement des suivis existants.
 
 ### Source de données native : Classe
 
@@ -43,7 +43,7 @@ Les doublons élève × période bloquent la création et l’affectation.
 
 ### Tables secondaires
 
-Les noms des tables restent fixes :
+Les noms des tables principales restent fixes :
 
 - `Classe` — source principale native ;
 - `Eleves` ;
@@ -51,7 +51,7 @@ Les noms des tables restent fixes :
 - `Affectation` ;
 - `Stage`.
 
-Le panneau **Paramètres** sert uniquement à choisir, lorsque nécessaire, les colonnes des tables secondaires :
+Le panneau **Paramètres** sert à choisir, lorsque nécessaire, les colonnes de ces tables secondaires :
 
 **Eleves**
 - classe de l’élève ;
@@ -75,9 +75,20 @@ Ces mappings secondaires sont détectés automatiquement dans le fichier actuel 
 
 ### Optimisation
 
-Le critère actuellement implémenté est la **diversification des enseignants entre les périodes d’un même élève**, avec une priorité **Faible / Moyenne / Forte**.
+Deux critères peuvent être combinés, chacun avec une priorité **Faible / Moyenne / Forte** :
 
-La **proximité géographique** apparaît dans le panneau Paramètres comme évolution prévue mais reste désactivée : aucune donnée de distance n’entre encore dans le calcul.
+- **Diversifier les enseignants** : évite autant que possible qu’un même enseignant suive plusieurs périodes du même élève ;
+- **Proximité géographique** : privilégie, dans le respect strict des quotas, les enseignants dont le domicile est géographiquement proche de la structure de stage.
+
+La proximité est **désactivée par défaut** afin de ne pas modifier silencieusement les répartitions existantes.
+
+Le calcul géographique utilise une distance directe sur la sphère terrestre (Haversine), sans appel réseau. Il s’appuie sur les colonnes techniques du document actuel :
+
+- `Enseignant.Latitude` et `Enseignant.Longitude` pour le domicile de l’enseignant ;
+- `Stage.Structure` comme référence vers `Structures_de_stage` ;
+- `Structures_de_stage.Latitude` et `Structures_de_stage.Longitude` pour la structure de stage.
+
+Lorsque la proximité est activée, toute nouvelle affectation à calculer doit disposer de coordonnées exploitables côté enseignant et côté structure. Sinon le calcul est bloqué avec un message explicite. Les distances sont affichées dans la proposition, avec une moyenne et un maximum.
 
 ### Sécurité des écritures
 
@@ -87,6 +98,7 @@ La **proximité géographique** apparaît dans le panneau Paramètres comme évo
 - les données sont relues avant application ;
 - une modification intervenue entre la prévisualisation et l’application invalide la proposition ;
 - un changement du mapping natif de la source `Classe` invalide également la proposition ;
+- les changements de coordonnées des enseignants ou structures invalident aussi une proposition géographique déjà calculée ;
 - les écritures utilisent les colonnes secondaires réellement configurées.
 
 ## Version publiée
