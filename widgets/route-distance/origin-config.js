@@ -2,11 +2,11 @@ import { geocodeAddress, validCoordinates } from '../../shared/services/ign-rout
 
 const OPTION_KEY = 'routeOrigin';
 
-export const DEFAULT_ROUTE_ORIGIN = Object.freeze({
+export const EMPTY_ROUTE_ORIGIN = Object.freeze({
   address: '',
-  label: 'Point de départ actuel',
-  latitude: 47.057944,
-  longitude: -1.521611
+  label: 'Adresse de départ à définir',
+  latitude: null,
+  longitude: null
 });
 
 const elements = {
@@ -16,14 +16,14 @@ const elements = {
   status: document.getElementById('originStatus')
 };
 
-let currentOrigin = { ...DEFAULT_ROUTE_ORIGIN };
+let currentOrigin = { ...EMPTY_ROUTE_ORIGIN };
 let busy = false;
 const listeners = new Set();
 
 function normalizeOrigin(value) {
   const latitude = Number(value?.latitude);
   const longitude = Number(value?.longitude);
-  if (!validCoordinates(latitude, longitude)) return { ...DEFAULT_ROUTE_ORIGIN };
+  if (!validCoordinates(latitude, longitude)) return { ...EMPTY_ROUTE_ORIGIN };
 
   const address = String(value?.address ?? value?.label ?? '').trim();
   const label = String(value?.label ?? address).trim() || 'Point de départ configuré';
