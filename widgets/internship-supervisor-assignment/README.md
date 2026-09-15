@@ -34,6 +34,8 @@ Ces colonnes sont des mappings explicites : leur présence, leur type et la réf
 
 Une localisation enseignant n'est exploitable que si `Localisation_validee` est vraie et si latitude/longitude sont numériques et dans les bornes géographiques valides. Une structure doit être renseignée sur le stage et posséder elle aussi des coordonnées valides.
 
+La validation des coordonnées et le calcul Haversine sont mutualisés dans `shared/services/geo.js`, également utilisé par le service de distance routière. Affectation et Distance routière partagent donc le même contrat géographique.
+
 Avant le calcul, le widget affiche un précontrôle du type :
 
 `2/2 enseignants localisés et validés · 20/20 structures exploitables`
@@ -58,11 +60,13 @@ Pour chaque période sélectionnée :
 
 L'ancien choix glouton par ordre de lignes est remplacé par un **solveur d'affectation à coût minimal sous capacités**.
 
-Pour chaque période, le solveur recherche globalement l'affectation de coût minimal entre tous les stages non affectés et tous les enseignants ayant encore du quota. Il peut donc faire un choix localement moins avantageux pour un stage si cela améliore fortement la solution globale.
+Pour chaque période, le solveur recherche globalement l'affectation de coût minimal entre tous les stages non affectés et tous les enseignants ayant encore du quota. Il peut donc faire un choix localement moins avantageux pour un stage si cela améliore fortement la solution de la période.
 
-Le widget évalue ensuite les différents ordres possibles des périodes sélectionnées — au maximum quatre — afin de prendre en compte la diversification entre les périodes d'un même élève.
+Le widget évalue les différents ordres possibles des périodes sélectionnées — au maximum quatre — afin de prendre en compte la diversification entre les périodes d'un même élève.
 
-Cette V2 est donc exacte pour l'affectation **à l'intérieur de chaque période**. L'optimisation globale de tournées multi-périodes et multi-classes appartient aux évolutions suivantes.
+Enfin, une passe de **raffinement inter-périodes** réévalue le score global. Elle cherche d'abord des échanges améliorants entre deux stages d'une même période ; si aucun échange isolé ne suffit, elle peut appliquer deux échanges coordonnés dans deux périodes différentes. Ces mouvements conservent exactement, par construction, le nombre de stages attribué à chaque enseignant dans chaque période : les quotas ne peuvent donc pas être modifiés par le raffinement.
+
+Le moteur est ainsi exact pour l'affectation à coût minimal **à l'intérieur de chaque période**, puis amélioré globalement entre périodes par une recherche locale déterministe. Il ne prétend pas résoudre exactement le problème combinatoire multi-périodes complet ; les tournées routières et l'optimisation multi-classes restent des évolutions distinctes.
 
 ### Critères et priorités
 
@@ -95,6 +99,8 @@ La prévisualisation affiche notamment :
 - le nombre de répétitions enseignant–élève ;
 - le contrôle des quotas ;
 - l'équivalence entre diversification et distance correspondant aux priorités choisies.
+
+Le plan conserve également des métriques internes de score avant/après raffinement afin de tester que toute modification inter-périodes améliore strictement l'objectif global.
 
 ### Sécurité des écritures
 
