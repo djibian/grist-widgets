@@ -59,24 +59,24 @@
       <section class="settings-rules" aria-label="Règles de répartition">
         <div class="criterion compact-criterion">
           <label class="criterion-main">
-            <input id="criterion-diversity" type="checkbox" checked>
-            <span><strong>Diversifier les enseignants</strong><small>Évite autant que possible qu'un enseignant suive plusieurs périodes du même élève.</small></span>
+            <input id="criterion-geography" type="checkbox" checked>
+            <span><strong>Proximité géographique</strong><small>Privilégie les enseignants dont le domicile est proche des structures de stage.</small></span>
           </label>
           <label class="priority"><span>Priorité</span>
-            <select id="priority-diversity" class="gw-select">
+            <select id="priority-geography" class="gw-select">
               <option value="faible">Faible</option>
-              <option value="moyenne" selected>Moyenne</option>
-              <option value="forte">Forte</option>
+              <option value="moyenne">Moyenne</option>
+              <option value="forte" selected>Forte</option>
             </select>
           </label>
         </div>
         <div class="criterion compact-criterion">
           <label class="criterion-main">
-            <input id="criterion-geography" type="checkbox">
-            <span><strong>Proximité géographique</strong><small>Privilégie les enseignants dont le domicile est proche des structures de stage.</small></span>
+            <input id="criterion-diversity" type="checkbox" checked>
+            <span><strong>Diversifier les enseignants</strong><small>Évite autant que possible qu'un enseignant suive plusieurs périodes du même élève.</small></span>
           </label>
           <label class="priority"><span>Priorité</span>
-            <select id="priority-geography" class="gw-select" disabled>
+            <select id="priority-diversity" class="gw-select">
               <option value="faible">Faible</option>
               <option value="moyenne" selected>Moyenne</option>
               <option value="forte">Forte</option>
@@ -185,6 +185,6 @@
     </section>
   </main>
 
-  <script type="module" src="app.js?v=1.6.0"></script>
+  <script type="module" src="app.js?v=1.6.1"></script>
 </body>
 </html>
