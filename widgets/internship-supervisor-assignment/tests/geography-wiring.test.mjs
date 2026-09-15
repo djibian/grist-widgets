@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const gristSource = await readFile(new URL("../grist.js", import.meta.url), "utf8");
+const mappingSource = await readFile(new URL("../mapping.js", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 
@@ -18,27 +19,36 @@ test("geographic criterion is first, enabled by default and stronger than divers
   assert.match(appSource, /diversity:\s*\{\s*enabled:\s*true,\s*priority:\s*"moyenne"\s*\}/);
 });
 
-test("Grist snapshot follows the real document structure", () => {
-  assert.match(gristSource, /fetchOptionalRawTable\("Structures_de_stage"\)/);
-  assert.match(gristSource, /address:\s*display\(row\.Adresse, ""\)/);
-  assert.match(gristSource, /geocodeAddress\(text, \{ limit: 1 \}\)/);
-  assert.match(gristSource, /const structureId = ref\(row\.Structure_de_stage\)/);
-  assert.match(gristSource, /latitude:\s*finiteNumber\(row\.Latitude\)/);
-  assert.match(gristSource, /longitude:\s*finiteNumber\(row\.Longitude\)/);
+test("Affectation consumes persisted validated coordinates and never geocodes teachers", () => {
+  assert.doesNotMatch(gristSource, /geocodeAddress|teacherGeocodeCache|geocodeTeacherAddress/);
+  assert.match(mappingSource, /key: "teacherLatitude"/);
+  assert.match(mappingSource, /key: "teacherLongitude"/);
+  assert.match(mappingSource, /key: "teacherLocationValidated"/);
+  assert.match(mappingSource, /Localisation_validee/);
+  assert.match(gristSource, /locationValidated:\s*boolValue\(readSecondary\(row, "teacherLocationValidated"\)\)/);
+});
+
+test("Grist snapshot follows the stage to structure reference through explicit mappings", () => {
+  assert.match(mappingSource, /key: "stageStructure"[\s\S]*refTarget: "Structures_de_stage"/);
+  assert.match(mappingSource, /key: "structureLatitude"/);
+  assert.match(mappingSource, /key: "structureLongitude"/);
+  assert.match(gristSource, /const structureId = ref\(readSecondary\(row, "stageStructure"\)\)/);
   assert.match(gristSource, /latitude:\s*structure\?\.latitude \?\? null/);
   assert.match(gristSource, /longitude:\s*structure\?\.longitude \?\? null/);
 });
 
-test("teacher geocoding happens only for geographic calculations and is repeated before apply", () => {
-  assert.match(gristSource, /fetchSnapshot\(mappings, \{ geography = false \} = \{\}\)/);
-  assert.match(appSource, /fetchSnapshot\(state\.mappings, \{[\s\S]*geography: state\.optimization\?\.geography\?\.enabled === true/);
-  assert.match(gristSource, /fetchSnapshot\(mappings, \{ geography: plan\.criteria\?\.geography\?\.enabled === true \}\)/);
-  assert.match(appSource, /analyzeClass\(state\.snapshot, cls\.id, periods\)/);
+test("geographic precheck is visible before calculation", () => {
+  assert.match(appSource, /analyzeClass\(state\.snapshot, cls\.id, periods, state\.optimization\)/);
+  assert.match(appSource, /enseignant\(s\) localisé\(s\) et validé\(s\)/);
+  assert.match(appSource, /structure\(s\) exploitable\(s\)/);
+  assert.doesNotMatch(appSource, /Géocodage des enseignants/);
 });
 
-test("proposal exposes distance after geographic calculation", () => {
+test("proposal exposes distance magnitude and scoring trade-off", () => {
   assert.match(html, /<th>Distance<\/th>/);
+  assert.match(appSource, /totalDistanceKm/);
   assert.match(appSource, /averageDistanceKm/);
   assert.match(appSource, /maxDistanceKm/);
+  assert.match(appSource, /repeatEquivalentKm/);
   assert.match(appSource, /formatDistance\(row\.distanceKm\)/);
 });
