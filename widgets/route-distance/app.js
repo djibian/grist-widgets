@@ -4,9 +4,8 @@ import {
   captureRouteOperation,
   updateSelectedResultIfSameRecord
 } from './operation.js';
+import { getRouteOrigin, onRouteOriginChange } from './origin-config.js';
 
-const DOMICILE_LATITUDE = 47.057944;
-const DOMICILE_LONGITUDE = -1.521611;
 const ITINERAIRE = 'fastest';
 const NOMBRE_DECIMALES = 2;
 
@@ -63,6 +62,11 @@ function setContextState(message, type = '') {
   elements.routeContextState.className = 'gw-context-value context-state' + (type ? ' ' + type : '');
 }
 
+function originIsConfigured() {
+  const origin = getRouteOrigin();
+  return validCoordinates(origin.latitude, origin.longitude);
+}
+
 function pendingMatchesSelection() {
   return Boolean(state.pending && state.selected && state.pending.operation.recordId === state.selected.id);
 }
@@ -72,6 +76,7 @@ function setBusy(busy) {
   const usableSelection = Boolean(
     state.selected &&
     mappingIsComplete() &&
+    originIsConfigured() &&
     validCoordinates(state.selected.Latitude, state.selected.Longitude)
   );
   elements.calculateSelected.disabled = busy || !usableSelection;
@@ -127,6 +132,9 @@ function renderSelected() {
   if (!validCoordinates(row.Latitude, row.Longitude)) {
     setContextState('Coordonnées invalides', 'error');
     setStatus('La destination ne possède pas de coordonnées utilisables.', 'error');
+  } else if (!originIsConfigured()) {
+    setContextState('Origine à définir', 'pending');
+    setStatus('Définissez une adresse de départ avant de calculer.');
   } else {
     setContextState('Coordonnées prêtes', 'ready');
     setStatus(isFiniteNumber(row.Distance) ? 'Distance actuellement enregistrée dans Grist.' : 'Prêt à calculer.');
@@ -141,10 +149,16 @@ function renderMappingState() {
   if (configured) renderSelected();
 }
 
+function sameOrigin(left, right) {
+  return left.latitude === right.latitude && left.longitude === right.longitude;
+}
+
 async function calculateSelected() {
+  const origin = getRouteOrigin();
   if (
     !state.selected ||
     state.busy ||
+    !validCoordinates(origin.latitude, origin.longitude) ||
     !validCoordinates(state.selected.Latitude, state.selected.Longitude)
   ) return;
 
@@ -156,8 +170,8 @@ async function calculateSelected() {
 
   try {
     const result = await requestIgnRoute({
-      startLatitude: DOMICILE_LATITUDE,
-      startLongitude: DOMICILE_LONGITUDE,
+      startLatitude: origin.latitude,
+      startLongitude: origin.longitude,
       endLatitude: operation.latitude,
       endLongitude: operation.longitude,
       optimization: ITINERAIRE,
@@ -168,6 +182,13 @@ async function calculateSelected() {
       setStatus(`Calcul terminé pour ${operation.label}, mais la sélection a changé. Recalculez sur la ligne active.`);
       renderStoredResult();
       setContextState('Sélection modifiée');
+      return;
+    }
+
+    if (!sameOrigin(origin, getRouteOrigin())) {
+      setStatus('Le point de départ a changé pendant le calcul. Recalculez l’itinéraire.');
+      renderStoredResult();
+      setContextState('Origine modifiée');
       return;
     }
 
@@ -212,6 +233,21 @@ async function saveSelected() {
 
 elements.calculateSelected.addEventListener('click', calculateSelected);
 elements.saveSelected.addEventListener('click', saveSelected);
+
+onRouteOriginChange((origin) => {
+  clearPending();
+  renderStoredResult();
+  if (state.selected && validCoordinates(state.selected.Latitude, state.selected.Longitude)) {
+    if (validCoordinates(origin.latitude, origin.longitude)) {
+      setContextState('Coordonnées prêtes', 'ready');
+      setStatus('Point de départ mis à jour. Prêt à recalculer.');
+    } else {
+      setContextState('Origine à définir', 'pending');
+      setStatus('Définissez une adresse de départ avant de calculer.');
+    }
+  }
+  setBusy(false);
+});
 
 grist.ready({
   requiredAccess: 'full',

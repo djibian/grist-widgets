@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildIgnRoutePayload,
+  geocodeAddress,
   requestIgnRoute,
   validCoordinates
 } from '../ign-route.js';
@@ -28,16 +29,55 @@ test('validCoordinates accepte uniquement des coordonnées finies dans les borne
   assert.equal(validCoordinates(47.1, 181), false);
 });
 
+test('geocodeAddress interroge la BAN Géoplateforme et normalise le meilleur résultat', async () => {
+  let capturedUrl = null;
+  const result = await geocodeAddress('5 rue des Lilas 44000 Nantes', {
+    fetchFn: async (url) => {
+      capturedUrl = url;
+      return response(200, {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [-1.55, 47.22] },
+          properties: { label: '5 Rue des Lilas 44000 Nantes', score: 0.92 }
+        }]
+      });
+    }
+  });
+
+  const url = new URL(capturedUrl);
+  assert.equal(url.origin + url.pathname, 'https://data.geopf.fr/geocodage/search');
+  assert.equal(url.searchParams.get('q'), '5 rue des Lilas 44000 Nantes');
+  assert.equal(url.searchParams.get('index'), 'address');
+  assert.equal(url.searchParams.get('limit'), '1');
+  assert.deepEqual(result, {
+    label: '5 Rue des Lilas 44000 Nantes',
+    latitude: 47.22,
+    longitude: -1.55,
+    score: 0.92
+  });
+});
+
+test('geocodeAddress refuse une saisie trop courte et une réponse sans adresse', async () => {
+  await assert.rejects(geocodeAddress('a'), /adresse de départ suffisamment précise/);
+  await assert.rejects(
+    geocodeAddress('adresse inconnue', {
+      fetchFn: async () => response(200, { type: 'FeatureCollection', features: [] })
+    }),
+    /Aucune adresse exploitable/
+  );
+});
+
 test('buildIgnRoutePayload utilise longitude,latitude et le profil voiture', () => {
   const payload = buildIgnRoutePayload({
-    startLatitude: 47.057944,
-    startLongitude: -1.521611,
+    startLatitude: 48.8566,
+    startLongitude: 2.3522,
     endLatitude: 47.2,
     endLongitude: -1.7
   });
 
   assert.equal(payload.resource, 'bdtopo-osrm');
-  assert.equal(payload.start, '-1.521611,47.057944');
+  assert.equal(payload.start, '2.3522,48.8566');
   assert.equal(payload.end, '-1.7,47.2');
   assert.equal(payload.profile, 'car');
   assert.equal(payload.optimization, 'fastest');
@@ -47,8 +87,8 @@ test('requestIgnRoute envoie la requête et arrondit distance et durée', async 
   let capturedUrl = null;
   let capturedOptions = null;
   const result = await requestIgnRoute({
-    startLatitude: 47.057944,
-    startLongitude: -1.521611,
+    startLatitude: 48.8566,
+    startLongitude: 2.3522,
     endLatitude: 47.2,
     endLongitude: -1.7,
     decimals: 2
@@ -63,7 +103,7 @@ test('requestIgnRoute envoie la requête et arrondit distance et durée', async 
   assert.match(capturedUrl, /data\.geopf\.fr\/navigation\/itineraire/);
   assert.equal(capturedOptions.method, 'POST');
   const body = JSON.parse(capturedOptions.body);
-  assert.equal(body.start, '-1.521611,47.057944');
+  assert.equal(body.start, '2.3522,48.8566');
   assert.equal(body.end, '-1.7,47.2');
   assert.deepEqual(result, { distance: 12.35, duration: 17.8 });
 });
