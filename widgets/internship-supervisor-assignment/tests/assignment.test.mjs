@@ -5,6 +5,7 @@ import {
   AssignmentError,
   configurationFingerprint,
   generatePlan,
+  geographicDistanceKm,
   periodsForClass,
   stageCoverage,
 } from "../assignment.js";
@@ -165,4 +166,74 @@ test("generatePlan refuses to produce a partial plan when a stage is missing", (
     () => generatePlan(data, { classId: 1, periods: [2] }),
     error => error instanceof AssignmentError && error.issues.some(row => row.code === "MISSING_STAGES"),
   );
+});
+
+test("geographicDistanceKm computes a realistic direct distance", () => {
+  const distance = geographicDistanceKm(47.061, -1.51, 47.218, -1.553);
+  assert.ok(distance > 17 && distance < 19);
+  assert.equal(geographicDistanceKm(null, -1.51, 47.218, -1.553), null);
+});
+
+test("geographic criterion prefers the closest teacher while preserving quotas", () => {
+  const data = fixture();
+  data.teachers[0].latitude = 47.05;
+  data.teachers[0].longitude = -1.50;
+  data.teachers[1].latitude = 47.45;
+  data.teachers[1].longitude = -1.90;
+  Object.assign(data.stages[0], { structureId: 101, latitude: 47.06, longitude: -1.51 });
+  Object.assign(data.stages[1], { structureId: 102, latitude: 47.44, longitude: -1.89 });
+
+  const plan = generatePlan(data, {
+    classId: 1,
+    periods: [1],
+    criteria: {
+      diversity: { enabled: false, priority: "moyenne" },
+      geography: { enabled: true, priority: "forte" },
+    },
+  });
+
+  const alice = plan.assignments.find(row => row.studentId === 11);
+  const bob = plan.assignments.find(row => row.studentId === 12);
+  assert.equal(alice.teacherId, 21);
+  assert.equal(bob.teacherId, 22);
+  assert.ok(alice.distanceKm < 5);
+  assert.ok(bob.distanceKm < 5);
+  assert.equal(plan.metrics.geographicAssignments, 2);
+  assert.ok(plan.metrics.averageDistanceKm < 5);
+});
+
+test("geographic criterion fails closed when a required coordinate is missing", () => {
+  const data = fixture();
+  data.teachers[0].latitude = 47.05;
+  data.teachers[0].longitude = -1.50;
+  data.teachers[1].latitude = null;
+  data.teachers[1].longitude = null;
+  Object.assign(data.stages[0], { structureId: 101, latitude: 47.06, longitude: -1.51 });
+  Object.assign(data.stages[1], { structureId: 102, latitude: null, longitude: null });
+
+  const analysis = analyzeClass(data, 1, [1], { geography: { enabled: true, priority: "moyenne" } });
+  assert.ok(analysis.errors.some(row => row.code === "MISSING_TEACHER_COORDINATES"));
+  assert.ok(analysis.errors.some(row => row.code === "MISSING_STAGE_COORDINATES"));
+});
+
+test("fingerprint changes when geographic data changes", () => {
+  const data = fixture();
+  data.teachers[0].latitude = 47.05;
+  data.teachers[0].longitude = -1.50;
+  Object.assign(data.stages[0], { structureId: 101, latitude: 47.06, longitude: -1.51 });
+  const criteria = { geography: { enabled: true, priority: "moyenne" } };
+  const before = configurationFingerprint(data, 1, criteria);
+  data.stages[0].latitude = 47.07;
+  const after = configurationFingerprint(data, 1, criteria);
+  assert.notEqual(before, after);
+});
+
+test("fingerprint ignores geographic data when proximity is disabled", () => {
+  const data = fixture();
+  const before = configurationFingerprint(data, 1);
+  data.teachers[0].latitude = 47.05;
+  data.stages[0].structureId = 101;
+  data.stages[0].latitude = 47.06;
+  const after = configurationFingerprint(data, 1);
+  assert.equal(before, after);
 });
