@@ -70,12 +70,18 @@
             </select>
           </label>
         </div>
-        <div class="criterion compact-criterion disabled" aria-disabled="true">
+        <div class="criterion compact-criterion">
           <label class="criterion-main">
-            <input type="checkbox" disabled>
-            <span><strong>Proximité géographique <span class="badge gw-badge">À venir</span></strong><small>Privilégiera les enseignants proches des structures lorsque cette règle sera disponible.</small></span>
+            <input id="criterion-geography" type="checkbox">
+            <span><strong>Proximité géographique</strong><small>Privilégie les enseignants dont le domicile est proche des structures de stage.</small></span>
           </label>
-          <label class="priority"><span>Priorité</span><select class="gw-select" disabled><option>Forte</option></select></label>
+          <label class="priority"><span>Priorité</span>
+            <select id="priority-geography" class="gw-select" disabled>
+              <option value="faible">Faible</option>
+              <option value="moyenne" selected>Moyenne</option>
+              <option value="forte">Forte</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -153,7 +159,7 @@
           <summary>Voir le détail des affectations proposées</summary>
           <div class="table-wrap gw-table-wrap">
             <table class="gw-table">
-              <thead><tr><th>Période</th><th>Élève</th><th>Enseignant</th></tr></thead>
+              <thead><tr><th>Période</th><th>Élève</th><th>Enseignant</th><th>Distance</th></tr></thead>
               <tbody id="proposal-details"></tbody>
             </table>
           </div>
@@ -179,6 +185,6 @@
     </section>
   </main>
 
-  <script type="module" src="app.js?v=1.5.0"></script>
+  <script type="module" src="app.js?v=1.6.0"></script>
 </body>
 </html>
