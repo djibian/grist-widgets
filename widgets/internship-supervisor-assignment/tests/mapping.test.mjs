@@ -18,6 +18,9 @@ function metadata() {
       Enseignant: table([
         { colId: "Nom", label: "Nom", writable: true },
         { colId: "Identite", label: "Identité", writable: false },
+        { colId: "Latitude", label: "Latitude", type: "Numeric" },
+        { colId: "Longitude", label: "Longitude", type: "Numeric" },
+        { colId: "Localisation_validee", label: "Localisation validée", type: "Bool" },
       ]),
       Affectation: table([
         { colId: "Enseignant", label: "Enseignant", type: "Ref:Enseignant" },
@@ -29,17 +32,28 @@ function metadata() {
         { colId: "Eleve", label: "Élève", type: "Ref:Eleves" },
         { colId: "Periode", label: "Période", type: "Numeric" },
         { colId: "Suivi_par", label: "Suivi par", type: "Ref:Enseignant" },
+        { colId: "Structure_de_stage", label: "Structure de stage", type: "Ref:Structures_de_stage" },
+      ]),
+      Structures_de_stage: table([
+        { colId: "Latitude", label: "Latitude", type: "Numeric" },
+        { colId: "Longitude", label: "Longitude", type: "Numeric" },
       ]),
     },
   };
 }
 
-test("inferMappings recognises the current secondary columns", () => {
+test("inferMappings recognises business and geographic columns", () => {
   const mappings = inferMappings(metadata());
   assert.equal(mappings.quotaTarget, "Nombre_de_stage_a_suivre");
   assert.equal(mappings.stageSupervisor, "Suivi_par");
   assert.equal(mappings.studentLabel, "Identite");
   assert.equal(mappings.teacherLabel, "Identite");
+  assert.equal(mappings.teacherLatitude, "Latitude");
+  assert.equal(mappings.teacherLongitude, "Longitude");
+  assert.equal(mappings.teacherLocationValidated, "Localisation_validee");
+  assert.equal(mappings.stageStructure, "Structure_de_stage");
+  assert.equal(mappings.structureLatitude, "Latitude");
+  assert.equal(mappings.structureLongitude, "Longitude");
   assert.equal(Object.hasOwn(mappings, "classLabel"), false);
   assert.equal(Object.hasOwn(mappings, "classPeriodCount"), false);
 });
@@ -52,17 +66,31 @@ test("saved valid secondary mappings take precedence over automatic detection", 
 });
 
 test("mapping groups never expose the primary Classe source", () => {
-  assert.deepEqual(mappingGroups().map(group => group.table), ["Eleves", "Enseignant", "Affectation", "Stage"]);
+  assert.deepEqual(mappingGroups().map(group => group.table), ["Eleves", "Enseignant", "Affectation", "Stage", "Structures_de_stage"]);
 });
 
-test("validateMappings checks reference targets and writable stage fields", () => {
+test("validateMappings checks references, types and writable stage fields", () => {
   const data = metadata();
   const mappings = inferMappings(data);
   assert.deepEqual(validateMappings(data, mappings), []);
 
   data.tables.Stage.columns.find(column => column.colId === "Suivi_par").writable = false;
-  const issues = validateMappings(data, mappings);
+  let issues = validateMappings(data, mappings);
   assert.ok(issues.some(row => row.code === "READ_ONLY_MAPPING" && row.key === "stageSupervisor"));
+
+  data.tables.Enseignant.columns.find(column => column.colId === "Localisation_validee").type = "Text";
+  issues = validateMappings(data, mappings);
+  assert.ok(issues.some(row => row.code === "INVALID_COLUMN_TYPE" && row.key === "teacherLocationValidated"));
+});
+
+test("geographic mappings are optional only when geographic optimization is disabled", () => {
+  const data = metadata();
+  delete data.tables.Structures_de_stage;
+  data.tables.Enseignant.columns = data.tables.Enseignant.columns.filter(column => !["Latitude", "Longitude", "Localisation_validee"].includes(column.colId));
+  data.tables.Stage.columns = data.tables.Stage.columns.filter(column => column.colId !== "Structure_de_stage");
+  const mappings = inferMappings(data);
+  assert.deepEqual(validateMappings(data, mappings, { geography: false }), []);
+  assert.ok(validateMappings(data, mappings, { geography: true }).length > 0);
 });
 
 test("mappingSignature is stable regardless of object insertion order", () => {
@@ -70,7 +98,6 @@ test("mappingSignature is stable regardless of object insertion order", () => {
   const b = Object.fromEntries(Object.entries(a).reverse());
   assert.equal(mappingSignature(a), mappingSignature(b));
 });
-
 
 test("automatic detection respects candidate priority over physical column order", () => {
   const data = metadata();
