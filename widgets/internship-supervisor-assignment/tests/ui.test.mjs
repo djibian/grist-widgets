@@ -11,10 +11,11 @@ const tokensCss = await readFile(new URL('../../../shared/ui/tokens.css', import
 const requiredIds = [
   'config-status', 'refresh', 'settings-toggle', 'settings-panel', 'settings-close',
   'settings-save', 'mapping-details', 'mapping-summary', 'mapping-summary-meta',
-  'mapping-auto', 'mapping-fields', 'mapping-status', 'criterion-diversity',
-  'priority-diversity', 'class-name', 'periods', 'analysis', 'stage-creation',
-  'stage-creation-title', 'create-stages', 'generate', 'proposal-card',
-  'proposal-periods', 'proposal-summary', 'proposal-details', 'quota-details', 'apply',
+  'mapping-auto', 'mapping-fields', 'mapping-status', 'criterion-geography',
+  'priority-geography', 'criterion-diversity', 'priority-diversity', 'class-name',
+  'periods', 'analysis', 'stage-creation', 'stage-creation-title', 'create-stages',
+  'generate', 'proposal-card', 'proposal-periods', 'proposal-summary',
+  'proposal-details', 'quota-details', 'apply',
 ];
 
 test('charge tout le socle Grist Studio avant la feuille locale', () => {
@@ -22,7 +23,7 @@ test('charge tout le socle Grist Studio avant la feuille locale', () => {
   const base = html.indexOf('../../shared/ui/base.css');
   const components = html.indexOf('../../shared/ui/components.css');
   const structure = html.indexOf('../../shared/ui/structure.css');
-  const local = html.indexOf('style.css?v=1.5.1');
+  const local = html.indexOf('style.css?v=1.6.0');
   assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
 });
 
@@ -65,7 +66,7 @@ test('rend la configuration des colonnes secondaire mais automatiquement visible
   assert.match(app, /✓ Colonnes Grist correctement configurées/);
   assert.match(app, /point\(s\) à vérifier/);
   assert.match(app, /el\.mappingDetails\.open = true/);
-  assert.match(app, /validateMappings\(state\.metadata, state\.mappings\)\.length > 0/);
+  assert.match(app, /validateMappings\(state\.metadata, state\.mappings, \{ geography: el\.geography\.checked \}\)\.length > 0/);
   assert.doesNotMatch(app, /settingsBackdrop|settings-backdrop/);
 });
 
@@ -86,6 +87,15 @@ test('matérialise la grammaire contexte travail validation', () => {
   assert.match(html, /02 · Vérifier/);
   assert.match(html, /class="gw-validation-bar prepare-validation"/);
   assert.match(html, /class="gw-validation-bar proposal-validation"/);
+});
+
+test('matérialise le précontrôle géographique avec des états sémantiques', () => {
+  assert.match(app, /geo-readiness ready/);
+  assert.match(app, /geo-readiness warning/);
+  assert.match(css, /\.geo-readiness\.ready/);
+  assert.match(css, /var\(--gw-color-success-soft\)/);
+  assert.match(css, /\.geo-readiness\.warning/);
+  assert.match(css, /var\(--gw-color-warning-soft\)/);
 });
 
 test('partage le mark, le bleu workflow et le cadre fluide commun', () => {
