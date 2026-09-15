@@ -12,6 +12,23 @@ const int = value => Number.isInteger(Number(value)) ? Number(value) : null;
 const id = value => { const n = int(value); return n && n > 0 ? n : null; };
 const key = (a, b) => String(a) + ":" + String(b);
 const issue = (code, message, details = {}) => ({ code, message, ...details });
+const validCoordinate = value => value !== undefined
+  && value !== null
+  && String(value).trim() !== ""
+  && Number.isFinite(Number(value));
+
+export function geographicDistanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
+  if (![latitudeA, longitudeA, latitudeB, longitudeB].every(validCoordinate)) return null;
+  const toRadians = value => Number(value) * Math.PI / 180;
+  const lat1 = toRadians(latitudeA);
+  const lat2 = toRadians(latitudeB);
+  const dLat = lat2 - lat1;
+  const dLon = toRadians(longitudeB) - toRadians(longitudeA);
+  const haversine = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  const centralAngle = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(Math.max(0, 1 - haversine)));
+  return 6371.0088 * centralAngle;
+}
 
 export function periodsForClass(row) {
   const n = int(row?.periodCount);
@@ -98,7 +115,41 @@ export function stageCoverage(snapshot, classId, selectedPeriods) {
   };
 }
 
-export function analyzeClass(snapshot, classId, selectedPeriods) {
+function geographyEnabled(criteria) {
+  return criteria?.geography?.enabled === true;
+}
+
+function addGeographyErrors(errors, periodStates, teachers) {
+  const missingTeachers = new Set();
+  const missingStages = new Set();
+
+  for (const state of periodStates) {
+    for (const capacity of state.capacities) {
+      if (capacity.remaining <= 0 || missingTeachers.has(capacity.teacherId)) continue;
+      const teacher = teachers.get(capacity.teacherId);
+      if (teacher && validCoordinate(teacher.latitude) && validCoordinate(teacher.longitude)) continue;
+      missingTeachers.add(capacity.teacherId);
+      errors.push(issue(
+        "MISSING_TEACHER_COORDINATES",
+        `${capacity.teacherLabel} n'a pas de coordonnées géographiques exploitables.`,
+        { teacherId: capacity.teacherId },
+      ));
+    }
+
+    for (const stage of state.unassignedStages) {
+      if (missingStages.has(stage.id)) continue;
+      if (stage.structureId && validCoordinate(stage.latitude) && validCoordinate(stage.longitude)) continue;
+      missingStages.add(stage.id);
+      errors.push(issue(
+        "MISSING_STAGE_COORDINATES",
+        `${stage.studentLabel} — période ${stage.period} : la structure de stage n'a pas de coordonnées géographiques exploitables.`,
+        { stageId: stage.id, structureId: stage.structureId ?? null },
+      ));
+    }
+  }
+}
+
+export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) {
   const cid = id(classId);
   const coverage = stageCoverage(snapshot, cid, selectedPeriods);
   const errors = [...coverage.errors];
@@ -181,6 +232,8 @@ export function analyzeClass(snapshot, classId, selectedPeriods) {
     });
   }
 
+  if (geographyEnabled(criteria)) addGeographyErrors(errors, periodStates, teachers);
+
   const existingSelectedCount = coverage.existing.filter(row => row.teacherId).length;
   return {
     ...coverage,
@@ -220,7 +273,37 @@ function permutations(values) {
   return out;
 }
 
-export function configurationFingerprint(snapshot, classId) {
+function geographicCosts(stages, capacities, teachers, priority) {
+  const weight = PRIORITY_WEIGHTS[priority];
+  const activeTeachers = capacities.filter(row => row.remaining > 0);
+  const byStage = new Map();
+
+  for (const stage of stages) {
+    const distances = activeTeachers.map(capacity => {
+      const teacher = teachers.get(capacity.teacherId);
+      return {
+        teacherId: capacity.teacherId,
+        distanceKm: geographicDistanceKm(stage.latitude, stage.longitude, teacher?.latitude, teacher?.longitude),
+      };
+    });
+    const finite = distances.map(row => row.distanceKm).filter(Number.isFinite);
+    const min = finite.length ? Math.min(...finite) : 0;
+    const max = finite.length ? Math.max(...finite) : min;
+    const span = max - min;
+    const map = new Map();
+    for (const row of distances) {
+      const normalized = Number.isFinite(row.distanceKm) && span > 1e-9 ? (row.distanceKm - min) / span : 0;
+      map.set(row.teacherId, {
+        distanceKm: row.distanceKm,
+        cost: normalized * weight,
+      });
+    }
+    byStage.set(stage.id, map);
+  }
+  return byStage;
+}
+
+export function configurationFingerprint(snapshot, classId, criteria = {}) {
   const cid = id(classId);
   const cls = snapshot.classes.find(row => row.id === cid);
   const students = snapshot.students
@@ -228,25 +311,34 @@ export function configurationFingerprint(snapshot, classId) {
     .map(row => [row.id, row.classId])
     .sort((a, b) => a[0] - b[0]);
   const studentIds = new Set(students.map(row => row[0]));
+  const includeGeography = geographyEnabled(criteria);
   const stages = snapshot.stages
     .filter(row => studentIds.has(row.studentId))
-    .map(row => [row.id, row.studentId, row.period, row.teacherId || 0])
+    .map(row => includeGeography
+      ? [row.id, row.studentId, row.period, row.teacherId || 0, row.structureId || 0, row.latitude ?? null, row.longitude ?? null]
+      : [row.id, row.studentId, row.period, row.teacherId || 0])
     .sort((a, b) => a[0] - b[0]);
   const quotas = snapshot.quotas
     .filter(row => row.classId === cid)
     .map(row => [row.id, row.teacherId, row.period, row.target])
     .sort((a, b) => a[0] - b[0]);
-  return JSON.stringify({ class: cls ? [cls.id, cls.periodCount] : null, students, stages, quotas });
+  const teachers = includeGeography
+    ? snapshot.teachers.map(row => [row.id, row.latitude ?? null, row.longitude ?? null]).sort((a, b) => a[0] - b[0])
+    : undefined;
+  return JSON.stringify({ class: cls ? [cls.id, cls.periodCount] : null, students, stages, quotas, ...(includeGeography ? { teachers } : {}) });
 }
 
 export function generatePlan(snapshot, options) {
   const cid = id(options?.classId);
-  const analysis = analyzeClass(snapshot, cid, options?.periods || []);
+  const criteria = options?.criteria ?? {};
+  const analysis = analyzeClass(snapshot, cid, options?.periods || [], criteria);
   if (analysis.errors.length) throw new AssignmentError("Les données doivent être corrigées avant le calcul.", analysis.errors);
 
-  const diversity = options?.criteria?.diversity?.enabled !== false;
-  const priority = PRIORITY_WEIGHTS[options?.criteria?.diversity?.priority] ? options.criteria.diversity.priority : "moyenne";
-  const weight = PRIORITY_WEIGHTS[priority];
+  const diversity = criteria?.diversity?.enabled !== false;
+  const diversityPriority = PRIORITY_WEIGHTS[criteria?.diversity?.priority] ? criteria.diversity.priority : "moyenne";
+  const diversityWeight = PRIORITY_WEIGHTS[diversityPriority];
+  const geography = geographyEnabled(criteria);
+  const geographyPriority = PRIORITY_WEIGHTS[criteria?.geography?.priority] ? criteria.geography.priority : "moyenne";
   const stagesById = new Map(snapshot.stages.map(row => [row.id, row]));
   const teachers = new Map(snapshot.teachers.map(row => [row.id, row]));
   const basePairs = new Map();
@@ -264,22 +356,35 @@ export function generatePlan(snapshot, options) {
     let score = 0;
     for (const period of order) {
       const state = stateByPeriod.get(period);
+      const geographyByStage = geography
+        ? geographicCosts(state.unassignedStages, state.capacities, teachers, geographyPriority)
+        : new Map();
       const rows = minCostPeriod(
         state.unassignedStages,
         state.capacities,
-        (stage, teacherId) => diversity ? (pairs.get(key(stage.studentId, teacherId)) || 0) * weight : 0,
+        (stage, teacherId) => {
+          const diversityCost = diversity ? (pairs.get(key(stage.studentId, teacherId)) || 0) * diversityWeight : 0;
+          const geographyCost = geography ? (geographyByStage.get(stage.id)?.get(teacherId)?.cost ?? 0) : 0;
+          return diversityCost + geographyCost;
+        },
       );
       for (const row of rows) {
         const stage = stagesById.get(row.stageId);
-        const addedCost = diversity ? (pairs.get(key(stage.studentId, row.teacherId)) || 0) * weight : 0;
-        score += addedCost;
-        assignments.push({ ...row, period });
+        const diversityCost = diversity ? (pairs.get(key(stage.studentId, row.teacherId)) || 0) * diversityWeight : 0;
+        const geographyData = geography ? geographyByStage.get(stage.id)?.get(row.teacherId) : null;
+        const geographyCost = geographyData?.cost ?? 0;
+        score += diversityCost + geographyCost;
+        assignments.push({
+          ...row,
+          period,
+          distanceKm: geography && Number.isFinite(geographyData?.distanceKm) ? geographyData.distanceKm : null,
+        });
         const pair = key(stage.studentId, row.teacherId);
         pairs.set(pair, (pairs.get(pair) || 0) + 1);
       }
     }
     const signature = assignments.map(row => `${row.stageId}:${row.teacherId}`).sort().join("|");
-    if (!best || score < best.score || (score === best.score && signature < best.signature)) {
+    if (!best || score < best.score - 1e-9 || (Math.abs(score - best.score) <= 1e-9 && signature < best.signature)) {
       best = { score, signature, assignments };
     }
   }
@@ -318,12 +423,16 @@ export function generatePlan(snapshot, options) {
     proposedPairs.set(pair, (proposedPairs.get(pair) || 0) + 1);
   }
 
+  const distances = assignments.map(row => row.distanceKm).filter(Number.isFinite);
   return {
     classId: cid,
     classLabel: analysis.classRow.label,
     periods: analysis.periods,
-    criteria: { diversity: { enabled: diversity, priority } },
-    fingerprint: configurationFingerprint(snapshot, cid),
+    criteria: {
+      diversity: { enabled: diversity, priority: diversityPriority },
+      geography: { enabled: geography, priority: geographyPriority },
+    },
+    fingerprint: configurationFingerprint(snapshot, cid, criteria),
     assignments,
     summary,
     metrics: {
@@ -332,6 +441,9 @@ export function generatePlan(snapshot, options) {
       newCount: assignments.length,
       introducedRepeats: repeats,
       diversifiedAssignments: assignments.length - repeats,
+      geographicAssignments: distances.length,
+      averageDistanceKm: distances.length ? distances.reduce((sum, value) => sum + value, 0) / distances.length : null,
+      maxDistanceKm: distances.length ? Math.max(...distances) : null,
     },
   };
 }
