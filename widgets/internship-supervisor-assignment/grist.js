@@ -1,13 +1,15 @@
 import { recordsFromTable } from "../../shared/grist/records.js";
 import { isWritableColumn } from "../../shared/grist/metadata.js";
+import { geocodeAddress } from "../structure-picker/geocode.js";
 import { configurationFingerprint, stageCoverage } from "./assignment.js";
 import { DOCUMENT_TABLES, inferMappings, mappingSignature, validateMappings } from "./mapping.js";
 
 const OPTION_KEY = "internshipSupervisorAssignmentV11";
 const DEFAULT_OPTIMIZATION = Object.freeze({
+  geography: { enabled: true, priority: "forte" },
   diversity: { enabled: true, priority: "moyenne" },
-  geography: { enabled: false, priority: "moyenne" },
 });
+const teacherGeocodeCache = new Map();
 
 export const SOURCE_COLUMNS = Object.freeze([
   { name: "ClassLabel", title: "Classe", type: "Text", optional: false },
@@ -53,6 +55,38 @@ async function fetchOptionalRawTable(tableId) {
   } catch {
     return null;
   }
+}
+
+async function geocodeTeacherAddress(address) {
+  const text = String(address ?? "").trim();
+  if (!text) return null;
+  const key = text.toLocaleLowerCase("fr");
+  if (!teacherGeocodeCache.has(key)) {
+    const request = geocodeAddress(text, { limit: 1 })
+      .then(results => results[0] ?? null)
+      .catch(error => {
+        teacherGeocodeCache.delete(key);
+        throw error;
+      });
+    teacherGeocodeCache.set(key, request);
+  }
+  return teacherGeocodeCache.get(key);
+}
+
+async function enrichTeacherCoordinates(teachers) {
+  return Promise.all(teachers.map(async teacher => {
+    if (!teacher.address) return teacher;
+    try {
+      const location = await geocodeTeacherAddress(teacher.address);
+      return {
+        ...teacher,
+        latitude: finiteNumber(location?.latitude),
+        longitude: finiteNumber(location?.longitude),
+      };
+    } catch (error) {
+      throw new Error(`Impossible de géocoder l'adresse de ${teacher.label} : ${error.message || "service indisponible"}`);
+    }
+  }));
 }
 
 export async function fetchMetadata() {
@@ -168,8 +202,8 @@ function normalizedCriterion(value, fallback, { defaultEnabled } = {}) {
 
 function normalizedOptimization(value) {
   return {
+    geography: normalizedCriterion(value?.geography, DEFAULT_OPTIMIZATION.geography, { defaultEnabled: true }),
     diversity: normalizedCriterion(value?.diversity, DEFAULT_OPTIMIZATION.diversity, { defaultEnabled: true }),
-    geography: normalizedCriterion(value?.geography, DEFAULT_OPTIMIZATION.geography, { defaultEnabled: false }),
   };
 }
 
@@ -225,7 +259,7 @@ export function initializeGrist(onClassSelection) {
   }
 }
 
-export async function fetchSnapshot(mappings) {
+export async function fetchSnapshot(mappings, { geography = false } = {}) {
   const [metadata, selectedTableId, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
     fetchMetadata(),
     getSelectedTableId(),
@@ -261,12 +295,14 @@ export async function fetchSnapshot(mappings) {
   }));
   const studentById = new Map(students.map(row => [row.id, row]));
 
-  const teachers = rowsFromTable(teachersRaw).map(row => ({
+  const teacherRows = rowsFromTable(teachersRaw).map(row => ({
     id: row.id,
     label: display(readSecondary(row, "teacherLabel"), `Enseignant #${row.id}`),
-    latitude: finiteNumber(row.Latitude),
-    longitude: finiteNumber(row.Longitude),
+    address: display(row.Adresse, ""),
+    latitude: null,
+    longitude: null,
   }));
+  const teachers = geography ? await enrichTeacherCoordinates(teacherRows) : teacherRows;
 
   const quotas = rowsFromTable(quotasRaw).map(row => ({
     id: row.id,
@@ -286,7 +322,7 @@ export async function fetchSnapshot(mappings) {
   const stages = rowsFromTable(stagesRaw).map(row => {
     const studentId = ref(readSecondary(row, "stageStudent"));
     const student = studentById.get(studentId);
-    const structureId = ref(row.Structure);
+    const structureId = ref(row.Structure_de_stage);
     const structure = structureById.get(structureId);
     return {
       id: row.id,
@@ -378,7 +414,7 @@ export async function applyPlan(plan, mappings) {
     throw new Error("Le paramétrage des tables secondaires a changé. Génère une nouvelle proposition.");
   }
 
-  const fresh = await fetchSnapshot(mappings);
+  const fresh = await fetchSnapshot(mappings, { geography: plan.criteria?.geography?.enabled === true });
   const problems = configurationProblems(fresh);
   if (problems.length) throw new Error(problems.join(" "));
 
