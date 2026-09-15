@@ -1,4 +1,5 @@
-export const PRIORITY_WEIGHTS = Object.freeze({ faible: 1, moyenne: 4, forte: 12 });
+export const PRIORITY_FACTORS = Object.freeze({ faible: 0.5, moyenne: 1, forte: 2 });
+export const DIVERSITY_REPEAT_BASE_KM = 10;
 
 export class AssignmentError extends Error {
   constructor(message, issues = []) {
@@ -12,13 +13,27 @@ const int = value => Number.isInteger(Number(value)) ? Number(value) : null;
 const id = value => { const n = int(value); return n && n > 0 ? n : null; };
 const key = (a, b) => String(a) + ":" + String(b);
 const issue = (code, message, details = {}) => ({ code, message, ...details });
-const validCoordinate = value => value !== undefined
-  && value !== null
-  && String(value).trim() !== ""
-  && Number.isFinite(Number(value));
+const EPSILON = 1e-9;
+
+export function validCoordinates(latitude, longitude) {
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+  return latitude !== undefined
+    && latitude !== null
+    && longitude !== undefined
+    && longitude !== null
+    && String(latitude).trim() !== ""
+    && String(longitude).trim() !== ""
+    && Number.isFinite(lat)
+    && Number.isFinite(lon)
+    && lat >= -90
+    && lat <= 90
+    && lon >= -180
+    && lon <= 180;
+}
 
 export function geographicDistanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
-  if (![latitudeA, longitudeA, latitudeB, longitudeB].every(validCoordinate)) return null;
+  if (!validCoordinates(latitudeA, longitudeA) || !validCoordinates(latitudeB, longitudeB)) return null;
   const toRadians = value => Number(value) * Math.PI / 180;
   const lat1 = toRadians(latitudeA);
   const lat2 = toRadians(latitudeB);
@@ -119,41 +134,78 @@ function geographyEnabled(criteria) {
   return criteria?.geography?.enabled === true;
 }
 
-function addGeographyErrors(errors, periodStates, teachers) {
-  const missingTeachers = new Set();
-  const missingStages = new Set();
+function geographyPrecheck(errors, periodStates, teachers) {
+  const requiredTeacherIds = new Set();
+  const validTeacherIds = new Set();
+  const requiredStageIds = new Set();
+  const validStageIds = new Set();
+  const reportedTeachers = new Set();
+  const reportedStages = new Set();
 
   for (const state of periodStates) {
     for (const capacity of state.capacities) {
-      if (capacity.remaining <= 0 || missingTeachers.has(capacity.teacherId)) continue;
+      if (capacity.remaining <= 0) continue;
+      requiredTeacherIds.add(capacity.teacherId);
       const teacher = teachers.get(capacity.teacherId);
-      if (teacher && validCoordinate(teacher.latitude) && validCoordinate(teacher.longitude)) continue;
-      missingTeachers.add(capacity.teacherId);
-      errors.push(issue(
-        "MISSING_TEACHER_COORDINATES",
-        `${capacity.teacherLabel} n'a pas de coordonnées géographiques exploitables.`,
-        { teacherId: capacity.teacherId },
-      ));
+      if (teacher?.locationValidated === true && validCoordinates(teacher.latitude, teacher.longitude)) {
+        validTeacherIds.add(capacity.teacherId);
+        continue;
+      }
+      if (reportedTeachers.has(capacity.teacherId)) continue;
+      reportedTeachers.add(capacity.teacherId);
+      if (teacher?.locationValidated !== true) {
+        errors.push(issue(
+          "TEACHER_LOCATION_NOT_VALIDATED",
+          `${capacity.teacherLabel} : la localisation doit être validée dans la page Enseignants.`,
+          { teacherId: capacity.teacherId },
+        ));
+      } else {
+        errors.push(issue(
+          "MISSING_TEACHER_COORDINATES",
+          `${capacity.teacherLabel} : latitude ou longitude invalide.`,
+          { teacherId: capacity.teacherId },
+        ));
+      }
     }
 
     for (const stage of state.unassignedStages) {
-      if (missingStages.has(stage.id)) continue;
-      if (stage.structureId && validCoordinate(stage.latitude) && validCoordinate(stage.longitude)) continue;
-      missingStages.add(stage.id);
-      errors.push(issue(
-        "MISSING_STAGE_COORDINATES",
-        `${stage.studentLabel} — période ${stage.period} : la structure de stage n'a pas de coordonnées géographiques exploitables.`,
-        { stageId: stage.id, structureId: stage.structureId ?? null },
-      ));
+      requiredStageIds.add(stage.id);
+      if (stage.structureId && validCoordinates(stage.latitude, stage.longitude)) {
+        validStageIds.add(stage.id);
+        continue;
+      }
+      if (reportedStages.has(stage.id)) continue;
+      reportedStages.add(stage.id);
+      if (!stage.structureId) {
+        errors.push(issue(
+          "MISSING_STAGE_STRUCTURE",
+          `${stage.studentLabel} — période ${stage.period} : aucune structure de stage n'est renseignée.`,
+          { stageId: stage.id },
+        ));
+      } else {
+        errors.push(issue(
+          "MISSING_STAGE_COORDINATES",
+          `${stage.studentLabel} — période ${stage.period} : la structure de stage n'a pas de coordonnées géographiques exploitables.`,
+          { stageId: stage.id, structureId: stage.structureId },
+        ));
+      }
     }
   }
+
+  return {
+    requiredTeacherCount: requiredTeacherIds.size,
+    validTeacherCount: validTeacherIds.size,
+    requiredStageCount: requiredStageIds.size,
+    validStageCount: validStageIds.size,
+    ready: requiredTeacherIds.size === validTeacherIds.size && requiredStageIds.size === validStageIds.size,
+  };
 }
 
 export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) {
   const cid = id(classId);
   const coverage = stageCoverage(snapshot, cid, selectedPeriods);
   const errors = [...coverage.errors];
-  if (!coverage.classRow) return { ...coverage, periodStates: [], errors };
+  if (!coverage.classRow) return { ...coverage, periodStates: [], errors, geography: null };
 
   const cls = coverage.classRow;
   const teachers = new Map(snapshot.teachers.map(row => [row.id, row]));
@@ -232,13 +284,13 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
     });
   }
 
-  if (geographyEnabled(criteria)) addGeographyErrors(errors, periodStates, teachers);
-
+  const geography = geographyEnabled(criteria) ? geographyPrecheck(errors, periodStates, teachers) : null;
   const existingSelectedCount = coverage.existing.filter(row => row.teacherId).length;
   return {
     ...coverage,
     errors,
     warnings: [],
+    geography,
     classQuotas: quotas,
     periodStates,
     selectedStageCount: coverage.expectedCount,
@@ -247,21 +299,101 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
   };
 }
 
-function minCostPeriod(stages, capacities, cost) {
-  const remaining = new Map(capacities.map(row => [row.teacherId, row.remaining]));
-  const result = [];
+function addResidualEdge(graph, from, to, capacity, cost, meta = null) {
+  const forward = { to, rev: graph[to].length, capacity, cost, initialCapacity: capacity, meta };
+  const reverse = { to: from, rev: graph[from].length, capacity: 0, cost: -cost, initialCapacity: 0, meta: null };
+  graph[from].push(forward);
+  graph[to].push(reverse);
+}
+
+export function solveMinCostPeriod(stages, capacities, costFunction) {
   const rows = [...stages].sort((a, b) => a.id - b.id);
-  for (const stage of rows) {
-    const candidates = capacities
-      .filter(row => (remaining.get(row.teacherId) || 0) > 0)
-      .map(row => ({ teacherId: row.teacherId, cost: cost(stage, row.teacherId), remaining: remaining.get(row.teacherId) }))
-      .sort((a, b) => a.cost - b.cost || b.remaining - a.remaining || a.teacherId - b.teacherId);
-    if (!candidates.length) throw new AssignmentError("Impossible de satisfaire les quotas.");
-    const chosen = candidates[0];
-    remaining.set(chosen.teacherId, chosen.remaining - 1);
-    result.push({ stageId: stage.id, teacherId: chosen.teacherId });
+  const activeCapacities = capacities
+    .filter(row => row.remaining > 0)
+    .sort((a, b) => a.teacherId - b.teacherId);
+  const requiredFlow = rows.length;
+  const availableCapacity = activeCapacities.reduce((sum, row) => sum + row.remaining, 0);
+  if (availableCapacity !== requiredFlow) {
+    throw new AssignmentError(`Impossible de satisfaire les quotas : ${requiredFlow} stage(s) à affecter pour ${availableCapacity} place(s).`);
   }
-  return result;
+  if (!requiredFlow) return [];
+
+  const source = 0;
+  const stageOffset = 1;
+  const teacherOffset = stageOffset + rows.length;
+  const sink = teacherOffset + activeCapacities.length;
+  const graph = Array.from({ length: sink + 1 }, () => []);
+
+  rows.forEach((stage, stageIndex) => {
+    const stageNode = stageOffset + stageIndex;
+    addResidualEdge(graph, source, stageNode, 1, 0);
+    activeCapacities.forEach((capacity, teacherIndex) => {
+      const teacherNode = teacherOffset + teacherIndex;
+      const cost = Number(costFunction(stage, capacity.teacherId));
+      if (!Number.isFinite(cost)) return;
+      addResidualEdge(graph, stageNode, teacherNode, 1, cost, {
+        kind: "assignment",
+        stageId: stage.id,
+        teacherId: capacity.teacherId,
+      });
+    });
+  });
+
+  activeCapacities.forEach((capacity, teacherIndex) => {
+    addResidualEdge(graph, teacherOffset + teacherIndex, sink, capacity.remaining, 0);
+  });
+
+  let flow = 0;
+  while (flow < requiredFlow) {
+    const distance = Array(graph.length).fill(Infinity);
+    const previousNode = Array(graph.length).fill(-1);
+    const previousEdge = Array(graph.length).fill(-1);
+    distance[source] = 0;
+
+    for (let iteration = 0; iteration < graph.length - 1; iteration += 1) {
+      let changed = false;
+      for (let from = 0; from < graph.length; from += 1) {
+        if (!Number.isFinite(distance[from])) continue;
+        for (let edgeIndex = 0; edgeIndex < graph[from].length; edgeIndex += 1) {
+          const edge = graph[from][edgeIndex];
+          if (edge.capacity <= 0) continue;
+          const candidate = distance[from] + edge.cost;
+          if (candidate < distance[edge.to] - EPSILON) {
+            distance[edge.to] = candidate;
+            previousNode[edge.to] = from;
+            previousEdge[edge.to] = edgeIndex;
+            changed = true;
+          }
+        }
+      }
+      if (!changed) break;
+    }
+
+    if (!Number.isFinite(distance[sink])) {
+      throw new AssignmentError("Impossible de trouver une répartition satisfaisant tous les quotas.");
+    }
+
+    let node = sink;
+    while (node !== source) {
+      const from = previousNode[node];
+      const edgeIndex = previousEdge[node];
+      if (from < 0 || edgeIndex < 0) throw new AssignmentError("Le solveur d'affectation n'a pas pu reconstruire la solution.");
+      const edge = graph[from][edgeIndex];
+      edge.capacity -= 1;
+      graph[node][edge.rev].capacity += 1;
+      node = from;
+    }
+    flow += 1;
+  }
+
+  const assignments = [];
+  for (let stageIndex = 0; stageIndex < rows.length; stageIndex += 1) {
+    const stageNode = stageOffset + stageIndex;
+    const chosen = graph[stageNode].find(edge => edge.meta?.kind === "assignment" && edge.initialCapacity === 1 && edge.capacity === 0);
+    if (!chosen) throw new AssignmentError(`Aucune affectation finale trouvée pour le stage #${rows[stageIndex].id}.`);
+    assignments.push({ stageId: chosen.meta.stageId, teacherId: chosen.meta.teacherId });
+  }
+  return assignments;
 }
 
 function permutations(values) {
@@ -273,34 +405,46 @@ function permutations(values) {
   return out;
 }
 
+function priorityFactor(priority, fallback = "moyenne") {
+  return PRIORITY_FACTORS[priority] ?? PRIORITY_FACTORS[fallback];
+}
+
 function geographicCosts(stages, capacities, teachers, priority) {
-  const weight = PRIORITY_WEIGHTS[priority];
+  const factor = priorityFactor(priority);
   const activeTeachers = capacities.filter(row => row.remaining > 0);
   const byStage = new Map();
 
   for (const stage of stages) {
-    const distances = activeTeachers.map(capacity => {
-      const teacher = teachers.get(capacity.teacherId);
-      return {
-        teacherId: capacity.teacherId,
-        distanceKm: geographicDistanceKm(stage.latitude, stage.longitude, teacher?.latitude, teacher?.longitude),
-      };
-    });
-    const finite = distances.map(row => row.distanceKm).filter(Number.isFinite);
-    const min = finite.length ? Math.min(...finite) : 0;
-    const max = finite.length ? Math.max(...finite) : min;
-    const span = max - min;
     const map = new Map();
-    for (const row of distances) {
-      const normalized = Number.isFinite(row.distanceKm) && span > 1e-9 ? (row.distanceKm - min) / span : 0;
-      map.set(row.teacherId, {
-        distanceKm: row.distanceKm,
-        cost: normalized * weight,
+    for (const capacity of activeTeachers) {
+      const teacher = teachers.get(capacity.teacherId);
+      const distanceKm = geographicDistanceKm(stage.latitude, stage.longitude, teacher?.latitude, teacher?.longitude);
+      map.set(capacity.teacherId, {
+        distanceKm,
+        cost: Number.isFinite(distanceKm) ? distanceKm * factor : Infinity,
       });
     }
     byStage.set(stage.id, map);
   }
   return byStage;
+}
+
+export function scoringModel(criteria = {}) {
+  const geography = geographyEnabled(criteria);
+  const diversity = criteria?.diversity?.enabled !== false;
+  const geographyPriority = PRIORITY_FACTORS[criteria?.geography?.priority] ? criteria.geography.priority : "moyenne";
+  const diversityPriority = PRIORITY_FACTORS[criteria?.diversity?.priority] ? criteria.diversity.priority : "moyenne";
+  const geographyFactor = geography ? priorityFactor(geographyPriority) : 0;
+  const diversityPenalty = diversity ? DIVERSITY_REPEAT_BASE_KM * priorityFactor(diversityPriority) : 0;
+  return {
+    geography,
+    diversity,
+    geographyPriority,
+    diversityPriority,
+    geographyFactor,
+    diversityPenalty,
+    repeatEquivalentKm: geographyFactor > 0 ? diversityPenalty / geographyFactor : null,
+  };
 }
 
 export function configurationFingerprint(snapshot, classId, criteria = {}) {
@@ -323,7 +467,9 @@ export function configurationFingerprint(snapshot, classId, criteria = {}) {
     .map(row => [row.id, row.teacherId, row.period, row.target])
     .sort((a, b) => a[0] - b[0]);
   const teachers = includeGeography
-    ? snapshot.teachers.map(row => [row.id, row.latitude ?? null, row.longitude ?? null]).sort((a, b) => a[0] - b[0])
+    ? snapshot.teachers
+      .map(row => [row.id, row.latitude ?? null, row.longitude ?? null, row.locationValidated === true])
+      .sort((a, b) => a[0] - b[0])
     : undefined;
   return JSON.stringify({ class: cls ? [cls.id, cls.periodCount] : null, students, stages, quotas, ...(includeGeography ? { teachers } : {}) });
 }
@@ -334,11 +480,7 @@ export function generatePlan(snapshot, options) {
   const analysis = analyzeClass(snapshot, cid, options?.periods || [], criteria);
   if (analysis.errors.length) throw new AssignmentError("Les données doivent être corrigées avant le calcul.", analysis.errors);
 
-  const diversity = criteria?.diversity?.enabled !== false;
-  const diversityPriority = PRIORITY_WEIGHTS[criteria?.diversity?.priority] ? criteria.diversity.priority : "moyenne";
-  const diversityWeight = PRIORITY_WEIGHTS[diversityPriority];
-  const geography = geographyEnabled(criteria);
-  const geographyPriority = PRIORITY_WEIGHTS[criteria?.geography?.priority] ? criteria.geography.priority : "moyenne";
+  const scoring = scoringModel(criteria);
   const stagesById = new Map(snapshot.stages.map(row => [row.id, row]));
   const teachers = new Map(snapshot.teachers.map(row => [row.id, row]));
   const basePairs = new Map();
@@ -356,35 +498,37 @@ export function generatePlan(snapshot, options) {
     let score = 0;
     for (const period of order) {
       const state = stateByPeriod.get(period);
-      const geographyByStage = geography
-        ? geographicCosts(state.unassignedStages, state.capacities, teachers, geographyPriority)
+      const geographyByStage = scoring.geography
+        ? geographicCosts(state.unassignedStages, state.capacities, teachers, scoring.geographyPriority)
         : new Map();
-      const rows = minCostPeriod(
+      const rows = solveMinCostPeriod(
         state.unassignedStages,
         state.capacities,
         (stage, teacherId) => {
-          const diversityCost = diversity ? (pairs.get(key(stage.studentId, teacherId)) || 0) * diversityWeight : 0;
-          const geographyCost = geography ? (geographyByStage.get(stage.id)?.get(teacherId)?.cost ?? 0) : 0;
+          const repeats = pairs.get(key(stage.studentId, teacherId)) || 0;
+          const diversityCost = scoring.diversity ? repeats * scoring.diversityPenalty : 0;
+          const geographyCost = scoring.geography ? (geographyByStage.get(stage.id)?.get(teacherId)?.cost ?? Infinity) : 0;
           return diversityCost + geographyCost;
         },
       );
       for (const row of rows) {
         const stage = stagesById.get(row.stageId);
-        const diversityCost = diversity ? (pairs.get(key(stage.studentId, row.teacherId)) || 0) * diversityWeight : 0;
-        const geographyData = geography ? geographyByStage.get(stage.id)?.get(row.teacherId) : null;
+        const repeats = pairs.get(key(stage.studentId, row.teacherId)) || 0;
+        const diversityCost = scoring.diversity ? repeats * scoring.diversityPenalty : 0;
+        const geographyData = scoring.geography ? geographyByStage.get(stage.id)?.get(row.teacherId) : null;
         const geographyCost = geographyData?.cost ?? 0;
         score += diversityCost + geographyCost;
         assignments.push({
           ...row,
           period,
-          distanceKm: geography && Number.isFinite(geographyData?.distanceKm) ? geographyData.distanceKm : null,
+          distanceKm: scoring.geography && Number.isFinite(geographyData?.distanceKm) ? geographyData.distanceKm : null,
         });
         const pair = key(stage.studentId, row.teacherId);
-        pairs.set(pair, (pairs.get(pair) || 0) + 1);
+        pairs.set(pair, repeats + 1);
       }
     }
     const signature = assignments.map(row => `${row.stageId}:${row.teacherId}`).sort().join("|");
-    if (!best || score < best.score - 1e-9 || (Math.abs(score - best.score) <= 1e-9 && signature < best.signature)) {
+    if (!best || score < best.score - EPSILON || (Math.abs(score - best.score) <= EPSILON && signature < best.signature)) {
       best = { score, signature, assignments };
     }
   }
@@ -429,9 +573,10 @@ export function generatePlan(snapshot, options) {
     classLabel: analysis.classRow.label,
     periods: analysis.periods,
     criteria: {
-      diversity: { enabled: diversity, priority: diversityPriority },
-      geography: { enabled: geography, priority: geographyPriority },
+      diversity: { enabled: scoring.diversity, priority: scoring.diversityPriority },
+      geography: { enabled: scoring.geography, priority: scoring.geographyPriority },
     },
+    scoring,
     fingerprint: configurationFingerprint(snapshot, cid, criteria),
     assignments,
     summary,
@@ -442,6 +587,7 @@ export function generatePlan(snapshot, options) {
       introducedRepeats: repeats,
       diversifiedAssignments: assignments.length - repeats,
       geographicAssignments: distances.length,
+      totalDistanceKm: distances.reduce((sum, value) => sum + value, 0),
       averageDistanceKm: distances.length ? distances.reduce((sum, value) => sum + value, 0) / distances.length : null,
       maxDistanceKm: distances.length ? Math.max(...distances) : null,
     },
