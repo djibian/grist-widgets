@@ -7,7 +7,10 @@ import {
   generatePlan,
   geographicDistanceKm,
   periodsForClass,
+  scoringModel,
+  solveMinCostPeriod,
   stageCoverage,
+  validCoordinates,
 } from "../assignment.js";
 
 function fixture() {
@@ -34,6 +37,16 @@ function fixture() {
       { id: 44, studentId: 12, studentLabel: "Bob", classId: 1, period: 2, teacherId: null },
     ],
   };
+}
+
+function prepareGeography(data) {
+  Object.assign(data.teachers[0], { latitude: 47.05, longitude: -1.50, locationValidated: true });
+  Object.assign(data.teachers[1], { latitude: 47.45, longitude: -1.90, locationValidated: true });
+  Object.assign(data.stages[0], { structureId: 101, latitude: 47.06, longitude: -1.51 });
+  Object.assign(data.stages[1], { structureId: 102, latitude: 47.44, longitude: -1.89 });
+  Object.assign(data.stages[2], { structureId: 103, latitude: 47.07, longitude: -1.52 });
+  Object.assign(data.stages[3], { structureId: 104, latitude: 47.43, longitude: -1.88 });
+  return data;
 }
 
 test("periodsForClass exposes only periods that exist", () => {
@@ -168,21 +181,40 @@ test("generatePlan refuses to produce a partial plan when a stage is missing", (
   );
 });
 
+test("coordinate validation checks geographic bounds", () => {
+  assert.equal(validCoordinates(47.1, -1.5), true);
+  assert.equal(validCoordinates(91, -1.5), false);
+  assert.equal(validCoordinates(47.1, -181), false);
+  assert.equal(validCoordinates(null, -1.5), false);
+});
+
 test("geographicDistanceKm computes a realistic direct distance", () => {
   const distance = geographicDistanceKm(47.061, -1.51, 47.218, -1.553);
   assert.ok(distance > 17 && distance < 19);
   assert.equal(geographicDistanceKm(null, -1.51, 47.218, -1.553), null);
 });
 
-test("geographic criterion prefers the closest teacher while preserving quotas", () => {
-  const data = fixture();
-  data.teachers[0].latitude = 47.05;
-  data.teachers[0].longitude = -1.50;
-  data.teachers[1].latitude = 47.45;
-  data.teachers[1].longitude = -1.90;
-  Object.assign(data.stages[0], { structureId: 101, latitude: 47.06, longitude: -1.51 });
-  Object.assign(data.stages[1], { structureId: 102, latitude: 47.44, longitude: -1.89 });
+test("exact min-cost solver fixes a case where greedy allocation is very suboptimal", () => {
+  const stages = [{ id: 1 }, { id: 2 }];
+  const capacities = [
+    { teacherId: 10, remaining: 1 },
+    { teacherId: 20, remaining: 1 },
+  ];
+  const costs = new Map([
+    ["1:10", 1],
+    ["1:20", 2],
+    ["2:10", 1.1],
+    ["2:20", 100],
+  ]);
+  const rows = solveMinCostPeriod(stages, capacities, (stage, teacherId) => costs.get(`${stage.id}:${teacherId}`));
+  assert.deepEqual(rows, [
+    { stageId: 1, teacherId: 20 },
+    { stageId: 2, teacherId: 10 },
+  ]);
+});
 
+test("geographic criterion prefers the closest global allocation while preserving quotas", () => {
+  const data = prepareGeography(fixture());
   const plan = generatePlan(data, {
     classId: 1,
     periods: [1],
@@ -199,39 +231,53 @@ test("geographic criterion prefers the closest teacher while preserving quotas",
   assert.ok(alice.distanceKm < 5);
   assert.ok(bob.distanceKm < 5);
   assert.equal(plan.metrics.geographicAssignments, 2);
-  assert.ok(plan.metrics.averageDistanceKm < 5);
+  assert.ok(plan.metrics.totalDistanceKm > plan.metrics.averageDistanceKm);
 });
 
-test("geographic criterion fails closed when a required coordinate is missing", () => {
-  const data = fixture();
-  data.teachers[0].latitude = 47.05;
-  data.teachers[0].longitude = -1.50;
-  data.teachers[1].latitude = null;
-  data.teachers[1].longitude = null;
-  Object.assign(data.stages[0], { structureId: 101, latitude: 47.06, longitude: -1.51 });
-  Object.assign(data.stages[1], { structureId: 102, latitude: null, longitude: null });
+test("geographic precheck requires human validation and usable structure coordinates", () => {
+  const data = prepareGeography(fixture());
+  data.teachers[1].locationValidated = false;
+  data.stages[1].latitude = null;
+  data.stages[1].longitude = null;
 
   const analysis = analyzeClass(data, 1, [1], { geography: { enabled: true, priority: "moyenne" } });
-  assert.ok(analysis.errors.some(row => row.code === "MISSING_TEACHER_COORDINATES"));
+  assert.equal(analysis.geography.requiredTeacherCount, 2);
+  assert.equal(analysis.geography.validTeacherCount, 1);
+  assert.equal(analysis.geography.requiredStageCount, 2);
+  assert.equal(analysis.geography.validStageCount, 1);
+  assert.equal(analysis.geography.ready, false);
+  assert.ok(analysis.errors.some(row => row.code === "TEACHER_LOCATION_NOT_VALIDATED"));
   assert.ok(analysis.errors.some(row => row.code === "MISSING_STAGE_COORDINATES"));
 });
 
-test("fingerprint changes when geographic data changes", () => {
-  const data = fixture();
-  data.teachers[0].latitude = 47.05;
-  data.teachers[0].longitude = -1.50;
-  Object.assign(data.stages[0], { structureId: 101, latitude: 47.06, longitude: -1.51 });
+test("scoring model preserves distance magnitude and exposes the default trade-off", () => {
+  const model = scoringModel({
+    geography: { enabled: true, priority: "forte" },
+    diversity: { enabled: true, priority: "moyenne" },
+  });
+  assert.equal(model.geographyFactor, 2);
+  assert.equal(model.diversityPenalty, 10);
+  assert.equal(model.repeatEquivalentKm, 5);
+});
+
+test("fingerprint changes when geographic data or validation changes", () => {
+  const data = prepareGeography(fixture());
   const criteria = { geography: { enabled: true, priority: "moyenne" } };
   const before = configurationFingerprint(data, 1, criteria);
   data.stages[0].latitude = 47.07;
-  const after = configurationFingerprint(data, 1, criteria);
-  assert.notEqual(before, after);
+  const afterCoordinates = configurationFingerprint(data, 1, criteria);
+  assert.notEqual(before, afterCoordinates);
+  data.stages[0].latitude = 47.06;
+  data.teachers[0].locationValidated = false;
+  const afterValidation = configurationFingerprint(data, 1, criteria);
+  assert.notEqual(before, afterValidation);
 });
 
 test("fingerprint ignores geographic data when proximity is disabled", () => {
   const data = fixture();
   const before = configurationFingerprint(data, 1);
   data.teachers[0].latitude = 47.05;
+  data.teachers[0].locationValidated = true;
   data.stages[0].structureId = 101;
   data.stages[0].latitude = 47.06;
   const after = configurationFingerprint(data, 1);
