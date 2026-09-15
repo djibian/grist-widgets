@@ -1,5 +1,7 @@
-export const DOCUMENT_TABLES = Object.freeze(["Classe", "Eleves", "Enseignant", "Affectation", "Stage"]);
-export const SECONDARY_TABLES = Object.freeze(["Eleves", "Enseignant", "Affectation", "Stage"]);
+export const CORE_TABLES = Object.freeze(["Classe", "Eleves", "Enseignant", "Affectation", "Stage"]);
+export const GEOGRAPHY_TABLES = Object.freeze(["Structures_de_stage"]);
+export const DOCUMENT_TABLES = Object.freeze([...CORE_TABLES, ...GEOGRAPHY_TABLES]);
+export const SECONDARY_TABLES = Object.freeze(["Eleves", "Enseignant", "Affectation", "Stage", "Structures_de_stage"]);
 
 export const MAPPING_DEFS = Object.freeze([
   {
@@ -20,6 +22,30 @@ export const MAPPING_DEFS = Object.freeze([
     table: "Enseignant",
     label: "Identité de l'enseignant",
     candidates: ["Identite", "Identité", "Nom_complet", "Nom complet", "Nom"],
+  },
+  {
+    key: "teacherLatitude",
+    table: "Enseignant",
+    label: "Latitude",
+    candidates: ["Latitude"],
+    allowedTypes: ["Numeric", "Int"],
+    scope: "geography",
+  },
+  {
+    key: "teacherLongitude",
+    table: "Enseignant",
+    label: "Longitude",
+    candidates: ["Longitude"],
+    allowedTypes: ["Numeric", "Int"],
+    scope: "geography",
+  },
+  {
+    key: "teacherLocationValidated",
+    table: "Enseignant",
+    label: "Localisation validée",
+    candidates: ["Localisation_validee", "Localisation validée", "Localisation validee"],
+    allowedTypes: ["Bool"],
+    scope: "geography",
   },
   {
     key: "quotaTeacher",
@@ -75,6 +101,30 @@ export const MAPPING_DEFS = Object.freeze([
     refTarget: "Enseignant",
     writable: true,
   },
+  {
+    key: "stageStructure",
+    table: "Stage",
+    label: "Structure de stage",
+    candidates: ["Structure_de_stage", "Structure de stage"],
+    refTarget: "Structures_de_stage",
+    scope: "geography",
+  },
+  {
+    key: "structureLatitude",
+    table: "Structures_de_stage",
+    label: "Latitude",
+    candidates: ["Latitude"],
+    allowedTypes: ["Numeric", "Int"],
+    scope: "geography",
+  },
+  {
+    key: "structureLongitude",
+    table: "Structures_de_stage",
+    label: "Longitude",
+    candidates: ["Longitude"],
+    allowedTypes: ["Numeric", "Int"],
+    scope: "geography",
+  },
 ]);
 
 const normalize = value => String(value ?? "")
@@ -86,6 +136,10 @@ const normalize = value => String(value ?? "")
 
 function columnFor(metadata, tableId, columnId) {
   return metadata?.tables?.[tableId]?.columns?.find(column => String(column.colId) === String(columnId)) ?? null;
+}
+
+function definitionEnabled(definition, { geography = true } = {}) {
+  return definition.scope !== "geography" || geography;
 }
 
 export function inferMappings(metadata, saved = {}) {
@@ -119,18 +173,20 @@ export function mappingGroups() {
   return SECONDARY_TABLES.map(table => ({
     table,
     fields: MAPPING_DEFS.filter(definition => definition.table === table),
-  }));
+  })).filter(group => group.fields.length);
 }
 
-export function validateMappings(metadata, mappings) {
+export function validateMappings(metadata, mappings, { geography = true } = {}) {
   const issues = [];
-  for (const tableId of DOCUMENT_TABLES) {
+  const requiredTables = geography ? DOCUMENT_TABLES : CORE_TABLES;
+  for (const tableId of requiredTables) {
     if (!metadata?.tables?.[tableId]) {
       issues.push({ code: "MISSING_TABLE", table: tableId, message: `Table Grist introuvable : ${tableId}.` });
     }
   }
 
   for (const definition of MAPPING_DEFS) {
+    if (!definitionEnabled(definition, { geography })) continue;
     const columnId = mappings?.[definition.key];
     if (!columnId) {
       issues.push({
@@ -157,6 +213,14 @@ export function validateMappings(metadata, mappings) {
         key: definition.key,
         table: definition.table,
         message: `${definition.table} — ${definition.label} doit être une référence vers ${definition.refTarget}.`,
+      });
+    }
+    if (definition.allowedTypes && !definition.allowedTypes.includes(column.type)) {
+      issues.push({
+        code: "INVALID_COLUMN_TYPE",
+        key: definition.key,
+        table: definition.table,
+        message: `${definition.table} — ${definition.label} doit être de type ${definition.allowedTypes.join(" ou ")}.`,
       });
     }
     if (definition.writable && column.writable === false) {
