@@ -1,3 +1,8 @@
+import { haversineDistanceKm, validCoordinates } from "../../shared/services/geo.js";
+
+export { validCoordinates } from "../../shared/services/geo.js";
+export const geographicDistanceKm = haversineDistanceKm;
+
 export const PRIORITY_FACTORS = Object.freeze({ faible: 0.5, moyenne: 1, forte: 2 });
 export const DIVERSITY_REPEAT_BASE_KM = 10;
 
@@ -14,36 +19,6 @@ const id = value => { const n = int(value); return n && n > 0 ? n : null; };
 const key = (a, b) => String(a) + ":" + String(b);
 const issue = (code, message, details = {}) => ({ code, message, ...details });
 const EPSILON = 1e-9;
-
-export function validCoordinates(latitude, longitude) {
-  const lat = Number(latitude);
-  const lon = Number(longitude);
-  return latitude !== undefined
-    && latitude !== null
-    && longitude !== undefined
-    && longitude !== null
-    && String(latitude).trim() !== ""
-    && String(longitude).trim() !== ""
-    && Number.isFinite(lat)
-    && Number.isFinite(lon)
-    && lat >= -90
-    && lat <= 90
-    && lon >= -180
-    && lon <= 180;
-}
-
-export function geographicDistanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
-  if (!validCoordinates(latitudeA, longitudeA) || !validCoordinates(latitudeB, longitudeB)) return null;
-  const toRadians = value => Number(value) * Math.PI / 180;
-  const lat1 = toRadians(latitudeA);
-  const lat2 = toRadians(latitudeB);
-  const dLat = lat2 - lat1;
-  const dLon = toRadians(longitudeB) - toRadians(longitudeA);
-  const haversine = Math.sin(dLat / 2) ** 2
-    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  const centralAngle = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(Math.max(0, 1 - haversine)));
-  return 6371.0088 * centralAngle;
-}
 
 export function periodsForClass(row) {
   const n = int(row?.periodCount);
@@ -447,6 +422,214 @@ export function scoringModel(criteria = {}) {
   };
 }
 
+function buildGeographyLookup(periodStates, teachers, scoring) {
+  if (!scoring.geography) return new Map();
+  const lookup = new Map();
+  for (const state of periodStates) {
+    const byStage = geographicCosts(state.unassignedStages, state.capacities, teachers, scoring.geographyPriority);
+    for (const [stageId, teacherMap] of byStage) lookup.set(stageId, teacherMap);
+  }
+  return lookup;
+}
+
+function assignmentSignature(assignments) {
+  return assignments.map(row => `${row.stageId}:${row.teacherId}`).sort().join("|");
+}
+
+function diversityContribution(baseCount, proposedCount, penalty) {
+  if (!penalty || proposedCount <= 0) return 0;
+  return penalty * ((proposedCount * baseCount) + (proposedCount * (proposedCount - 1) / 2));
+}
+
+function proposedPairCounts(assignments, stagesById) {
+  const counts = new Map();
+  for (const row of assignments) {
+    const stage = stagesById.get(row.stageId);
+    if (!stage?.studentId) continue;
+    const pair = key(stage.studentId, row.teacherId);
+    counts.set(pair, (counts.get(pair) || 0) + 1);
+  }
+  return counts;
+}
+
+export function scoreAssignmentsGlobally(assignments, { stagesById, basePairs, scoring, geographyByStage }) {
+  let score = 0;
+  if (scoring.geography) {
+    for (const row of assignments) {
+      const cost = geographyByStage.get(row.stageId)?.get(row.teacherId)?.cost;
+      if (!Number.isFinite(cost)) return Infinity;
+      score += cost;
+    }
+  }
+  if (scoring.diversity) {
+    const counts = proposedPairCounts(assignments, stagesById);
+    for (const [pair, count] of counts) {
+      score += diversityContribution(basePairs.get(pair) || 0, count, scoring.diversityPenalty);
+    }
+  }
+  return score;
+}
+
+function swapCandidates(assignments) {
+  const byPeriod = new Map();
+  assignments.forEach((row, index) => {
+    const indices = byPeriod.get(row.period) ?? [];
+    indices.push(index);
+    byPeriod.set(row.period, indices);
+  });
+  const result = new Map();
+  for (const [period, indices] of byPeriod) {
+    const swaps = [];
+    for (let a = 0; a < indices.length; a += 1) {
+      for (let b = a + 1; b < indices.length; b += 1) {
+        const left = indices[a];
+        const right = indices[b];
+        if (assignments[left].teacherId === assignments[right].teacherId) continue;
+        swaps.push({ period, left, right });
+      }
+    }
+    result.set(period, swaps);
+  }
+  return result;
+}
+
+function changesForSwap(assignments, swap) {
+  return [
+    { index: swap.left, teacherId: assignments[swap.right].teacherId },
+    { index: swap.right, teacherId: assignments[swap.left].teacherId },
+  ];
+}
+
+function changesSignature(assignments, changes) {
+  return changes
+    .map(change => `${assignments[change.index].stageId}:${change.teacherId}`)
+    .sort()
+    .join("|");
+}
+
+function moveDelta(assignments, changes, context, counts) {
+  const pairDeltas = new Map();
+  let delta = 0;
+  for (const change of changes) {
+    const row = assignments[change.index];
+    if (!row || row.teacherId === change.teacherId) continue;
+    const stage = context.stagesById.get(row.stageId);
+    if (!stage?.studentId) return Infinity;
+    if (context.scoring.geography) {
+      const oldCost = context.geographyByStage.get(row.stageId)?.get(row.teacherId)?.cost;
+      const newCost = context.geographyByStage.get(row.stageId)?.get(change.teacherId)?.cost;
+      if (!Number.isFinite(oldCost) || !Number.isFinite(newCost)) return Infinity;
+      delta += newCost - oldCost;
+    }
+    const oldPair = key(stage.studentId, row.teacherId);
+    const newPair = key(stage.studentId, change.teacherId);
+    pairDeltas.set(oldPair, (pairDeltas.get(oldPair) || 0) - 1);
+    pairDeltas.set(newPair, (pairDeltas.get(newPair) || 0) + 1);
+  }
+
+  if (context.scoring.diversity) {
+    for (const [pair, countDelta] of pairDeltas) {
+      if (!countDelta) continue;
+      const before = counts.get(pair) || 0;
+      const after = before + countDelta;
+      if (after < 0) return Infinity;
+      const base = context.basePairs.get(pair) || 0;
+      delta += diversityContribution(base, after, context.scoring.diversityPenalty)
+        - diversityContribution(base, before, context.scoring.diversityPenalty);
+    }
+  }
+  return delta;
+}
+
+function applyChanges(assignments, changes, context, counts) {
+  for (const change of changes) {
+    const row = assignments[change.index];
+    if (!row || row.teacherId === change.teacherId) continue;
+    const stage = context.stagesById.get(row.stageId);
+    const oldPair = key(stage.studentId, row.teacherId);
+    const newPair = key(stage.studentId, change.teacherId);
+    counts.set(oldPair, (counts.get(oldPair) || 0) - 1);
+    if (counts.get(oldPair) === 0) counts.delete(oldPair);
+    counts.set(newPair, (counts.get(newPair) || 0) + 1);
+    row.teacherId = change.teacherId;
+    const geo = context.geographyByStage.get(row.stageId)?.get(change.teacherId);
+    row.distanceKm = context.scoring.geography && Number.isFinite(geo?.distanceKm) ? geo.distanceKm : null;
+  }
+}
+
+function betterMove(candidate, best) {
+  if (!candidate || !(candidate.delta < -EPSILON)) return best;
+  if (!best || candidate.delta < best.delta - EPSILON) return candidate;
+  if (Math.abs(candidate.delta - best.delta) <= EPSILON && candidate.signature < best.signature) return candidate;
+  return best;
+}
+
+export function refineAssignmentsGlobally(assignments, context) {
+  const rows = assignments.map(row => ({ ...row }));
+  const counts = proposedPairCounts(rows, context.stagesById);
+  const initialScore = scoreAssignmentsGlobally(rows, context);
+  let score = initialScore;
+  let steps = 0;
+  let coordinatedSteps = 0;
+
+  while (true) {
+    const swapsByPeriod = swapCandidates(rows);
+    let best = null;
+
+    for (const swaps of swapsByPeriod.values()) {
+      for (const swap of swaps) {
+        const changes = changesForSwap(rows, swap);
+        best = betterMove({
+          changes,
+          delta: moveDelta(rows, changes, context, counts),
+          signature: changesSignature(rows, changes),
+          coordinated: false,
+        }, best);
+      }
+    }
+
+    if (!best) {
+      const periods = [...swapsByPeriod.keys()].sort((a, b) => a - b);
+      for (let p = 0; p < periods.length; p += 1) {
+        const first = swapsByPeriod.get(periods[p]) || [];
+        for (let q = p + 1; q < periods.length; q += 1) {
+          const second = swapsByPeriod.get(periods[q]) || [];
+          for (const leftSwap of first) {
+            const leftChanges = changesForSwap(rows, leftSwap);
+            for (const rightSwap of second) {
+              const changes = leftChanges.concat(changesForSwap(rows, rightSwap));
+              best = betterMove({
+                changes,
+                delta: moveDelta(rows, changes, context, counts),
+                signature: changesSignature(rows, changes),
+                coordinated: true,
+              }, best);
+            }
+          }
+        }
+      }
+    }
+
+    if (!best) break;
+    applyChanges(rows, best.changes, context, counts);
+    score += best.delta;
+    steps += 1;
+    if (best.coordinated) coordinatedSteps += 1;
+  }
+
+  const verifiedScore = scoreAssignmentsGlobally(rows, context);
+  if (!Number.isFinite(verifiedScore) || Math.abs(verifiedScore - score) > 1e-6) {
+    throw new AssignmentError("Le raffinement global n'a pas pu vérifier son score final.");
+  }
+  return {
+    assignments: rows,
+    score: verifiedScore,
+    initialScore,
+    steps,
+    coordinatedSteps,
+  };
+}
+
 export function configurationFingerprint(snapshot, classId, criteria = {}) {
   const cid = id(classId);
   const cls = snapshot.classes.find(row => row.id === cid);
@@ -489,18 +672,16 @@ export function generatePlan(snapshot, options) {
     const pair = key(stage.studentId, stage.teacherId);
     basePairs.set(pair, (basePairs.get(pair) || 0) + 1);
   }
+  const geographyByStage = buildGeographyLookup(analysis.periodStates, teachers, scoring);
+  const objectiveContext = { stagesById, basePairs, scoring, geographyByStage };
 
   let best = null;
   const stateByPeriod = new Map(analysis.periodStates.map(row => [row.period, row]));
   for (const order of permutations(analysis.periods)) {
     const pairs = new Map(basePairs);
     const assignments = [];
-    let score = 0;
     for (const period of order) {
       const state = stateByPeriod.get(period);
-      const geographyByStage = scoring.geography
-        ? geographicCosts(state.unassignedStages, state.capacities, teachers, scoring.geographyPriority)
-        : new Map();
       const rows = solveMinCostPeriod(
         state.unassignedStages,
         state.capacities,
@@ -513,27 +694,25 @@ export function generatePlan(snapshot, options) {
       );
       for (const row of rows) {
         const stage = stagesById.get(row.stageId);
-        const repeats = pairs.get(key(stage.studentId, row.teacherId)) || 0;
-        const diversityCost = scoring.diversity ? repeats * scoring.diversityPenalty : 0;
         const geographyData = scoring.geography ? geographyByStage.get(stage.id)?.get(row.teacherId) : null;
-        const geographyCost = geographyData?.cost ?? 0;
-        score += diversityCost + geographyCost;
         assignments.push({
           ...row,
           period,
           distanceKm: scoring.geography && Number.isFinite(geographyData?.distanceKm) ? geographyData.distanceKm : null,
         });
         const pair = key(stage.studentId, row.teacherId);
-        pairs.set(pair, repeats + 1);
+        pairs.set(pair, (pairs.get(pair) || 0) + 1);
       }
     }
-    const signature = assignments.map(row => `${row.stageId}:${row.teacherId}`).sort().join("|");
+    const score = scoreAssignmentsGlobally(assignments, objectiveContext);
+    const signature = assignmentSignature(assignments);
     if (!best || score < best.score - EPSILON || (Math.abs(score - best.score) <= EPSILON && signature < best.signature)) {
       best = { score, signature, assignments };
     }
   }
 
-  const assignments = (best?.assignments || []).map(row => {
+  const refinement = refineAssignmentsGlobally(best?.assignments || [], objectiveContext);
+  const assignments = refinement.assignments.map(row => {
     const stage = stagesById.get(row.stageId);
     return {
       ...row,
@@ -590,6 +769,10 @@ export function generatePlan(snapshot, options) {
       totalDistanceKm: distances.reduce((sum, value) => sum + value, 0),
       averageDistanceKm: distances.length ? distances.reduce((sum, value) => sum + value, 0) / distances.length : null,
       maxDistanceKm: distances.length ? Math.max(...distances) : null,
+      objectiveScore: refinement.score,
+      initialObjectiveScore: refinement.initialScore,
+      refinementSteps: refinement.steps,
+      coordinatedRefinementSteps: refinement.coordinatedSteps,
     },
   };
 }
