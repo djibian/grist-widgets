@@ -6,6 +6,7 @@ import { DOCUMENT_TABLES, inferMappings, mappingSignature, validateMappings } fr
 const OPTION_KEY = "internshipSupervisorAssignmentV11";
 const DEFAULT_OPTIMIZATION = Object.freeze({
   diversity: { enabled: true, priority: "moyenne" },
+  geography: { enabled: false, priority: "moyenne" },
 });
 
 export const SOURCE_COLUMNS = Object.freeze([
@@ -27,6 +28,12 @@ function integer(value) {
   return Number.isInteger(number) ? number : null;
 }
 
+function finiteNumber(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function display(value, fallback) {
   const text = String(value ?? "").trim();
   return text || fallback;
@@ -37,6 +44,14 @@ async function fetchRawTable(tableId) {
     return await grist.docApi.fetchTable(tableId);
   } catch {
     throw new Error(`Table Grist introuvable : ${tableId}.`);
+  }
+}
+
+async function fetchOptionalRawTable(tableId) {
+  try {
+    return await grist.docApi.fetchTable(tableId);
+  } catch {
+    return null;
   }
 }
 
@@ -143,12 +158,19 @@ async function readStoredOptions() {
   }
 }
 
+function normalizedCriterion(value, fallback, { defaultEnabled } = {}) {
+  const enabled = value?.enabled === undefined ? defaultEnabled : value.enabled !== false;
+  const priority = ["faible", "moyenne", "forte"].includes(value?.priority)
+    ? value.priority
+    : fallback.priority;
+  return { enabled, priority };
+}
+
 function normalizedOptimization(value) {
-  const enabled = value?.diversity?.enabled !== false;
-  const priority = ["faible", "moyenne", "forte"].includes(value?.diversity?.priority)
-    ? value.diversity.priority
-    : DEFAULT_OPTIMIZATION.diversity.priority;
-  return { diversity: { enabled, priority } };
+  return {
+    diversity: normalizedCriterion(value?.diversity, DEFAULT_OPTIMIZATION.diversity, { defaultEnabled: true }),
+    geography: normalizedCriterion(value?.geography, DEFAULT_OPTIMIZATION.geography, { defaultEnabled: false }),
+  };
 }
 
 export async function loadConfiguration() {
@@ -172,7 +194,7 @@ export async function loadConfiguration() {
 
 export async function saveConfiguration(mappings, optimization) {
   const value = {
-    version: 2,
+    version: 3,
     mappings: { ...mappings },
     optimization: normalizedOptimization(optimization),
   };
@@ -204,7 +226,7 @@ export function initializeGrist(onClassSelection) {
 }
 
 export async function fetchSnapshot(mappings) {
-  const [metadata, selectedTableId, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw] = await Promise.all([
+  const [metadata, selectedTableId, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
     fetchMetadata(),
     getSelectedTableId(),
     getSourceMappings(),
@@ -213,6 +235,7 @@ export async function fetchSnapshot(mappings) {
     fetchRawTable("Enseignant"),
     fetchRawTable("Affectation"),
     fetchRawTable("Stage"),
+    fetchOptionalRawTable("Structures_de_stage"),
   ]);
   const mappingIssues = validateMappings(metadata, mappings);
   const sourceProblems = sourceMappingProblems(metadata, selectedTableId, sourceMappings);
@@ -241,6 +264,8 @@ export async function fetchSnapshot(mappings) {
   const teachers = rowsFromTable(teachersRaw).map(row => ({
     id: row.id,
     label: display(readSecondary(row, "teacherLabel"), `Enseignant #${row.id}`),
+    latitude: finiteNumber(row.Latitude),
+    longitude: finiteNumber(row.Longitude),
   }));
 
   const quotas = rowsFromTable(quotasRaw).map(row => ({
@@ -251,9 +276,18 @@ export async function fetchSnapshot(mappings) {
     target: integer(readSecondary(row, "quotaTarget")),
   }));
 
+  const structures = structuresRaw ? rowsFromTable(structuresRaw).map(row => ({
+    id: row.id,
+    latitude: finiteNumber(row.Latitude),
+    longitude: finiteNumber(row.Longitude),
+  })) : [];
+  const structureById = new Map(structures.map(row => [row.id, row]));
+
   const stages = rowsFromTable(stagesRaw).map(row => {
     const studentId = ref(readSecondary(row, "stageStudent"));
     const student = studentById.get(studentId);
+    const structureId = ref(row.Structure);
+    const structure = structureById.get(structureId);
     return {
       id: row.id,
       studentId,
@@ -261,6 +295,9 @@ export async function fetchSnapshot(mappings) {
       classId: student?.classId ?? null,
       period: integer(readSecondary(row, "stagePeriod")),
       teacherId: ref(readSecondary(row, "stageSupervisor")),
+      structureId,
+      latitude: structure?.latitude ?? null,
+      longitude: structure?.longitude ?? null,
     };
   });
 
@@ -270,6 +307,7 @@ export async function fetchSnapshot(mappings) {
     teachers,
     quotas,
     stages,
+    structures,
     configuration: {
       metadata,
       mappings: { ...mappings },
@@ -348,7 +386,7 @@ export async function applyPlan(plan, mappings) {
     throw new Error("Le mapping de la source Classe a changé. Génère une nouvelle proposition.");
   }
 
-  const currentFingerprint = configurationFingerprint(fresh, plan.classId);
+  const currentFingerprint = configurationFingerprint(fresh, plan.classId, plan.criteria);
   if (currentFingerprint !== plan.fingerprint) {
     throw new Error("Les données ont changé depuis la génération de la proposition. Actualise puis génère une nouvelle proposition.");
   }
