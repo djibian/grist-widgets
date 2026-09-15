@@ -1,11 +1,8 @@
-export const IGN_ROUTE_API_URL = 'https://data.geopf.fr/navigation/itineraire';
+import { validCoordinates } from './geo.js';
 
-export function validCoordinates(latitude, longitude) {
-  return typeof latitude === 'number' && Number.isFinite(latitude) &&
-    typeof longitude === 'number' && Number.isFinite(longitude) &&
-    latitude >= -90 && latitude <= 90 &&
-    longitude >= -180 && longitude <= 180;
-}
+export { validCoordinates } from './geo.js';
+
+export const IGN_ROUTE_API_URL = 'https://data.geopf.fr/navigation/itineraire';
 
 export function buildIgnRoutePayload({
   startLatitude,
