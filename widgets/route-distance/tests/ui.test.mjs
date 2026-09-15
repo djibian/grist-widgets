@@ -15,7 +15,7 @@ test('charge le socle Grist Studio complet dans le bon ordre', () => {
   const structure = html.indexOf('../../shared/ui/structure.css');
   const local = html.indexOf('style.css?v=1.4.0');
   assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
-  assert.match(html, /app\.js\?v=1\.4\.0/);
+  assert.match(html, /app\.js\?v=1\.4\.1/);
   assert.doesNotMatch(html, /studio\.css/);
 });
 
@@ -42,6 +42,7 @@ test('matérialise le flux contexte calcul vérification', () => {
 test('rend l’adresse de départ modifiable, géocodée et persistante', () => {
   assert.match(html, /id="originAddress"[^>]*placeholder="Saisir une adresse de départ"/);
   assert.match(html, /id="originSave"[^>]*>Définir</);
+  assert.match(html, /id="originCurrent">Adresse de départ à définir</);
   assert.match(originConfig, /geocodeAddress/);
   assert.match(originConfig, /grist\.setOption\(OPTION_KEY, next\)/);
   assert.match(originConfig, /const OPTION_KEY = 'routeOrigin'/);
@@ -50,6 +51,15 @@ test('rend l’adresse de départ modifiable, géocodée et persistante', () => 
   assert.match(app, /startLongitude: origin\.longitude/);
   assert.match(app, /Le point de départ a changé pendant le calcul/);
   assert.doesNotMatch(app, /DOMICILE_LATITUDE|DOMICILE_LONGITUDE/);
+});
+
+test('n’utilise aucune origine codée en dur et bloque le calcul sans configuration', () => {
+  assert.match(originConfig, /EMPTY_ROUTE_ORIGIN[\s\S]*latitude: null[\s\S]*longitude: null/);
+  assert.doesNotMatch(originConfig, /47\.057944|-1\.521611/);
+  assert.doesNotMatch(app, /47\.057944|-1\.521611/);
+  assert.match(app, /originIsConfigured\(\)/);
+  assert.match(app, /Origine à définir/);
+  assert.match(app, /Définissez une adresse de départ avant de calculer/);
 });
 
 test('utilise un cadre fluide et une zone résultat responsive', () => {
