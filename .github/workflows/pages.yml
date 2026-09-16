@@ -77,28 +77,18 @@ jobs:
 
           git -C source fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
 
-          branches=("contacts-resolver")
           while IFS= read -r ref; do
             branch="${ref#refs/remotes/origin/}"
-            branches+=("$branch")
-          done < <(git -C source for-each-ref --format='%(refname)' 'refs/remotes/origin/preview/*')
 
-          declare -A seen
-          for branch in "${branches[@]}"; do
-            if [[ -n "${seen[$branch]:-}" ]]; then
-              continue
-            fi
-            seen[$branch]=1
-
-            ref="refs/remotes/origin/$branch"
-            if ! git -C source show-ref --verify --quiet "$ref"; then
+            if git -C source diff --quiet main "$ref" --; then
+              echo "Skipping $branch: preview content is identical to main"
               continue
             fi
 
             slug="${branch#preview/}"
             mkdir -p "site/previews/$slug"
             git -C source archive "$ref" | tar -x -C "site/previews/$slug"
-          done
+          done < <(git -C source for-each-ref --format='%(refname)' 'refs/remotes/origin/preview/*')
 
           snapshot="$GITHUB_WORKSPACE/contact-index-snapshot"
           if [[ -f "$snapshot/indexed-departments.json" ]]; then
