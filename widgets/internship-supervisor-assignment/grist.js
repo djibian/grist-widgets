@@ -1,9 +1,16 @@
 import { recordsFromTable } from "../../shared/grist/records.js";
 import { isWritableColumn } from "../../shared/grist/metadata.js";
 import { configurationFingerprint, stageCoverage } from "./assignment.js";
-import { DOCUMENT_TABLES, inferMappings, mappingSignature, validateMappings } from "./mapping.js";
+import {
+  DOCUMENT_TABLES,
+  inferMappings,
+  mappingSignature,
+  serializeBindings,
+  validateMappings,
+} from "./mapping.js";
 
 const OPTION_KEY = "internshipSupervisorAssignmentV11";
+const CONFIG_VERSION = 5;
 const DEFAULT_OPTIMIZATION = Object.freeze({
   geography: { enabled: true, priority: "forte" },
   diversity: { enabled: true, priority: "moyenne" },
@@ -77,9 +84,11 @@ export async function fetchMetadata() {
     const columns = columnRows
       .filter(column => column.parentId === table.id)
       .map(column => ({
+        ref: ref(column.id),
         colId: String(column.colId),
         label: display(column.label, column.colId),
         type: String(column.type ?? "Any"),
+        visibleColRef: ref(column.visibleCol),
         isFormula: Boolean(column.isFormula),
         formula: String(column.formula ?? ""),
         writable: isWritableColumn(column),
@@ -87,7 +96,7 @@ export async function fetchMetadata() {
       }))
       .sort((a, b) => a.position - b.position || a.label.localeCompare(b.label, "fr"));
     result.tables[tableId] = {
-      id: table.id,
+      id: ref(table.id),
       tableId,
       label: display(table.tableId, tableId),
       columns,
@@ -180,6 +189,26 @@ function normalizedOptimization(value) {
   };
 }
 
+function storedMappingSource(stored, fallback = {}) {
+  if (stored?.bindings && typeof stored.bindings === "object") return stored.bindings;
+  if (stored?.mappings && typeof stored.mappings === "object") return stored.mappings;
+  return fallback ?? {};
+}
+
+function storedValue(metadata, mappings, optimization) {
+  return {
+    version: CONFIG_VERSION,
+    bindings: serializeBindings(metadata, mappings),
+    optimization: normalizedOptimization(optimization),
+  };
+}
+
+async function persistConfiguration(metadata, mappings, optimization) {
+  const value = storedValue(metadata, mappings, optimization);
+  await grist.widgetApi.setOption(OPTION_KEY, value);
+  return value;
+}
+
 export async function loadConfiguration() {
   const [metadata, stored, selectedTableId, sourceMappings] = await Promise.all([
     fetchMetadata(),
@@ -187,27 +216,33 @@ export async function loadConfiguration() {
     getSelectedTableId(),
     getSourceMappings(),
   ]);
-  const mappings = inferMappings(metadata, stored?.mappings ?? {});
   const optimization = normalizedOptimization(stored?.optimization);
+  const mappings = inferMappings(metadata, storedMappingSource(stored));
+  const mappingIssues = validateMappings(metadata, mappings, { geography: optimization.geography.enabled });
+
+  if ((!stored?.bindings || Number(stored?.version) < CONFIG_VERSION) && !mappingIssues.length) {
+    try {
+      await persistConfiguration(metadata, mappings, optimization);
+    } catch {
+      // La migration reste facultative : le format V4 continue d'être lu tant que Grist n'a pas pu enregistrer V5.
+    }
+  }
+
   return {
     metadata,
     mappings,
     sourceMappings,
     optimization,
     selectedTableId,
-    mappingIssues: validateMappings(metadata, mappings, { geography: optimization.geography.enabled }),
+    mappingIssues,
     sourceMappingProblems: sourceMappingProblems(metadata, selectedTableId, sourceMappings),
   };
 }
 
 export async function saveConfiguration(mappings, optimization) {
-  const value = {
-    version: 4,
-    mappings: { ...mappings },
-    optimization: normalizedOptimization(optimization),
-  };
-  await grist.widgetApi.setOption(OPTION_KEY, value);
-  return value;
+  const metadata = await fetchMetadata();
+  const resolvedMappings = inferMappings(metadata, mappings);
+  return persistConfiguration(metadata, resolvedMappings, optimization);
 }
 
 export function initializeGrist(onClassSelection) {
@@ -235,8 +270,9 @@ export function initializeGrist(onClassSelection) {
 
 export async function fetchSnapshot(mappings, { geography = false } = {}) {
   const structuresPromise = geography ? fetchRawTable("Structures_de_stage") : fetchOptionalRawTable("Structures_de_stage");
-  const [metadata, selectedTableId, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
+  const [metadata, stored, selectedTableId, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
     fetchMetadata(),
+    readStoredOptions(),
     getSelectedTableId(),
     getSourceMappings(),
     fetchRawTable("Classe"),
@@ -246,10 +282,11 @@ export async function fetchSnapshot(mappings, { geography = false } = {}) {
     fetchRawTable("Stage"),
     structuresPromise,
   ]);
-  const mappingIssues = validateMappings(metadata, mappings, { geography });
+  const effectiveMappings = inferMappings(metadata, storedMappingSource(stored, mappings));
+  const mappingIssues = validateMappings(metadata, effectiveMappings, { geography });
   const sourceProblems = sourceMappingProblems(metadata, selectedTableId, sourceMappings);
   const readSecondary = (row, key) => {
-    const columnId = mappings?.[key];
+    const columnId = effectiveMappings?.[key];
     return columnId ? row?.[columnId] : null;
   };
   const readClass = (row, key) => {
@@ -320,7 +357,7 @@ export async function fetchSnapshot(mappings, { geography = false } = {}) {
     structures,
     configuration: {
       metadata,
-      mappings: { ...mappings },
+      mappings: { ...effectiveMappings },
       mappingIssues,
       selectedTableId,
       sourceMappings,
@@ -370,9 +407,10 @@ export async function createMissingStages(classId, periods, mappings) {
   }
   if (!coverage.missing.length) return { snapshot: fresh, createdCount: 0, created: [] };
 
-  await grist.docApi.applyUserActions([buildStageCreationAction(coverage.missing, mappings)]);
+  const effectiveMappings = fresh.configuration.mappings;
+  await grist.docApi.applyUserActions([buildStageCreationAction(coverage.missing, effectiveMappings)]);
 
-  const after = await fetchSnapshot(mappings, { geography: false });
+  const after = await fetchSnapshot(effectiveMappings, { geography: false });
   const afterCoverage = stageCoverage(after, classId, periods);
   if (afterCoverage.errors.some(row => row.code === "DUPLICATE_STAGE")) {
     throw new Error("Des doublons de stages ont été détectés après la création. Vérifie la table Stage avant de poursuivre.");
@@ -411,6 +449,7 @@ export async function applyPlan(plan, mappings) {
   }
 
   if (!plan.assignments.length) return fresh;
-  await grist.docApi.applyUserActions(buildAssignmentActions(plan.assignments, mappings));
-  return fetchSnapshot(mappings, { geography });
+  const effectiveMappings = fresh.configuration.mappings;
+  await grist.docApi.applyUserActions(buildAssignmentActions(plan.assignments, effectiveMappings));
+  return fetchSnapshot(effectiveMappings, { geography });
 }
