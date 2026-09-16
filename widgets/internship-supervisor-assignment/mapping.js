@@ -297,6 +297,7 @@ export function mappingGroups() {
 
 export function validateMappings(metadata, mappings, { geography = true } = {}) {
   const issues = [];
+  const effectiveMappings = inferMappings(metadata, mappings ?? {});
   const requiredTables = geography ? DOCUMENT_TABLES : CORE_TABLES;
   for (const tableId of requiredTables) {
     if (!tableFor(metadata, tableId)) {
@@ -306,7 +307,7 @@ export function validateMappings(metadata, mappings, { geography = true } = {}) 
 
   for (const definition of MAPPING_DEFS) {
     if (!definitionEnabled(definition, { geography })) continue;
-    const columnId = mappings?.[definition.key];
+    const columnId = effectiveMappings?.[definition.key];
     if (!columnId) {
       const origin = definition.mode === "structural"
         ? "relation Grist non déductible de manière unique"
