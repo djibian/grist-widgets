@@ -3,7 +3,6 @@ name: Request Pages preview rebuild
 on:
   push:
     branches:
-      - contacts-resolver
       - "preview/**"
 
 permissions:
