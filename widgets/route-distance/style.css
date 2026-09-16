@@ -56,6 +56,24 @@
   background: var(--gw-color-workflow);
   box-shadow: 0 0 0 5px var(--gw-color-workflow-soft);
 }
+.route-origin-editor { flex: 1 1 auto; min-width: 0; }
+.route-origin-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 8px;
+}
+.route-origin-input { width: 100%; min-width: 0; }
+.route-point .route-origin-status {
+  min-height: 17px;
+  margin-top: 5px;
+  color: var(--gw-color-text-muted);
+  font-size: var(--gw-font-size-xs);
+  line-height: 1.35;
+}
+.route-point .route-origin-status:empty { display: none; }
+.route-point .route-origin-status.success { color: var(--gw-color-success); }
+.route-point .route-origin-status.error { color: var(--gw-color-danger); }
 .route-line {
   min-height: 68px;
   margin: 8px 0 8px 6px;
@@ -146,4 +164,9 @@
     border-left: 0;
     border-top: 1px solid var(--gw-color-border-subtle);
   }
+}
+
+@container gw-widget (max-width: 480px) {
+  .route-origin-input-row { grid-template-columns: 1fr; }
+  .route-origin-input-row .gw-button { width: 100%; }
 }
