@@ -1,28 +1,75 @@
 export const CORE_TABLES = Object.freeze(["Classe", "Eleves", "Enseignant", "Affectation", "Stage"]);
 export const GEOGRAPHY_TABLES = Object.freeze(["Structures_de_stage"]);
 export const DOCUMENT_TABLES = Object.freeze([...CORE_TABLES, ...GEOGRAPHY_TABLES]);
-export const SECONDARY_TABLES = Object.freeze(["Eleves", "Enseignant", "Affectation", "Stage", "Structures_de_stage"]);
 
-export const MAPPING_DEFS = Object.freeze([
+const STRUCTURAL_DEFS = Object.freeze([
   {
     key: "studentClass",
     table: "Eleves",
     label: "Classe de l'élève",
-    candidates: ["Classe"],
     refTarget: "Classe",
+    mode: "structural",
   },
+  {
+    key: "quotaTeacher",
+    table: "Affectation",
+    label: "Enseignant",
+    refTarget: "Enseignant",
+    mode: "structural",
+  },
+  {
+    key: "quotaClass",
+    table: "Affectation",
+    label: "Classe",
+    refTarget: "Classe",
+    mode: "structural",
+  },
+  {
+    key: "stageStudent",
+    table: "Stage",
+    label: "Élève",
+    refTarget: "Eleves",
+    writable: true,
+    mode: "structural",
+  },
+  {
+    key: "stageSupervisor",
+    table: "Stage",
+    label: "Suivi par",
+    refTarget: "Enseignant",
+    writable: true,
+    mode: "structural",
+  },
+  {
+    key: "stageStructure",
+    table: "Stage",
+    label: "Structure de stage",
+    refTarget: "Structures_de_stage",
+    scope: "geography",
+    mode: "structural",
+  },
+]);
+
+const VISIBLE_LABEL_DEFS = Object.freeze([
   {
     key: "studentLabel",
     table: "Eleves",
     label: "Identité de l'élève",
+    sourceKeys: ["stageStudent"],
     candidates: ["Identite", "Identité", "Nom_complet", "Nom complet", "Nom_Prenom", "Nom Prénom", "Prenom_Nom", "Prénom Nom", "Nom"],
+    mode: "visibleCol",
   },
   {
     key: "teacherLabel",
     table: "Enseignant",
     label: "Identité de l'enseignant",
+    sourceKeys: ["stageSupervisor", "quotaTeacher"],
     candidates: ["Identite", "Identité", "Nom_complet", "Nom complet", "Nom_Prenom", "Nom Prénom", "Prenom_Nom", "Prénom Nom", "Nom"],
+    mode: "visibleCol",
   },
+]);
+
+export const CONFIGURABLE_MAPPING_DEFS = Object.freeze([
   {
     key: "teacherLatitude",
     table: "Enseignant",
@@ -30,6 +77,7 @@ export const MAPPING_DEFS = Object.freeze([
     candidates: ["Latitude"],
     allowedTypes: ["Numeric", "Int"],
     scope: "geography",
+    mode: "semantic",
   },
   {
     key: "teacherLongitude",
@@ -38,6 +86,7 @@ export const MAPPING_DEFS = Object.freeze([
     candidates: ["Longitude"],
     allowedTypes: ["Numeric", "Int"],
     scope: "geography",
+    mode: "semantic",
   },
   {
     key: "teacherLocationValidated",
@@ -46,20 +95,7 @@ export const MAPPING_DEFS = Object.freeze([
     candidates: ["Localisation_validee", "Localisation validée", "Localisation validee"],
     allowedTypes: ["Bool"],
     scope: "geography",
-  },
-  {
-    key: "quotaTeacher",
-    table: "Affectation",
-    label: "Enseignant",
-    candidates: ["Enseignant"],
-    refTarget: "Enseignant",
-  },
-  {
-    key: "quotaClass",
-    table: "Affectation",
-    label: "Classe",
-    candidates: ["Classe"],
-    refTarget: "Classe",
+    mode: "semantic",
   },
   {
     key: "quotaPeriod",
@@ -67,6 +103,7 @@ export const MAPPING_DEFS = Object.freeze([
     label: "Période",
     candidates: ["Periode", "Période", "Periode_de_stage", "Période de stage"],
     allowedTypes: ["Numeric", "Int"],
+    mode: "semantic",
   },
   {
     key: "quotaTarget",
@@ -83,14 +120,7 @@ export const MAPPING_DEFS = Object.freeze([
       "Nombre de stages à suivre",
     ],
     allowedTypes: ["Numeric", "Int"],
-  },
-  {
-    key: "stageStudent",
-    table: "Stage",
-    label: "Élève",
-    candidates: ["Eleve", "Élève"],
-    refTarget: "Eleves",
-    writable: true,
+    mode: "semantic",
   },
   {
     key: "stagePeriod",
@@ -99,22 +129,7 @@ export const MAPPING_DEFS = Object.freeze([
     candidates: ["Periode", "Période", "Periode_de_stage", "Période de stage"],
     allowedTypes: ["Numeric", "Int"],
     writable: true,
-  },
-  {
-    key: "stageSupervisor",
-    table: "Stage",
-    label: "Suivi par",
-    candidates: ["Suivi_par", "Suivi par", "Enseignant", "Enseignant_de_suivi", "Enseignant de suivi"],
-    refTarget: "Enseignant",
-    writable: true,
-  },
-  {
-    key: "stageStructure",
-    table: "Stage",
-    label: "Structure de stage",
-    candidates: ["Structure_de_stage", "Structure de stage", "Structure"],
-    refTarget: "Structures_de_stage",
-    scope: "geography",
+    mode: "semantic",
   },
   {
     key: "structureLatitude",
@@ -123,6 +138,7 @@ export const MAPPING_DEFS = Object.freeze([
     candidates: ["Latitude"],
     allowedTypes: ["Numeric", "Int"],
     scope: "geography",
+    mode: "semantic",
   },
   {
     key: "structureLongitude",
@@ -131,7 +147,14 @@ export const MAPPING_DEFS = Object.freeze([
     candidates: ["Longitude"],
     allowedTypes: ["Numeric", "Int"],
     scope: "geography",
+    mode: "semantic",
   },
+]);
+
+export const MAPPING_DEFS = Object.freeze([
+  ...STRUCTURAL_DEFS,
+  ...VISIBLE_LABEL_DEFS,
+  ...CONFIGURABLE_MAPPING_DEFS,
 ]);
 
 const normalize = value => String(value ?? "")
@@ -141,8 +164,18 @@ const normalize = value => String(value ?? "")
   .replace(/[^a-z0-9]+/g, "_")
   .replace(/^_+|_+$/g, "");
 
+function tableFor(metadata, tableId) {
+  return metadata?.tables?.[tableId] ?? null;
+}
+
 function columnFor(metadata, tableId, columnId) {
-  return metadata?.tables?.[tableId]?.columns?.find(column => String(column.colId) === String(columnId)) ?? null;
+  return tableFor(metadata, tableId)?.columns?.find(column => String(column.colId) === String(columnId)) ?? null;
+}
+
+function columnForRef(metadata, tableId, columnRef) {
+  const wanted = Number(columnRef);
+  if (!Number.isInteger(wanted) || wanted <= 0) return null;
+  return tableFor(metadata, tableId)?.columns?.find(column => Number(column.ref) === wanted) ?? null;
 }
 
 function definitionEnabled(definition, { geography = true } = {}) {
@@ -150,6 +183,7 @@ function definitionEnabled(definition, { geography = true } = {}) {
 }
 
 function columnMatchesShape(column, definition) {
+  if (!column) return false;
   if (definition.refTarget && column.type !== `Ref:${definition.refTarget}`) return false;
   if (definition.allowedTypes && !definition.allowedTypes.includes(column.type)) return false;
   if (definition.writable && column.writable === false) return false;
@@ -158,7 +192,7 @@ function columnMatchesShape(column, definition) {
 
 function candidateColumn(columns, definition) {
   const compatible = columns.filter(column => columnMatchesShape(column, definition));
-  for (const candidate of definition.candidates) {
+  for (const candidate of definition.candidates ?? []) {
     const wanted = normalize(candidate);
     const found = compatible.find(column => normalize(column.colId) === wanted)
       ?? compatible.find(column => normalize(column.label) === wanted)
@@ -168,26 +202,85 @@ function candidateColumn(columns, definition) {
   return null;
 }
 
-function uniqueStructuralColumn(columns, definition) {
+function uniqueStructuralColumn(metadata, definition) {
+  const columns = tableFor(metadata, definition.table)?.columns ?? [];
   const compatible = columns.filter(column => columnMatchesShape(column, definition));
   return compatible.length === 1 ? compatible[0] : null;
 }
 
+function savedColumn(metadata, definition, savedValue) {
+  if (!savedValue) return null;
+  const table = tableFor(metadata, definition.table);
+  if (!table) return null;
+
+  let column = null;
+  if (typeof savedValue === "string") {
+    column = columnFor(metadata, definition.table, savedValue);
+  } else if (typeof savedValue === "object") {
+    const tableRef = Number(savedValue.tableRef);
+    if (Number.isInteger(tableRef) && tableRef > 0 && Number(table.id) !== tableRef) return null;
+    column = columnForRef(metadata, definition.table, savedValue.columnRef);
+    if (!column && typeof savedValue.colId === "string") {
+      column = columnFor(metadata, definition.table, savedValue.colId);
+    }
+  }
+  return columnMatchesShape(column, definition) ? column : null;
+}
+
+function visibleColumn(metadata, definition, mappings) {
+  for (const sourceKey of definition.sourceKeys ?? []) {
+    const sourceDefinition = MAPPING_DEFS.find(item => item.key === sourceKey);
+    const sourceColumnId = mappings?.[sourceKey];
+    if (!sourceDefinition || !sourceColumnId) continue;
+    const sourceColumn = columnFor(metadata, sourceDefinition.table, sourceColumnId);
+    const visible = columnForRef(metadata, definition.table, sourceColumn?.visibleColRef);
+    if (visible) return visible;
+  }
+  return null;
+}
+
 export function inferMappings(metadata, saved = {}) {
   const result = {};
-  for (const definition of MAPPING_DEFS) {
-    const columns = metadata?.tables?.[definition.table]?.columns ?? [];
-    const savedColumn = saved?.[definition.key];
-    if (savedColumn && columns.some(column => column.colId === savedColumn)) {
-      result[definition.key] = savedColumn;
-      continue;
-    }
 
-    const found = candidateColumn(columns, definition)
-      ?? uniqueStructuralColumn(columns, definition);
+  for (const definition of STRUCTURAL_DEFS) {
+    const found = uniqueStructuralColumn(metadata, definition)
+      ?? savedColumn(metadata, definition, saved?.[definition.key]);
     result[definition.key] = found?.colId ?? "";
   }
+
+  for (const definition of VISIBLE_LABEL_DEFS) {
+    const columns = tableFor(metadata, definition.table)?.columns ?? [];
+    const found = visibleColumn(metadata, definition, result)
+      ?? savedColumn(metadata, definition, saved?.[definition.key])
+      ?? candidateColumn(columns, definition);
+    result[definition.key] = found?.colId ?? "";
+  }
+
+  for (const definition of CONFIGURABLE_MAPPING_DEFS) {
+    const columns = tableFor(metadata, definition.table)?.columns ?? [];
+    const found = savedColumn(metadata, definition, saved?.[definition.key])
+      ?? candidateColumn(columns, definition);
+    result[definition.key] = found?.colId ?? "";
+  }
+
   return result;
+}
+
+export function serializeBindings(metadata, mappings) {
+  const bindings = {};
+  for (const definition of CONFIGURABLE_MAPPING_DEFS) {
+    const table = tableFor(metadata, definition.table);
+    const column = columnFor(metadata, definition.table, mappings?.[definition.key]);
+    if (!table || !column || !columnMatchesShape(column, definition)) continue;
+    const tableRef = Number(table.id);
+    const columnRef = Number(column.ref);
+    if (Number.isInteger(tableRef) && tableRef > 0 && Number.isInteger(columnRef) && columnRef > 0) {
+      bindings[definition.key] = { tableRef, columnRef };
+    } else {
+      bindings[definition.key] = column.colId;
+    }
+  }
+  return bindings;
 }
 
 export function mappingDefinition(key) {
@@ -195,30 +288,37 @@ export function mappingDefinition(key) {
 }
 
 export function mappingGroups() {
-  return SECONDARY_TABLES.map(table => ({
+  const tables = ["Enseignant", "Affectation", "Stage", "Structures_de_stage"];
+  return tables.map(table => ({
     table,
-    fields: MAPPING_DEFS.filter(definition => definition.table === table),
+    fields: CONFIGURABLE_MAPPING_DEFS.filter(definition => definition.table === table),
   })).filter(group => group.fields.length);
 }
 
 export function validateMappings(metadata, mappings, { geography = true } = {}) {
   const issues = [];
+  const effectiveMappings = inferMappings(metadata, mappings ?? {});
   const requiredTables = geography ? DOCUMENT_TABLES : CORE_TABLES;
   for (const tableId of requiredTables) {
-    if (!metadata?.tables?.[tableId]) {
+    if (!tableFor(metadata, tableId)) {
       issues.push({ code: "MISSING_TABLE", table: tableId, message: `Table Grist introuvable : ${tableId}.` });
     }
   }
 
   for (const definition of MAPPING_DEFS) {
     if (!definitionEnabled(definition, { geography })) continue;
-    const columnId = mappings?.[definition.key];
+    const columnId = effectiveMappings?.[definition.key];
     if (!columnId) {
+      const origin = definition.mode === "structural"
+        ? "relation Grist non déductible de manière unique"
+        : definition.mode === "visibleCol"
+          ? "colonne d'affichage Grist introuvable"
+          : "colonne métier non paramétrée";
       issues.push({
         code: "MISSING_MAPPING",
         key: definition.key,
         table: definition.table,
-        message: `${definition.table} — ${definition.label} : colonne non paramétrée.`,
+        message: `${definition.table} — ${definition.label} : ${origin}.`,
       });
       continue;
     }
