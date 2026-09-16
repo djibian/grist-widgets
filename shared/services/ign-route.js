@@ -3,6 +3,7 @@ import { validCoordinates } from './geo.js';
 export { validCoordinates } from './geo.js';
 
 export const IGN_ROUTE_API_URL = 'https://data.geopf.fr/navigation/itineraire';
+export const IGN_GEOCODE_API_URL = 'https://data.geopf.fr/geocodage/search';
 
 export function buildIgnRoutePayload({
   startLatitude,
@@ -48,6 +49,58 @@ async function readJson(response) {
   } catch (_) {
     return null;
   }
+}
+
+export async function geocodeAddress(address, {
+  fetchFn = globalThis.fetch,
+  apiUrl = IGN_GEOCODE_API_URL
+} = {}) {
+  const query = String(address ?? '').trim();
+  if (query.length < 3) {
+    throw new Error('Saisissez une adresse de départ suffisamment précise.');
+  }
+  if (typeof fetchFn !== 'function') {
+    throw new Error('Service réseau indisponible.');
+  }
+
+  const url = new URL(apiUrl);
+  url.searchParams.set('q', query);
+  url.searchParams.set('index', 'address');
+  url.searchParams.set('limit', '1');
+  url.searchParams.set('autocomplete', '0');
+  url.searchParams.set('returntruegeometry', 'false');
+
+  let response;
+  try {
+    response = await fetchFn(url.toString(), {
+      method: 'GET',
+      headers: { Accept: 'application/json' }
+    });
+  } catch (_) {
+    throw new Error('Impossible de joindre le service de géocodage IGN. Vérifiez la connexion réseau.');
+  }
+
+  const data = await readJson(response);
+  if (!response.ok) {
+    const apiMessage = data?.error?.message || data?.message;
+    throw new Error(apiMessage || `Le géocodeur IGN a répondu avec l’erreur HTTP ${response.status}.`);
+  }
+
+  const feature = data?.features?.[0];
+  const longitude = feature?.geometry?.coordinates?.[0];
+  const latitude = feature?.geometry?.coordinates?.[1];
+  if (!validCoordinates(latitude, longitude)) {
+    throw new Error('Aucune adresse exploitable n’a été trouvée.');
+  }
+
+  const label = String(feature?.properties?.label ?? query).trim() || query;
+  const score = feature?.properties?.score;
+  return {
+    label,
+    latitude,
+    longitude,
+    score: typeof score === 'number' && Number.isFinite(score) ? score : null
+  };
 }
 
 export async function requestIgnRoute({
