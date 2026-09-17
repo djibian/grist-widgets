@@ -11,6 +11,7 @@ import {
 
 const OPTION_KEY = "internshipSupervisorAssignmentV11";
 const CONFIG_VERSION = 5;
+const DEFAULT_CLASS_TABLE_ID = "Classe";
 const DEFAULT_OPTIMIZATION = Object.freeze({
   geography: { enabled: true, priority: "forte" },
   diversity: { enabled: true, priority: "moyenne" },
@@ -53,6 +54,17 @@ function display(value, fallback) {
   return text || fallback;
 }
 
+export function sourceTableId(selectedTableId) {
+  const tableId = String(selectedTableId ?? "").trim();
+  return tableId || DEFAULT_CLASS_TABLE_ID;
+}
+
+export function normalizeReferenceType(type, selectedClassTableId) {
+  const value = String(type ?? "Any");
+  const classTableId = sourceTableId(selectedClassTableId);
+  return value === `Ref:${classTableId}` ? `Ref:${DEFAULT_CLASS_TABLE_ID}` : value;
+}
+
 async function fetchRawTable(tableId) {
   try {
     return await grist.docApi.fetchTable(tableId);
@@ -69,7 +81,8 @@ async function fetchOptionalRawTable(tableId) {
   }
 }
 
-export async function fetchMetadata() {
+export async function fetchMetadata(selectedClassTableId = DEFAULT_CLASS_TABLE_ID) {
+  const classTableId = sourceTableId(selectedClassTableId);
   const [tablesRaw, columnsRaw] = await Promise.all([
     grist.docApi.fetchTable("_grist_Tables"),
     grist.docApi.fetchTable("_grist_Tables_column"),
@@ -78,8 +91,9 @@ export async function fetchMetadata() {
   const columnRows = rowsFromTable(columnsRaw);
   const result = { tables: {} };
 
-  for (const tableId of DOCUMENT_TABLES) {
-    const table = tableRows.find(row => String(row.tableId) === tableId);
+  for (const tableRole of DOCUMENT_TABLES) {
+    const actualTableId = tableRole === DEFAULT_CLASS_TABLE_ID ? classTableId : tableRole;
+    const table = tableRows.find(row => String(row.tableId) === actualTableId);
     if (!table) continue;
     const columns = columnRows
       .filter(column => column.parentId === table.id)
@@ -87,7 +101,7 @@ export async function fetchMetadata() {
         ref: ref(column.id),
         colId: String(column.colId),
         label: display(column.label, column.colId),
-        type: String(column.type ?? "Any"),
+        type: normalizeReferenceType(column.type, classTableId),
         visibleColRef: ref(column.visibleCol),
         isFormula: Boolean(column.isFormula),
         formula: String(column.formula ?? ""),
@@ -95,10 +109,10 @@ export async function fetchMetadata() {
         position: Number(column.parentPos ?? 0),
       }))
       .sort((a, b) => a.position - b.position || a.label.localeCompare(b.label, "fr"));
-    result.tables[tableId] = {
+    result.tables[tableRole] = {
       id: ref(table.id),
-      tableId,
-      label: display(table.tableId, tableId),
+      tableId: actualTableId,
+      label: display(table.tableId, actualTableId),
       columns,
     };
   }
@@ -143,11 +157,15 @@ async function getSourceMappings() {
 
 function sourceMappingProblems(metadata, selectedTableId, sourceMappings) {
   const problems = [];
-  if (selectedTableId !== "Classe") {
-    problems.push("Dans Source de données, sélectionne la table Classe.");
+  if (!selectedTableId) {
+    problems.push("Dans Source de données, sélectionne la table contenant les classes.");
   }
 
-  const classColumns = metadata?.tables?.Classe?.columns ?? [];
+  const classTable = metadata?.tables?.Classe ?? null;
+  if (!classTable) {
+    problems.push(`Table source Grist introuvable : ${sourceTableId(selectedTableId)}.`);
+  }
+  const classColumns = classTable?.columns ?? [];
   const checks = [
     ["classLabel", "Classe"],
     ["classPeriodCount", "Nombre de périodes de stage"],
@@ -155,7 +173,7 @@ function sourceMappingProblems(metadata, selectedTableId, sourceMappings) {
   for (const [key, label] of checks) {
     const columnId = sourceMappings?.[key];
     if (!columnId) {
-      problems.push(`Dans le panneau de droite, associe le champ « ${label} » à une colonne de Classe.`);
+      problems.push(`Dans le panneau de droite, associe le champ « ${label} » à une colonne de la table source.`);
       continue;
     }
     if (!classColumns.some(column => column.colId === columnId)) {
@@ -210,10 +228,10 @@ async function persistConfiguration(metadata, mappings, optimization) {
 }
 
 export async function loadConfiguration() {
-  const [metadata, stored, selectedTableId, sourceMappings] = await Promise.all([
-    fetchMetadata(),
+  const selectedTableId = await getSelectedTableId();
+  const [metadata, stored, sourceMappings] = await Promise.all([
+    fetchMetadata(selectedTableId),
     readStoredOptions(),
-    getSelectedTableId(),
     getSourceMappings(),
   ]);
   const optimization = normalizedOptimization(stored?.optimization);
@@ -240,7 +258,8 @@ export async function loadConfiguration() {
 }
 
 export async function saveConfiguration(mappings, optimization) {
-  const metadata = await fetchMetadata();
+  const selectedTableId = await getSelectedTableId();
+  const metadata = await fetchMetadata(selectedTableId);
   const resolvedMappings = inferMappings(metadata, mappings);
   return persistConfiguration(metadata, resolvedMappings, optimization);
 }
@@ -269,13 +288,14 @@ export function initializeGrist(onClassSelection) {
 }
 
 export async function fetchSnapshot(mappings, { geography = false } = {}) {
+  const selectedTableId = await getSelectedTableId();
+  const classTableId = sourceTableId(selectedTableId);
   const structuresPromise = geography ? fetchRawTable("Structures_de_stage") : fetchOptionalRawTable("Structures_de_stage");
-  const [metadata, stored, selectedTableId, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
-    fetchMetadata(),
+  const [metadata, stored, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
+    fetchMetadata(classTableId),
     readStoredOptions(),
-    getSelectedTableId(),
     getSourceMappings(),
-    fetchRawTable("Classe"),
+    fetchRawTable(classTableId),
     fetchRawTable("Eleves"),
     fetchRawTable("Enseignant"),
     fetchRawTable("Affectation"),
