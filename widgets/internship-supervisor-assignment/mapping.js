@@ -127,7 +127,7 @@ export const CONFIGURABLE_MAPPING_DEFS = Object.freeze([
     table: "Stage",
     label: "Période",
     candidates: ["Periode", "Période", "Periode_de_stage", "Période de stage"],
-    allowedTypes: ["Numeric", "Int"],
+    allowedTypes: ["Numeric", "Int", "Choice"],
     writable: true,
     mode: "semantic",
   },
