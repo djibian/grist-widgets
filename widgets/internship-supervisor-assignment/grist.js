@@ -451,6 +451,10 @@ function roleTableId(metadata, role) {
   return String(metadata?.tables?.[role]?.tableId ?? "").trim() || null;
 }
 
+function mappedColumnType(metadata, role, columnId) {
+  return metadata?.tables?.[role]?.columns?.find(column => String(column.colId) === String(columnId))?.type ?? null;
+}
+
 async function fetchRoleRawTable(metadata, role, { optional = false } = {}) {
   const tableId = roleTableId(metadata, role);
   if (!tableId) {
@@ -568,7 +572,13 @@ export function configurationProblems(snapshot) {
   return problems;
 }
 
-export function buildStageCreationAction(missing, mappings, stageTableId = DEFAULT_TABLE_IDS.Stage) {
+export function stagePeriodWriteValue(period, columnType = "Numeric") {
+  const value = integer(period);
+  if (value === null) throw new Error(`Période de stage invalide : ${period}.`);
+  return columnType === "Choice" ? String(value) : value;
+}
+
+export function buildStageCreationAction(missing, mappings, stageTableId = DEFAULT_TABLE_IDS.Stage, stagePeriodType = "Numeric") {
   const rows = Array.isArray(missing) ? missing : [];
   return [
     "BulkAddRecord",
@@ -576,7 +586,7 @@ export function buildStageCreationAction(missing, mappings, stageTableId = DEFAU
     rows.map(() => null),
     {
       [mappings.stageStudent]: rows.map(row => row.studentId),
-      [mappings.stagePeriod]: rows.map(row => row.period),
+      [mappings.stagePeriod]: rows.map(row => stagePeriodWriteValue(row.period, stagePeriodType)),
     },
   ];
 }
@@ -603,7 +613,10 @@ export async function createMissingStages(classId, periods, mappings) {
 
   const effectiveMappings = fresh.configuration.mappings;
   const stageTableId = fresh.configuration.tableIds?.Stage ?? DEFAULT_TABLE_IDS.Stage;
-  await grist.docApi.applyUserActions([buildStageCreationAction(coverage.missing, effectiveMappings, stageTableId)]);
+  const stagePeriodType = mappedColumnType(fresh.configuration.metadata, "Stage", effectiveMappings.stagePeriod) ?? "Numeric";
+  await grist.docApi.applyUserActions([
+    buildStageCreationAction(coverage.missing, effectiveMappings, stageTableId, stagePeriodType),
+  ]);
 
   const after = await fetchSnapshot(effectiveMappings, { geography: false });
   const afterCoverage = stageCoverage(after, classId, periods);
