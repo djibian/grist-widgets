@@ -2,6 +2,7 @@ import { recordsFromTable } from "../../shared/grist/records.js";
 import { isWritableColumn } from "../../shared/grist/metadata.js";
 import { configurationFingerprint, stageCoverage } from "./assignment.js";
 import {
+  CONFIGURABLE_MAPPING_DEFS,
   DOCUMENT_TABLES,
   inferMappings,
   mappingSignature,
@@ -10,8 +11,9 @@ import {
 } from "./mapping.js";
 
 const OPTION_KEY = "internshipSupervisorAssignmentV11";
-const CONFIG_VERSION = 5;
+const CONFIG_VERSION = 6;
 const DEFAULT_CLASS_TABLE_ID = "Classe";
+const DEFAULT_TABLE_IDS = Object.freeze(Object.fromEntries(DOCUMENT_TABLES.map(role => [role, role])));
 const DEFAULT_OPTIMIZATION = Object.freeze({
   geography: { enabled: true, priority: "forte" },
   diversity: { enabled: true, priority: "moyenne" },
@@ -59,10 +61,160 @@ export function sourceTableId(selectedTableId) {
   return tableId || DEFAULT_CLASS_TABLE_ID;
 }
 
-export function normalizeReferenceType(type, selectedClassTableId) {
+function storedMappingSource(stored, fallback = {}) {
+  if (stored?.bindings && typeof stored.bindings === "object") return stored.bindings;
+  if (stored?.mappings && typeof stored.mappings === "object") return stored.mappings;
+  return fallback ?? {};
+}
+
+function rawTableById(tableRows, tableId) {
+  const wanted = String(tableId ?? "");
+  return tableRows.find(row => String(row.tableId) === wanted) ?? null;
+}
+
+function rawTableByRef(tableRows, tableRef) {
+  const wanted = ref(tableRef);
+  return wanted ? tableRows.find(row => ref(row.id) === wanted) ?? null : null;
+}
+
+function rawColumnsFor(columnRows, table) {
+  if (!table) return [];
+  return columnRows.filter(column => Number(column.parentId) === Number(table.id));
+}
+
+function referenceTarget(type) {
+  const value = String(type ?? "");
+  return value.startsWith("Ref:") ? value.slice(4) : null;
+}
+
+function referenceTargets(columnRows, table) {
+  return rawColumnsFor(columnRows, table)
+    .map(column => referenceTarget(column.type))
+    .filter(Boolean);
+}
+
+function tableReferences(columnRows, table, targetTableId) {
+  return referenceTargets(columnRows, table).includes(String(targetTableId ?? ""));
+}
+
+function numericColumnCount(columnRows, table) {
+  return rawColumnsFor(columnRows, table).filter(column => ["Numeric", "Int"].includes(String(column.type ?? ""))).length;
+}
+
+function storedRoleRef(stored, role) {
+  const explicit = ref(stored?.tables?.[role]);
+  if (explicit) return explicit;
+
+  const bindings = storedMappingSource(stored);
+  const refs = new Set();
+  for (const definition of CONFIGURABLE_MAPPING_DEFS) {
+    if (definition.table !== role) continue;
+    const tableRef = ref(bindings?.[definition.key]?.tableRef);
+    if (tableRef) refs.add(tableRef);
+  }
+  return refs.size === 1 ? [...refs][0] : null;
+}
+
+export function resolveTableRoles(tableRows, columnRows, selectedClassTableId, stored = {}) {
+  const roles = {};
+  const usedRefs = new Set();
+
+  const assign = (role, table) => {
+    const tableRef = ref(table?.id);
+    if (!table || !tableRef || usedRefs.has(tableRef)) return false;
+    roles[role] = table;
+    usedRefs.add(tableRef);
+    return true;
+  };
+  const assignById = (role, tableId) => assign(role, rawTableById(tableRows, tableId));
+  const assignByRef = (role, tableRef) => assign(role, rawTableByRef(tableRows, tableRef));
+  const actualId = role => String(roles?.[role]?.tableId ?? "");
+  const unresolved = role => !roles[role];
+
+  assignById("Classe", sourceTableId(selectedClassTableId));
+
+  for (const role of DOCUMENT_TABLES) {
+    if (unresolved(role)) assignByRef(role, storedRoleRef(stored, role));
+  }
+  for (const role of DOCUMENT_TABLES) {
+    if (unresolved(role)) assignById(role, DEFAULT_TABLE_IDS[role]);
+  }
+
+  for (let pass = 0; pass < 6; pass += 1) {
+    let changed = false;
+
+    if (unresolved("Enseignant") && roles.Affectation && roles.Classe) {
+      const candidates = referenceTargets(columnRows, roles.Affectation)
+        .filter(target => target !== actualId("Classe"))
+        .map(target => rawTableById(tableRows, target))
+        .filter(table => table && !usedRefs.has(ref(table.id)));
+      if (candidates.length === 1) changed = assign("Enseignant", candidates[0]) || changed;
+    }
+
+    if (unresolved("Eleves") && roles.Stage && roles.Classe) {
+      const candidates = referenceTargets(columnRows, roles.Stage)
+        .map(target => rawTableById(tableRows, target))
+        .filter(table => table && !usedRefs.has(ref(table.id)))
+        .filter(table => tableReferences(columnRows, table, actualId("Classe")));
+      if (candidates.length === 1) changed = assign("Eleves", candidates[0]) || changed;
+    }
+
+    if (unresolved("Structures_de_stage") && roles.Stage) {
+      const excluded = new Set([actualId("Classe"), actualId("Eleves"), actualId("Enseignant")].filter(Boolean));
+      const candidates = referenceTargets(columnRows, roles.Stage)
+        .filter(target => !excluded.has(target))
+        .map(target => rawTableById(tableRows, target))
+        .filter(table => table && !usedRefs.has(ref(table.id)));
+      if (candidates.length === 1) changed = assign("Structures_de_stage", candidates[0]) || changed;
+    }
+
+    if (unresolved("Enseignant") && roles.Stage) {
+      const excluded = new Set([actualId("Classe"), actualId("Eleves"), actualId("Structures_de_stage")].filter(Boolean));
+      const candidates = referenceTargets(columnRows, roles.Stage)
+        .filter(target => !excluded.has(target))
+        .map(target => rawTableById(tableRows, target))
+        .filter(table => table && !usedRefs.has(ref(table.id)));
+      if (candidates.length === 1) changed = assign("Enseignant", candidates[0]) || changed;
+    }
+
+    if (unresolved("Affectation") && roles.Classe && roles.Enseignant) {
+      const candidates = tableRows
+        .filter(table => !usedRefs.has(ref(table.id)))
+        .filter(table => tableReferences(columnRows, table, actualId("Classe")))
+        .filter(table => tableReferences(columnRows, table, actualId("Enseignant")))
+        .filter(table => numericColumnCount(columnRows, table) >= 2);
+      if (candidates.length === 1) changed = assign("Affectation", candidates[0]) || changed;
+    }
+
+    if (unresolved("Stage") && roles.Eleves && roles.Enseignant) {
+      const candidates = tableRows
+        .filter(table => !usedRefs.has(ref(table.id)))
+        .filter(table => tableReferences(columnRows, table, actualId("Eleves")))
+        .filter(table => tableReferences(columnRows, table, actualId("Enseignant")))
+        .filter(table => !roles.Structures_de_stage || tableReferences(columnRows, table, actualId("Structures_de_stage")));
+      if (candidates.length === 1) changed = assign("Stage", candidates[0]) || changed;
+    }
+
+    if (!changed) break;
+  }
+
+  return roles;
+}
+
+export function normalizeReferenceType(type, tableRolesOrClassId) {
   const value = String(type ?? "Any");
-  const classTableId = sourceTableId(selectedClassTableId);
-  return value === `Ref:${classTableId}` ? `Ref:${DEFAULT_CLASS_TABLE_ID}` : value;
+  const target = referenceTarget(value);
+  if (!target) return value;
+
+  if (typeof tableRolesOrClassId === "string" || tableRolesOrClassId == null) {
+    const classTableId = sourceTableId(tableRolesOrClassId);
+    return target === classTableId ? `Ref:${DEFAULT_CLASS_TABLE_ID}` : value;
+  }
+
+  for (const [role, actualTableId] of Object.entries(tableRolesOrClassId ?? {})) {
+    if (String(actualTableId) === target) return `Ref:${role}`;
+  }
+  return value;
 }
 
 async function fetchRawTable(tableId) {
@@ -74,6 +226,7 @@ async function fetchRawTable(tableId) {
 }
 
 async function fetchOptionalRawTable(tableId) {
+  if (!tableId) return null;
   try {
     return await grist.docApi.fetchTable(tableId);
   } catch {
@@ -81,27 +234,27 @@ async function fetchOptionalRawTable(tableId) {
   }
 }
 
-export async function fetchMetadata(selectedClassTableId = DEFAULT_CLASS_TABLE_ID) {
-  const classTableId = sourceTableId(selectedClassTableId);
+export async function fetchMetadata(selectedClassTableId = DEFAULT_CLASS_TABLE_ID, stored = {}) {
   const [tablesRaw, columnsRaw] = await Promise.all([
     grist.docApi.fetchTable("_grist_Tables"),
     grist.docApi.fetchTable("_grist_Tables_column"),
   ]);
   const tableRows = rowsFromTable(tablesRaw);
   const columnRows = rowsFromTable(columnsRaw);
-  const result = { tables: {} };
+  const roles = resolveTableRoles(tableRows, columnRows, selectedClassTableId, stored);
+  const tableIds = Object.fromEntries(DOCUMENT_TABLES.map(role => [role, roles?.[role]?.tableId ?? null]));
+  const result = { tables: {}, tableIds };
 
   for (const tableRole of DOCUMENT_TABLES) {
-    const actualTableId = tableRole === DEFAULT_CLASS_TABLE_ID ? classTableId : tableRole;
-    const table = tableRows.find(row => String(row.tableId) === actualTableId);
+    const table = roles[tableRole];
     if (!table) continue;
-    const columns = columnRows
-      .filter(column => column.parentId === table.id)
+    const actualTableId = String(table.tableId);
+    const columns = rawColumnsFor(columnRows, table)
       .map(column => ({
         ref: ref(column.id),
         colId: String(column.colId),
         label: display(column.label, column.colId),
-        type: normalizeReferenceType(column.type, classTableId),
+        type: normalizeReferenceType(column.type, tableIds),
         visibleColRef: ref(column.visibleCol),
         isFormula: Boolean(column.isFormula),
         formula: String(column.formula ?? ""),
@@ -117,6 +270,15 @@ export async function fetchMetadata(selectedClassTableId = DEFAULT_CLASS_TABLE_I
     };
   }
   return result;
+}
+
+export function serializeTableBindings(metadata) {
+  const bindings = {};
+  for (const role of DOCUMENT_TABLES) {
+    const tableRef = ref(metadata?.tables?.[role]?.id);
+    if (tableRef) bindings[role] = tableRef;
+  }
+  return bindings;
 }
 
 async function getSelectedTableId() {
@@ -207,15 +369,10 @@ function normalizedOptimization(value) {
   };
 }
 
-function storedMappingSource(stored, fallback = {}) {
-  if (stored?.bindings && typeof stored.bindings === "object") return stored.bindings;
-  if (stored?.mappings && typeof stored.mappings === "object") return stored.mappings;
-  return fallback ?? {};
-}
-
 function storedValue(metadata, mappings, optimization) {
   return {
     version: CONFIG_VERSION,
+    tables: serializeTableBindings(metadata),
     bindings: serializeBindings(metadata, mappings),
     optimization: normalizedOptimization(optimization),
   };
@@ -229,20 +386,20 @@ async function persistConfiguration(metadata, mappings, optimization) {
 
 export async function loadConfiguration() {
   const selectedTableId = await getSelectedTableId();
-  const [metadata, stored, sourceMappings] = await Promise.all([
-    fetchMetadata(selectedTableId),
+  const [stored, sourceMappings] = await Promise.all([
     readStoredOptions(),
     getSourceMappings(),
   ]);
+  const metadata = await fetchMetadata(selectedTableId, stored);
   const optimization = normalizedOptimization(stored?.optimization);
   const mappings = inferMappings(metadata, storedMappingSource(stored));
   const mappingIssues = validateMappings(metadata, mappings, { geography: optimization.geography.enabled });
 
-  if ((!stored?.bindings || Number(stored?.version) < CONFIG_VERSION) && !mappingIssues.length) {
+  if ((!stored?.tables || !stored?.bindings || Number(stored?.version) < CONFIG_VERSION) && !mappingIssues.length) {
     try {
       await persistConfiguration(metadata, mappings, optimization);
     } catch {
-      // La migration reste facultative : le format V4 continue d'être lu tant que Grist n'a pas pu enregistrer V5.
+      // Les anciens formats restent lisibles tant que Grist n'a pas pu enregistrer la migration V6.
     }
   }
 
@@ -258,8 +415,11 @@ export async function loadConfiguration() {
 }
 
 export async function saveConfiguration(mappings, optimization) {
-  const selectedTableId = await getSelectedTableId();
-  const metadata = await fetchMetadata(selectedTableId);
+  const [selectedTableId, stored] = await Promise.all([
+    getSelectedTableId(),
+    readStoredOptions(),
+  ]);
+  const metadata = await fetchMetadata(selectedTableId, stored);
   const resolvedMappings = inferMappings(metadata, mappings);
   return persistConfiguration(metadata, resolvedMappings, optimization);
 }
@@ -287,20 +447,33 @@ export function initializeGrist(onClassSelection) {
   }
 }
 
+function roleTableId(metadata, role) {
+  return String(metadata?.tables?.[role]?.tableId ?? "").trim() || null;
+}
+
+async function fetchRoleRawTable(metadata, role, { optional = false } = {}) {
+  const tableId = roleTableId(metadata, role);
+  if (!tableId) {
+    if (optional) return null;
+    throw new Error(`Table Grist introuvable pour le rôle : ${role}.`);
+  }
+  return optional ? fetchOptionalRawTable(tableId) : fetchRawTable(tableId);
+}
+
 export async function fetchSnapshot(mappings, { geography = false } = {}) {
   const selectedTableId = await getSelectedTableId();
-  const classTableId = sourceTableId(selectedTableId);
-  const structuresPromise = geography ? fetchRawTable("Structures_de_stage") : fetchOptionalRawTable("Structures_de_stage");
-  const [metadata, stored, sourceMappings, classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
-    fetchMetadata(classTableId),
+  const [stored, sourceMappings] = await Promise.all([
     readStoredOptions(),
     getSourceMappings(),
-    fetchRawTable(classTableId),
-    fetchRawTable("Eleves"),
-    fetchRawTable("Enseignant"),
-    fetchRawTable("Affectation"),
-    fetchRawTable("Stage"),
-    structuresPromise,
+  ]);
+  const metadata = await fetchMetadata(selectedTableId, stored);
+  const [classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
+    fetchRoleRawTable(metadata, "Classe"),
+    fetchRoleRawTable(metadata, "Eleves"),
+    fetchRoleRawTable(metadata, "Enseignant"),
+    fetchRoleRawTable(metadata, "Affectation"),
+    fetchRoleRawTable(metadata, "Stage"),
+    fetchRoleRawTable(metadata, "Structures_de_stage", { optional: !geography }),
   ]);
   const effectiveMappings = inferMappings(metadata, storedMappingSource(stored, mappings));
   const mappingIssues = validateMappings(metadata, effectiveMappings, { geography });
@@ -377,6 +550,7 @@ export async function fetchSnapshot(mappings, { geography = false } = {}) {
     structures,
     configuration: {
       metadata,
+      tableIds: { ...metadata.tableIds },
       mappings: { ...effectiveMappings },
       mappingIssues,
       selectedTableId,
@@ -394,11 +568,11 @@ export function configurationProblems(snapshot) {
   return problems;
 }
 
-export function buildStageCreationAction(missing, mappings) {
+export function buildStageCreationAction(missing, mappings, stageTableId = DEFAULT_TABLE_IDS.Stage) {
   const rows = Array.isArray(missing) ? missing : [];
   return [
     "BulkAddRecord",
-    "Stage",
+    stageTableId,
     rows.map(() => null),
     {
       [mappings.stageStudent]: rows.map(row => row.studentId),
@@ -407,10 +581,10 @@ export function buildStageCreationAction(missing, mappings) {
   ];
 }
 
-export function buildAssignmentActions(assignments, mappings) {
+export function buildAssignmentActions(assignments, mappings, stageTableId = DEFAULT_TABLE_IDS.Stage) {
   return (assignments || []).map(assignment => [
     "UpdateRecord",
-    "Stage",
+    stageTableId,
     assignment.stageId,
     { [mappings.stageSupervisor]: assignment.teacherId },
   ]);
@@ -428,12 +602,13 @@ export async function createMissingStages(classId, periods, mappings) {
   if (!coverage.missing.length) return { snapshot: fresh, createdCount: 0, created: [] };
 
   const effectiveMappings = fresh.configuration.mappings;
-  await grist.docApi.applyUserActions([buildStageCreationAction(coverage.missing, effectiveMappings)]);
+  const stageTableId = fresh.configuration.tableIds?.Stage ?? DEFAULT_TABLE_IDS.Stage;
+  await grist.docApi.applyUserActions([buildStageCreationAction(coverage.missing, effectiveMappings, stageTableId)]);
 
   const after = await fetchSnapshot(effectiveMappings, { geography: false });
   const afterCoverage = stageCoverage(after, classId, periods);
   if (afterCoverage.errors.some(row => row.code === "DUPLICATE_STAGE")) {
-    throw new Error("Des doublons de stages ont été détectés après la création. Vérifie la table Stage avant de poursuivre.");
+    throw new Error("Des doublons de stages ont été détectés après la création. Vérifie la table des stages avant de poursuivre.");
   }
   if (afterCoverage.missing.length) {
     throw new Error("Certains stages n'ont pas pu être créés. Vérifie les droits d'écriture et le paramétrage des colonnes.");
@@ -453,7 +628,7 @@ export async function applyPlan(plan, mappings) {
   if (problems.length) throw new Error(problems.join(" "));
 
   if (plan.sourceMappingSignature && plan.sourceMappingSignature !== sourceMappingSignature(fresh.configuration.sourceMappings)) {
-    throw new Error("Le mapping de la source Classe a changé. Génère une nouvelle proposition.");
+    throw new Error("Le mapping de la source des classes a changé. Génère une nouvelle proposition.");
   }
 
   const currentFingerprint = configurationFingerprint(fresh, plan.classId, plan.criteria);
@@ -470,6 +645,7 @@ export async function applyPlan(plan, mappings) {
 
   if (!plan.assignments.length) return fresh;
   const effectiveMappings = fresh.configuration.mappings;
-  await grist.docApi.applyUserActions(buildAssignmentActions(plan.assignments, effectiveMappings));
+  const stageTableId = fresh.configuration.tableIds?.Stage ?? DEFAULT_TABLE_IDS.Stage;
+  await grist.docApi.applyUserActions(buildAssignmentActions(plan.assignments, effectiveMappings, stageTableId));
   return fetchSnapshot(effectiveMappings, { geography });
 }
