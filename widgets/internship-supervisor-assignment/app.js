@@ -285,6 +285,19 @@ function columnOptionLabel(column) {
   return column.label === column.colId ? column.colId : `${column.label} · ${column.colId}`;
 }
 
+function tableDisplayName(tableRole) {
+  return state.metadata?.tables?.[tableRole]?.tableId ?? tableRole;
+}
+
+function displayMappingIssue(issue) {
+  const message = String(issue?.message ?? "");
+  const tableRole = issue?.table;
+  if (!tableRole) return message;
+  const tableName = tableDisplayName(tableRole);
+  if (!tableName || tableName === tableRole) return message;
+  return message.replace(tableRole, tableName);
+}
+
 function mappingStats() {
   const groups = mappingGroups();
   return {
@@ -299,7 +312,7 @@ function renderMappingFields(mappings = state.mappings) {
     const wrapper = document.createElement("section");
     wrapper.className = "mapping-group";
     const heading = document.createElement("h4");
-    heading.textContent = group.table;
+    heading.textContent = tableDisplayName(group.table);
     wrapper.append(heading);
 
     const columns = state.metadata?.tables?.[group.table]?.columns ?? [];
@@ -358,7 +371,7 @@ function renderMappingDraftStatus() {
     el.mappingSummary.textContent = `⚠ ${issues.length} point(s) à vérifier`;
     el.mappingSummaryMeta.textContent = "Ouvre cette section pour corriger les colonnes concernées.";
     el.mappingStatus.className = "settings-message error";
-    el.mappingStatus.innerHTML = issues.map(row => `• ${esc(row.message)}`).join("<br>");
+    el.mappingStatus.innerHTML = issues.map(row => `• ${esc(displayMappingIssue(row))}`).join("<br>");
     el.mappingDetails.open = true;
   }
   return issues;
