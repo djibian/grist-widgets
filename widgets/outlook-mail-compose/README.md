@@ -45,15 +45,15 @@ Après **Appliquer ce modèle**, Grist considère les options du widget comme mo
 
 ## Ouverture d'Outlook
 
-Le widget construit une URL de composition Microsoft 365 à partir du destinataire, de l'objet et du corps résolus.
+Le bouton **Ouvrir dans Outlook** est un lien HTML direct (`target="_blank"`) plutôt qu'un appel JavaScript à `window.open()`. L'ouverture reste ainsi directement attachée au clic utilisateur et n'est pas traitée comme une fenêtre surgissante créée par script.
 
-Le bouton **Ouvrir dans Outlook** est un lien HTML direct (`target="_blank"`) plutôt qu'un appel JavaScript à `window.open()`. L'ouverture reste ainsi directement attachée au clic utilisateur et ne doit pas être traitée comme une fenêtre surgissante créée par script.
+La route utilisée est le deeplink Outlook Web de composition pour Microsoft 365 :
 
-La route actuellement testée est :
+`https://outlook.office.com/mail/0/deeplink/compose`
 
-`https://outlook.office.com/?path=/mail/action/compose`
+Le widget ajoute `popoutv2=1`, puis encode le destinataire, l'objet et le corps dans les paramètres `to`, `subject` et `body`.
 
-Le destinataire, l'objet et le corps sont encodés dans l'URL.
+La précédente route historique `/?path=/mail/action/compose` a été abandonnée après test réel : elle ouvrait bien Outlook mais sans ouvrir le message préparé dans l'environnement testé.
 
 ## Limites assumées
 
@@ -62,7 +62,7 @@ Le destinataire, l'objet et le corps sont encodés dans l'URL.
 - aucune information fiable de type « envoyé » ne peut être remontée automatiquement dans Grist, puisque l'envoi est confirmé ensuite dans Outlook ;
 - les pièces jointes ne sont pas prises en charge ;
 - le mécanisme repose sur une URL de composition : il convient donc aux messages de taille raisonnable ;
-- l'utilisateur doit être authentifié dans Outlook Web dans son navigateur.
+- l'utilisateur doit être authentifié dans Outlook Web dans son navigateur. Une réauthentification Microsoft peut modifier ou perdre les paramètres du deeplink ; ce cas devra être testé séparément.
 
 ## Sécurité et données
 
