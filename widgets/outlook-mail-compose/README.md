@@ -45,7 +45,7 @@ Le widget utilise la route Microsoft 365 destinée aux comptes professionnels :
 
 `https://outlook.office.com/?path=/mail/action/compose`
 
-L'ouverture est déclenchée directement par le clic utilisateur afin d'éviter le blocage des fenêtres surgissantes. Le destinataire, l'objet et le corps sont encodés dans l'URL.
+Cette route est utilisée à la place du deeplink direct après observation, lors du premier test réel, que le deeplink ouvrait Outlook sans afficher le message à composer. L'ouverture est déclenchée directement par le clic utilisateur afin d'éviter le blocage des fenêtres surgissantes. Le destinataire, l'objet et le corps sont encodés dans l'URL.
 
 ## Limites assumées
 
