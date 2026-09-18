@@ -59,6 +59,11 @@ test('buildOutlookComposeUrl uses the Microsoft 365 work compose route', () => {
     url,
     `${OUTLOOK_COMPOSE_BASE}?path=${OUTLOOK_COMPOSE_PATH}&to=agent%40example.fr&subject=Suivi%20%26%20acc%C3%A8s%20%C3%A9l%C3%A8ve&body=Bonjour%20%C3%89lodie`
   );
+
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get('path'), OUTLOOK_COMPOSE_PATH);
+  assert.equal(parsed.searchParams.get('to'), 'agent@example.fr');
+  assert.equal(parsed.searchParams.get('subject'), 'Suivi & accès élève');
 });
 
 test('buildOutlookComposeUrl preserves line breaks and full URLs through encoding', () => {
