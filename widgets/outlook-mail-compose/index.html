@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../../shared/ui/base.css">
   <link rel="stylesheet" href="../../shared/ui/components.css">
   <link rel="stylesheet" href="../../shared/ui/structure.css">
-  <link rel="stylesheet" href="style.css?v=0.2.2">
+  <link rel="stylesheet" href="style.css?v=0.3.0">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
 <body>
@@ -19,37 +19,27 @@
         <div class="gw-widget-heading__text">
           <div class="gw-kicker">Outlook Web</div>
           <h1 class="gw-header__title">Préparer un courriel</h1>
-          <p class="gw-header__subtitle">Préparer un message personnalisé depuis la ligne Grist sélectionnée, puis l’envoyer depuis Outlook.</p>
+          <p class="gw-header__subtitle">Vérifier le message préparé dans Grist, puis l’ouvrir dans Outlook pour l’envoyer.</p>
         </div>
       </div>
     </header>
 
     <section id="mappingError" class="gw-status gw-status--warning mapping-error" role="alert">
       <strong>Configuration incomplète.</strong><br>
-      Associez au minimum la colonne Destinataire dans le panneau de création Grist.
-    </section>
-
-    <section class="gw-context-strip" aria-label="Contexte Grist">
-      <div class="gw-context-item">
-        <span class="gw-context-label">Ligne Grist</span>
-        <strong id="recordLabel" class="gw-context-value">Sélectionnez une ligne</strong>
-      </div>
-      <div class="gw-context-item">
-        <span class="gw-context-label">Destinataire</span>
-        <span id="recipientValue" class="gw-context-value">—</span>
-      </div>
-      <div class="gw-context-item">
-        <span class="gw-context-label">État</span>
-        <span id="composeContextState" class="gw-context-value context-state">Sélection requise</span>
-      </div>
+      Associez les colonnes Destinataire et Lien dans le panneau de création Grist.
     </section>
 
     <div class="gw-work-grid mail-work-grid">
       <section class="gw-work-main">
         <div class="gw-step-heading">
           <span class="gw-step-heading__index">01 · Vérifier</span>
-          <h2 class="gw-step-heading__title">Message préparé</h2>
-          <p class="gw-step-heading__help">L’objet et le corps sont définis dans les réglages du widget et peuvent inclure des variables de la ligne Grist.</p>
+          <h2 class="gw-step-heading__title">Courriel préparé</h2>
+          <p class="gw-step-heading__help">Le destinataire et le lien viennent de la ligne sélectionnée. L’objet et le corps utilisent le modèle enregistré dans ce widget.</p>
+        </div>
+
+        <div class="mail-field">
+          <span class="mail-field__label">Destinataire</span>
+          <strong id="recipientValue" class="mail-field__value">—</strong>
         </div>
 
         <div class="mail-field">
@@ -62,46 +52,47 @@
           <pre id="bodyPreview" class="mail-body-preview">Le contenu du message apparaîtra ici.</pre>
         </div>
 
-        <div class="gw-action-dock mail-action-dock">
-          <div class="gw-action-dock__text">
-            <strong>Préparer dans Outlook</strong>
-            <small>Outlook s’ouvre dans un nouvel onglet. Vous gardez la maîtrise du clic final sur Envoyer.</small>
+        <details class="mail-template-editor">
+          <summary>Modifier le modèle pour les prochains messages</summary>
+          <p class="mail-template-help">Les modifications sont prévisualisées immédiatement. Le lien de la ligne sélectionnée est disponible avec <code>{{Lien}}</code>.</p>
+
+          <label class="mail-setting-label" for="subjectTemplate">Objet du modèle</label>
+          <input id="subjectTemplate" class="gw-input" type="text">
+
+          <label class="mail-setting-label" for="bodyTemplate">Corps du modèle</label>
+          <textarea id="bodyTemplate" class="gw-input mail-template-body" rows="9"></textarea>
+
+          <details class="mail-variables">
+            <summary>Autres variables disponibles</summary>
+            <p>Vous pouvez également insérer une valeur de la ligne avec la syntaxe <code>{{Nom_de_colonne}}</code>.</p>
+            <div id="availableFields" class="mail-variable-list">Sélectionnez une ligne pour afficher les variables disponibles.</div>
+          </details>
+
+          <div class="mail-template-save">
+            <button id="saveTemplates" class="gw-button gw-button--secondary" type="button">Appliquer ce modèle</button>
+            <div id="settingsStatus" class="settings-status" role="status" aria-live="polite"></div>
           </div>
-          <button id="openOutlook" class="gw-button gw-button--primary" type="button" disabled>
-            Ouvrir dans Outlook
-          </button>
+        </details>
+      </section>
+
+      <aside class="gw-decision-panel mail-send-panel">
+        <div class="gw-step-heading">
+          <span class="gw-step-heading__index">02 · Ouvrir</span>
+          <h2 class="gw-step-heading__title">Envoyer avec Outlook</h2>
+          <p class="gw-step-heading__help">Le bouton ouvre Outlook Web avec le destinataire, l’objet et le corps déjà renseignés. L’envoi reste à confirmer dans Outlook.</p>
         </div>
+
+        <a id="openOutlook" class="gw-button gw-button--primary is-disabled" aria-disabled="true" target="_blank" rel="noopener noreferrer">
+          Ouvrir dans Outlook
+        </a>
 
         <div id="status" class="status" role="status" aria-live="polite">
           Sélectionnez une ligne Grist pour préparer le message.
         </div>
-      </section>
-
-      <aside class="gw-decision-panel mail-settings-panel">
-        <div class="gw-step-heading">
-          <span class="gw-step-heading__index">02 · Configurer</span>
-          <h2 class="gw-step-heading__title">Modèle du message</h2>
-          <p class="gw-step-heading__help">Ces réglages remplacent les anciennes colonnes Objet et Corps.</p>
-        </div>
-
-        <label class="mail-setting-label" for="subjectTemplate">Objet</label>
-        <input id="subjectTemplate" class="gw-input" type="text" placeholder="Ex. Votre accès Grist">
-
-        <label class="mail-setting-label" for="bodyTemplate">Corps</label>
-        <textarea id="bodyTemplate" class="gw-input mail-template-body" rows="10" placeholder="Bonjour,&#10;&#10;Voici votre lien : {{Lien_Stages}}&#10;&#10;Cordialement"></textarea>
-
-        <details class="mail-variables">
-          <summary>Variables disponibles dans la ligne sélectionnée</summary>
-          <p>Insérez une variable avec la syntaxe <code>{{Nom_de_colonne}}</code>.</p>
-          <div id="availableFields" class="mail-variable-list">Sélectionnez une ligne pour afficher les variables disponibles.</div>
-        </details>
-
-        <button id="saveTemplates" class="gw-button gw-button--secondary" type="button">Appliquer les réglages</button>
-        <div id="settingsStatus" class="settings-status" role="status" aria-live="polite"></div>
 
         <div class="notice">
-          <strong>Aucun envoi automatique.</strong>
-          <span>Le widget ne possède aucun accès à votre boîte mail. Le clic ouvre uniquement le compositeur Outlook prérempli.</span>
+          <strong>Aucun accès à votre boîte mail.</strong>
+          <span>Le widget prépare uniquement une URL de composition Outlook. Aucun webhook, jeton Microsoft ou serveur intermédiaire n’est utilisé.</span>
         </div>
       </aside>
     </div>
@@ -109,6 +100,6 @@
     <p class="footer">Grist Studio · préparation locale du message, envoi confirmé dans Outlook</p>
   </main>
 
-  <script type="module" src="app.js?v=0.2.2"></script>
+  <script type="module" src="app.js?v=0.3.0"></script>
 </body>
 </html>
