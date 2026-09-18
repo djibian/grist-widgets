@@ -1,5 +1,4 @@
-export const OUTLOOK_COMPOSE_BASE = 'https://outlook.office.com/';
-export const OUTLOOK_COMPOSE_PATH = '/mail/action/compose';
+export const OUTLOOK_COMPOSE_BASE = 'https://outlook.office.com/mail/0/deeplink/compose';
 
 function text(value) {
   return value === null || value === undefined ? '' : String(value);
@@ -47,6 +46,7 @@ export function buildOutlookComposeUrl({ recipient, subject, body } = {}) {
   }
 
   const query = [
+    ['popoutv2', '1'],
     ['to', text(recipient).trim()],
     ['subject', text(subject)],
     ['body', text(body)]
@@ -54,5 +54,5 @@ export function buildOutlookComposeUrl({ recipient, subject, body } = {}) {
     .map(([name, value]) => `${name}=${encodeURIComponent(value)}`)
     .join('&');
 
-  return `${OUTLOOK_COMPOSE_BASE}?path=${OUTLOOK_COMPOSE_PATH}&${query}`;
+  return `${OUTLOOK_COMPOSE_BASE}?${query}`;
 }
