@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 
 import {
   OUTLOOK_COMPOSE_BASE,
-  OUTLOOK_COMPOSE_PATH,
   buildOutlookComposeUrl,
   renderTemplate,
   validateComposeData
@@ -48,7 +47,7 @@ test('renderTemplate reports unknown variables once', () => {
   );
 });
 
-test('buildOutlookComposeUrl uses the Microsoft 365 work compose route', () => {
+test('buildOutlookComposeUrl uses Outlook Web compose deeplink', () => {
   const url = buildOutlookComposeUrl({
     recipient: ' agent@example.fr ',
     subject: 'Suivi & accès élève',
@@ -57,11 +56,12 @@ test('buildOutlookComposeUrl uses the Microsoft 365 work compose route', () => {
 
   assert.equal(
     url,
-    `${OUTLOOK_COMPOSE_BASE}?path=${OUTLOOK_COMPOSE_PATH}&to=agent%40example.fr&subject=Suivi%20%26%20acc%C3%A8s%20%C3%A9l%C3%A8ve&body=Bonjour%20%C3%89lodie`
+    `${OUTLOOK_COMPOSE_BASE}?popoutv2=1&to=agent%40example.fr&subject=Suivi%20%26%20acc%C3%A8s%20%C3%A9l%C3%A8ve&body=Bonjour%20%C3%89lodie`
   );
 
   const parsed = new URL(url);
-  assert.equal(parsed.searchParams.get('path'), OUTLOOK_COMPOSE_PATH);
+  assert.equal(parsed.pathname, '/mail/0/deeplink/compose');
+  assert.equal(parsed.searchParams.get('popoutv2'), '1');
   assert.equal(parsed.searchParams.get('to'), 'agent@example.fr');
   assert.equal(parsed.searchParams.get('subject'), 'Suivi & accès élève');
 });
