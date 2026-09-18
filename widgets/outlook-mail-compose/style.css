@@ -148,6 +148,12 @@
   margin-top: var(--gw-space-2);
 }
 
+#openOutlook:disabled,
+#saveTemplates:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
 @media (max-width: 760px) {
   .mail-action-dock {
     align-items: stretch;
