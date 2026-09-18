@@ -36,25 +36,28 @@ test('extractHyperlinkUrl removes the Grist hyperlink label', () => {
   );
 });
 
-test('renderTemplate substitutes Grist column identifiers', () => {
+test('renderTemplate substitutes mapped semantic variables', () => {
   assert.deepEqual(
-    renderTemplate('Bonjour {{Prenom}},\n{{Lien_Stages}}', {
-      Prenom: 'Élodie',
-      Lien_Stages: 'https://example.fr/access?token=a&mode=1'
+    renderTemplate('Destinataire : {{Destinataire}}\nLien : {{Lien}}', {
+      Destinataire: 'agent@example.fr',
+      Lien: 'https://example.fr/access?token=a&mode=1'
     }),
     {
-      text: 'Bonjour Élodie,\nhttps://example.fr/access?token=a&mode=1',
+      text: 'Destinataire : agent@example.fr\nLien : https://example.fr/access?token=a&mode=1',
       missingFields: []
     }
   );
 });
 
-test('renderTemplate reports unknown variables once', () => {
+test('renderTemplate reports an unmapped variable once', () => {
   assert.deepEqual(
-    renderTemplate('{{Inconnue}} puis {{ Inconnue }}', {}),
+    renderTemplate('{{Email}} puis {{ Email }}', {
+      Destinataire: 'agent@example.fr',
+      Lien: 'https://example.fr'
+    }),
     {
       text: ' puis ',
-      missingFields: ['Inconnue']
+      missingFields: ['Email']
     }
   );
 });
