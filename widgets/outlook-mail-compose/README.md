@@ -1,23 +1,20 @@
 # Préparer un courriel Outlook
 
-Widget Grist minimal pour ouvrir Outlook Web avec un message prérempli à partir de la ligne sélectionnée.
+Widget Grist minimal pour préparer un courriel depuis la ligne sélectionnée puis l'ouvrir dans Outlook Web.
 
 ## Principe
 
 Le widget ne fait aucun envoi lui-même et n'utilise ni API Microsoft, ni secret, ni serveur intermédiaire.
 
-Il ouvre le compositeur Outlook Web de Microsoft 365 avec :
+L'interface est volontairement organisée en deux étapes :
 
-- le destinataire issu d'une colonne Grist ;
-- l'objet défini directement dans les réglages du widget ;
-- le corps défini directement dans les réglages du widget.
-
-L'utilisateur vérifie ensuite le message et clique lui-même sur **Envoyer** dans Outlook.
+1. **Vérifier** — afficher le courriel complet avec destinataire, objet et corps déjà résolus ;
+2. **Ouvrir** — ouvrir Outlook Web avec ce même message prérempli, puis laisser l'utilisateur cliquer sur **Envoyer**.
 
 ## Colonnes à associer
 
 - **Destinataire** — adresse de courriel ;
-- **Libellé de la ligne** — facultatif, uniquement pour l'affichage dans le widget.
+- **Lien** — lien personnalisé à insérer dans le message.
 
 Il n'est pas nécessaire de créer de colonne Grist pour l'objet ou le corps.
 
@@ -25,27 +22,38 @@ Le widget demande seulement l'accès `read table`.
 
 ## Modèle du message
 
-L'objet et le corps sont enregistrés comme options du widget. Ils peuvent contenir des variables correspondant aux identifiants de colonnes de la ligne sélectionnée :
+Le widget fournit un modèle par défaut immédiatement utilisable :
 
 ```text
-Bonjour {{Prenom}},
+Objet : Votre lien d'accès
 
-Voici votre lien : {{Lien_Stages}}
+Bonjour,
+
+Voici votre lien d'accès :
+{{Lien}}
 
 Cordialement
 ```
 
-Le widget affiche les variables disponibles pour la ligne sélectionnée. Une variable inconnue bloque l'ouverture d'Outlook afin d'éviter d'envoyer un message incomplet.
+`{{Lien}}` désigne toujours la colonne associée au mapping **Lien**, quel que soit son nom réel dans le document Grist.
 
-Après **Appliquer les réglages**, Grist considère les options du widget comme modifiées : utilisez également l'action **Enregistrer** de Grist pour les rendre persistantes après rechargement.
+L'objet et le corps peuvent être modifiés dans **Modifier le modèle pour les prochains messages**. La prévisualisation est mise à jour immédiatement. D'autres colonnes de la ligne peuvent également être utilisées avec la syntaxe `{{Nom_de_colonne}}`.
+
+Une variable inconnue bloque l'ouverture d'Outlook afin d'éviter de préparer un message incomplet.
+
+Après **Appliquer ce modèle**, Grist considère les options du widget comme modifiées : utilisez également l'action **Enregistrer** de Grist pour les rendre persistantes après rechargement.
 
 ## Ouverture d'Outlook
 
-Le widget utilise la route Microsoft 365 destinée aux comptes professionnels :
+Le widget construit une URL de composition Microsoft 365 à partir du destinataire, de l'objet et du corps résolus.
+
+Le bouton **Ouvrir dans Outlook** est un lien HTML direct (`target="_blank"`) plutôt qu'un appel JavaScript à `window.open()`. L'ouverture reste ainsi directement attachée au clic utilisateur et ne doit pas être traitée comme une fenêtre surgissante créée par script.
+
+La route actuellement testée est :
 
 `https://outlook.office.com/?path=/mail/action/compose`
 
-Cette route est utilisée à la place du deeplink direct après observation, lors du premier test réel, que le deeplink ouvrait Outlook sans afficher le message à composer. L'ouverture est déclenchée directement par le clic utilisateur afin d'éviter le blocage des fenêtres surgissantes. Le destinataire, l'objet et le corps sont encodés dans l'URL.
+Le destinataire, l'objet et le corps sont encodés dans l'URL.
 
 ## Limites assumées
 
@@ -53,7 +61,7 @@ Cette route est utilisée à la place du deeplink direct après observation, lor
 - les URL complètes peuvent être incluses telles quelles dans le texte, mais leur rendu cliquable dépend d'Outlook et du client du destinataire ;
 - aucune information fiable de type « envoyé » ne peut être remontée automatiquement dans Grist, puisque l'envoi est confirmé ensuite dans Outlook ;
 - les pièces jointes ne sont pas prises en charge ;
-- le mécanisme repose sur une URL de composition : il convient donc aux messages de taille raisonnable, pas à de très longs contenus ;
+- le mécanisme repose sur une URL de composition : il convient donc aux messages de taille raisonnable ;
 - l'utilisateur doit être authentifié dans Outlook Web dans son navigateur.
 
 ## Sécurité et données
