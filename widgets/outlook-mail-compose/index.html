@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Préparer un courriel Outlook</title>
+  <link rel="stylesheet" href="../../shared/ui/tokens.css">
+  <link rel="stylesheet" href="../../shared/ui/base.css">
+  <link rel="stylesheet" href="../../shared/ui/components.css">
+  <link rel="stylesheet" href="../../shared/ui/structure.css">
+  <link rel="stylesheet" href="style.css?v=0.4.0">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+</head>
+<body>
+  <main class="mail-shell gw-widget-frame">
+    <header class="mail-header gw-widget-header">
+      <div class="gw-widget-heading">
+        <div class="gw-widget-icon" aria-hidden="true">✉</div>
+        <div class="gw-widget-heading__text">
+          <div class="gw-kicker">Outlook Web</div>
+          <h1 class="gw-header__title">Préparer un courriel</h1>
+          <p class="gw-header__subtitle">Vérifier le message préparé dans Grist, puis l’ouvrir dans Outlook pour l’envoyer.</p>
+        </div>
+      </div>
+    </header>
+
+    <section id="mappingError" class="gw-status gw-status--warning mapping-error" role="alert">
+      <strong>Configuration incomplète.</strong><br>
+      Les mappings Destinataire et Lien sont obligatoires.
+    </section>
+
+    <div class="gw-work-grid mail-work-grid">
+      <section class="gw-work-main">
+        <div class="gw-step-heading">
+          <span class="gw-step-heading__index">01 · Vérifier</span>
+          <h2 class="gw-step-heading__title">Courriel préparé</h2>
+          <p class="gw-step-heading__help">Le destinataire et le lien viennent des deux champs obligatoirement mappés. L’objet et le corps utilisent le modèle enregistré dans ce widget.</p>
+        </div>
+
+        <div class="mail-field">
+          <span class="mail-field__label">Destinataire</span>
+          <strong id="recipientValue" class="mail-field__value">—</strong>
+        </div>
+
+        <div class="mail-field">
+          <span class="mail-field__label">Objet</span>
+          <strong id="subjectValue" class="mail-field__value">—</strong>
+        </div>
+
+        <div class="mail-field mail-field--body">
+          <span class="mail-field__label">Corps</span>
+          <pre id="bodyPreview" class="mail-body-preview">Le contenu du message apparaîtra ici.</pre>
+        </div>
+
+        <details class="mail-template-editor">
+          <summary>Modifier le modèle pour les prochains messages</summary>
+          <p class="mail-template-help">Les modifications sont prévisualisées immédiatement. Seules les variables issues de champs explicitement mappés sont utilisables.</p>
+
+          <label class="mail-setting-label" for="subjectTemplate">Objet du modèle</label>
+          <input id="subjectTemplate" class="gw-input" type="text">
+
+          <label class="mail-setting-label" for="bodyTemplate">Corps du modèle</label>
+          <textarea id="bodyTemplate" class="gw-input mail-template-body" rows="10"></textarea>
+
+          <div class="notice">
+            <strong>Variables mappées disponibles</strong>
+            <span><code>{{Destinataire}}</code> — colonne mappée sur Destinataire</span>
+            <span><code>{{Lien}}</code> — colonne mappée sur Lien ; si elle provient de <code>SELF_HYPERLINK</code>, seul l’URL est conservée.</span>
+            <span>Pour utiliser un autre champ dans le modèle, il faudra d’abord l’ajouter comme mapping explicite au widget.</span>
+          </div>
+
+          <div class="mail-template-save">
+            <button id="saveTemplates" class="gw-button gw-button--secondary" type="button">Appliquer ce modèle</button>
+            <div id="settingsStatus" class="settings-status" role="status" aria-live="polite"></div>
+          </div>
+        </details>
+      </section>
+
+      <aside class="gw-decision-panel mail-send-panel">
+        <div class="gw-step-heading">
+          <span class="gw-step-heading__index">02 · Ouvrir</span>
+          <h2 class="gw-step-heading__title">Envoyer avec Outlook</h2>
+          <p class="gw-step-heading__help">Le bouton ouvre Outlook Web avec le destinataire, l’objet et le corps déjà renseignés. L’envoi reste à confirmer dans Outlook.</p>
+        </div>
+
+        <a id="openOutlook" class="gw-button gw-button--primary is-disabled" aria-disabled="true" target="_blank" rel="noopener noreferrer">
+          Ouvrir dans Outlook
+        </a>
+
+        <div id="status" class="status" role="status" aria-live="polite">
+          Sélectionnez une ligne Grist pour préparer le message.
+        </div>
+
+        <div class="notice">
+          <strong>Aucun accès à votre boîte mail.</strong>
+          <span>Le widget prépare uniquement une URL de composition Outlook. Aucun webhook, jeton Microsoft ou serveur intermédiaire n’est utilisé.</span>
+        </div>
+      </aside>
+    </div>
+
+    <p class="footer">Grist Studio · préparation locale du message, envoi confirmé dans Outlook</p>
+  </main>
+
+  <script type="module" src="app.js?v=0.4.0"></script>
+</body>
+</html>

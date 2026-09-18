@@ -74,6 +74,24 @@ URL publiée :
 
 Tests dédiés : `npm run test:route-distance`.
 
+## Préparer un courriel Outlook
+
+Dossier : `widgets/outlook-mail-compose/`.
+
+Le widget ouvre Outlook Web avec un message personnalisé sans API Microsoft, webhook ni serveur intermédiaire :
+
+- seule la colonne destinataire est requise ;
+- l’objet et le corps sont configurés directement dans le widget ;
+- les modèles peuvent utiliser les colonnes de la ligne avec `{{Nom_de_colonne}}` ;
+- l’utilisateur vérifie le message puis confirme lui-même l’envoi dans Outlook ;
+- aucune écriture dans Grist n’est nécessaire.
+
+URL publiée :
+
+`https://djibian.github.io/grist-widgets/widgets/outlook-mail-compose/`
+
+Tests dédiés : `npm run test:outlook-mail-compose`.
+
 ## Automatisation
 
 Les workflows permanents sont limités à :
