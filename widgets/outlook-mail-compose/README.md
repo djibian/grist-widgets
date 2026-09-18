@@ -11,39 +11,54 @@ L'interface est volontairement organisée en deux étapes :
 1. **Vérifier** — afficher le courriel complet avec destinataire, objet et corps déjà résolus ;
 2. **Ouvrir** — ouvrir Outlook Web avec ce même message prérempli, puis laisser l'utilisateur cliquer sur **Envoyer**.
 
-## Colonnes à associer
+## Champs à associer
+
+Deux mappings sont obligatoires :
 
 - **Destinataire** — adresse de courriel ;
-- **Lien** — lien personnalisé à insérer dans le message.
+- **Lien** — lien personnel à insérer dans le message.
 
 Il n'est pas nécessaire de créer de colonne Grist pour l'objet ou le corps.
 
 Le widget demande seulement l'accès `read table`.
 
+## Variables du modèle
+
+Le modèle n'accède pas directement à toutes les colonnes de la ligne Grist. Une donnée utilisable dans le modèle doit correspondre à un mapping explicite du widget.
+
+La version actuelle expose seulement :
+
+- `{{Destinataire}}` — valeur de la colonne mappée sur **Destinataire** ;
+- `{{Lien}}` — valeur de la colonne mappée sur **Lien**.
+
+Cela évite les doublons ambigus du type `{{Destinataire}}` / `{{Email}}` ou `{{Lien}}` / `{{Lien_Stages}}`. Si un nouveau champ doit être utilisé plus tard dans le modèle, il devra d'abord être ajouté comme mapping explicite au widget.
+
+Si la colonne **Lien** est un hyperlien produit par `SELF_HYPERLINK`, sa valeur peut être exposée au widget sous la forme `Libellé https://...`. Le widget extrait uniquement l'URL pour `{{Lien}}` ; le libellé d'origine n'est pas repris dans le courriel.
+
 ## Modèle du message
 
-Le widget fournit un modèle par défaut immédiatement utilisable :
+Le widget fournit désormais ce modèle par défaut :
 
 ```text
-Objet : Votre lien d'accès
+Objet : Votre lien personnel pour le suivi des stages
 
 Bonjour,
 
-Voici votre lien d'accès :
-Suivi des stages : {{Lien}}
+Voici votre lien personnel pour le suivi des stages :
+{{Lien}}
+
+Ce lien est personnel. Merci de ne pas le transmettre ni de le diffuser.
 
 Cordialement
 ```
 
-`{{Lien}}` désigne toujours la colonne associée au mapping **Lien**, quel que soit son nom réel dans le document Grist.
+L'objet et le corps peuvent être modifiés dans **Modifier le modèle pour les prochains messages**. La prévisualisation est mise à jour immédiatement.
 
-Si la colonne Grist est un hyperlien produit par `SELF_HYPERLINK`, sa valeur peut être exposée au widget sous la forme `Libellé https://...`. Le widget extrait alors uniquement l'URL pour `{{Lien}}` afin d'éviter de répéter le libellé dans le courriel.
-
-L'objet et le corps peuvent être modifiés dans **Modifier le modèle pour les prochains messages**. La prévisualisation est mise à jour immédiatement. D'autres colonnes de la ligne peuvent également être utilisées avec la syntaxe `{{Nom_de_colonne}}`.
-
-Une variable inconnue bloque l'ouverture d'Outlook afin d'éviter de préparer un message incomplet.
+Une variable non mappée bloque l'ouverture d'Outlook afin d'éviter de préparer un message incomplet.
 
 Après **Appliquer ce modèle**, Grist considère les options du widget comme modifiées : utilisez également l'action **Enregistrer** de Grist pour les rendre persistantes après rechargement.
+
+Les anciens modèles par défaut connus sont migrés automatiquement vers le nouveau texte. Un modèle réellement personnalisé par l'utilisateur est conservé.
 
 ## Ouverture d'Outlook
 
@@ -59,8 +74,8 @@ La précédente route historique `/?path=/mail/action/compose` a été abandonn�
 
 ## Limites assumées
 
-- le paramètre `body` du deeplink Outlook Web est du texte simple : il n'est pas possible d'y transmettre un vrai lien HTML `<a href="…">Suivi des stages</a>` ;
-- la meilleure solution sans API Microsoft consiste donc à transmettre l'URL complète, qu'Outlook peut détecter comme lien cliquable selon son mode de composition ;
+- le paramètre `body` du deeplink Outlook Web est du texte simple : il n'est pas possible d'y transmettre un vrai lien HTML masqué derrière un libellé ;
+- la solution minimale transmet donc l'URL complète, qu'Outlook peut détecter comme lien cliquable selon son mode de composition ;
 - aucune information fiable de type « envoyé » ne peut être remontée automatiquement dans Grist, puisque l'envoi est confirmé ensuite dans Outlook ;
 - les pièces jointes ne sont pas prises en charge ;
 - le mécanisme repose sur une URL de composition : il convient donc aux messages de taille raisonnable ;
