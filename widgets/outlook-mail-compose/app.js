@@ -27,7 +27,6 @@ const state = {
   rawRecord: null,
   mappings: null,
   composeUrl: null,
-  templatesLoaded: false,
   templates: {
     subject: '',
     body: ''
@@ -123,6 +122,7 @@ function renderSelected() {
   renderAvailableFields();
 
   if (!mappingIsComplete()) {
+    elements.mappingError.classList.add('visible');
     elements.recordLabel.textContent = 'Configuration requise';
     elements.recipientValue.textContent = '—';
     elements.subjectValue.textContent = '—';
@@ -131,6 +131,8 @@ function renderSelected() {
     setStatus('Associez la colonne Destinataire dans la configuration du widget.', 'error');
     return;
   }
+
+  elements.mappingError.classList.remove('visible');
 
   if (!state.selected) {
     elements.recordLabel.textContent = 'Sélectionnez une ligne';
@@ -219,7 +221,7 @@ function openOutlook() {
     }
     setContextState('Ouvert dans Outlook', 'ready');
     setStatus('Outlook a été ouvert. Vérifiez le destinataire, l’objet et le corps puis cliquez sur Envoyer dans Outlook.', 'success');
-  } catch (error) {
+  } catch {
     setContextState('Ouverture impossible', 'error');
     setStatus('Le navigateur a empêché l’ouverture d’Outlook. Autorisez les fenêtres surgissantes pour ce site.', 'error');
   }
@@ -228,34 +230,34 @@ function openOutlook() {
 elements.openOutlook.addEventListener('click', openOutlook);
 elements.saveTemplates.addEventListener('click', saveTemplates);
 
-async function initialize() {
-  grist.ready({
-    requiredAccess: 'read table',
-    columns: [
-      {
-        name: 'Recipient',
-        title: 'Destinataire',
-        type: 'Text',
-        optional: true,
-        description: 'Adresse de courriel du destinataire.'
-      },
-      {
-        name: 'Label',
-        title: 'Libellé de la ligne',
-        type: 'Text',
-        optional: true,
-        description: 'Libellé facultatif affiché dans le widget.'
-      }
-    ]
-  });
+grist.ready({
+  requiredAccess: 'read table',
+  columns: [
+    {
+      name: 'Recipient',
+      title: 'Destinataire',
+      type: 'Text',
+      optional: true,
+      description: 'Adresse de courriel du destinataire.'
+    },
+    {
+      name: 'Label',
+      title: 'Libellé de la ligne',
+      type: 'Text',
+      optional: true,
+      description: 'Libellé facultatif affiché dans le widget.'
+    }
+  ]
+});
 
-  grist.onRecord((record, mappings) => {
-    state.rawRecord = record || null;
-    state.mappings = mappings || null;
-    state.selected = record ? grist.mapColumnNames(record, { mappings }) : null;
-    renderSelected();
-  });
+grist.onRecord((record, mappings) => {
+  state.rawRecord = record || null;
+  state.mappings = mappings || null;
+  state.selected = record ? grist.mapColumnNames(record, { mappings }) : null;
+  renderSelected();
+});
 
+async function loadStoredTemplates() {
   try {
     const stored = await grist.widgetApi.getOption(OPTION_KEY);
     if (stored && typeof stored === 'object') {
@@ -264,13 +266,12 @@ async function initialize() {
         body: String(stored.body ?? '')
       };
     }
-  } catch (error) {
+  } catch {
     setSettingsStatus('Impossible de relire les réglages enregistrés.', 'error');
-  } finally {
-    state.templatesLoaded = true;
-    renderTemplateInputs();
-    renderSelected();
   }
+
+  renderTemplateInputs();
+  renderSelected();
 }
 
-initialize();
+loadStoredTemplates();
