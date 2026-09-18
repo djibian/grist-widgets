@@ -1,5 +1,6 @@
 import {
   buildOutlookComposeUrl,
+  extractHyperlinkUrl,
   renderTemplate,
   validateComposeData
 } from './compose.js';
@@ -7,7 +8,7 @@ import {
 const OPTION_KEY = 'outlookMailComposeV1';
 const DEFAULT_TEMPLATES = Object.freeze({
   subject: "Votre lien d'accès",
-  body: "Bonjour,\n\nVoici votre lien d'accès :\n{{Lien}}\n\nCordialement"
+  body: "Bonjour,\n\nVoici votre lien d'accès :\nSuivi des stages : {{Lien}}\n\nCordialement"
 });
 
 const elements = Object.fromEntries([
@@ -79,7 +80,7 @@ function templateContext() {
   return {
     ...state.rawRecord,
     Destinataire: state.selected.Recipient ?? '',
-    Lien: state.selected.Link ?? ''
+    Lien: extractHyperlinkUrl(state.selected.Link ?? '')
   };
 }
 
@@ -206,7 +207,7 @@ async function saveTemplates() {
 
   try {
     const value = {
-      version: 2,
+      version: 3,
       subject: state.templates.subject,
       body: state.templates.body
     };
