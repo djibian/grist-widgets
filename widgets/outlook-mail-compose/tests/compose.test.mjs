@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 
 import {
   OUTLOOK_COMPOSE_BASE,
+  OUTLOOK_COMPOSE_PATH,
   buildOutlookComposeUrl,
+  renderTemplate,
   validateComposeData
 } from '../compose.js';
 
@@ -23,7 +25,30 @@ test('validateComposeData requires recipient, subject and body', () => {
   });
 });
 
-test('buildOutlookComposeUrl encodes recipient, accents and ampersands', () => {
+test('renderTemplate substitutes Grist column identifiers', () => {
+  assert.deepEqual(
+    renderTemplate('Bonjour {{Prenom}},\n{{Lien_Stages}}', {
+      Prenom: 'Élodie',
+      Lien_Stages: 'https://example.fr/access?token=a&mode=1'
+    }),
+    {
+      text: 'Bonjour Élodie,\nhttps://example.fr/access?token=a&mode=1',
+      missingFields: []
+    }
+  );
+});
+
+test('renderTemplate reports unknown variables once', () => {
+  assert.deepEqual(
+    renderTemplate('{{Inconnue}} puis {{ Inconnue }}', {}),
+    {
+      text: ' puis ',
+      missingFields: ['Inconnue']
+    }
+  );
+});
+
+test('buildOutlookComposeUrl uses the Microsoft 365 work compose route', () => {
   const url = buildOutlookComposeUrl({
     recipient: ' agent@example.fr ',
     subject: 'Suivi & accès élève',
@@ -32,7 +57,7 @@ test('buildOutlookComposeUrl encodes recipient, accents and ampersands', () => {
 
   assert.equal(
     url,
-    `${OUTLOOK_COMPOSE_BASE}?to=agent%40example.fr&subject=Suivi%20%26%20acc%C3%A8s%20%C3%A9l%C3%A8ve&body=Bonjour%20%C3%89lodie`
+    `${OUTLOOK_COMPOSE_BASE}?path=${OUTLOOK_COMPOSE_PATH}&to=agent%40example.fr&subject=Suivi%20%26%20acc%C3%A8s%20%C3%A9l%C3%A8ve&body=Bonjour%20%C3%89lodie`
   );
 });
 
