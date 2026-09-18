@@ -78,15 +78,13 @@ Tests dédiés : `npm run test:route-distance`.
 
 Dossier : `widgets/outlook-mail-compose/`.
 
-Le widget prépare un message Outlook Web à partir de la ligne Grist sélectionnée :
+Le widget ouvre Outlook Web avec un message personnalisé sans API Microsoft, webhook ni serveur intermédiaire :
 
-- mapping Destinataire / Objet / Corps ;
-- prévisualisation du message dans Grist ;
-- ouverture d’Outlook Web avec le message prérempli ;
-- aucun envoi automatique : l’utilisateur conserve le clic final sur **Envoyer** ;
-- aucun webhook, aucun secret Microsoft et aucun serveur intermédiaire.
-
-Le corps transmis au compositeur Outlook Web est du texte simple. Le widget demande seulement l’accès `read table`.
+- seule la colonne destinataire est requise ;
+- l’objet et le corps sont configurés directement dans le widget ;
+- les modèles peuvent utiliser les colonnes de la ligne avec `{{Nom_de_colonne}}` ;
+- l’utilisateur vérifie le message puis confirme lui-même l’envoi dans Outlook ;
+- aucune écriture dans Grist n’est nécessaire.
 
 URL publiée :
 
