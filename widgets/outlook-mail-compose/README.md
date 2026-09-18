@@ -30,12 +30,14 @@ Objet : Votre lien d'accès
 Bonjour,
 
 Voici votre lien d'accès :
-{{Lien}}
+Suivi des stages : {{Lien}}
 
 Cordialement
 ```
 
 `{{Lien}}` désigne toujours la colonne associée au mapping **Lien**, quel que soit son nom réel dans le document Grist.
+
+Si la colonne Grist est un hyperlien produit par `SELF_HYPERLINK`, sa valeur peut être exposée au widget sous la forme `Libellé https://...`. Le widget extrait alors uniquement l'URL pour `{{Lien}}` afin d'éviter de répéter le libellé dans le courriel.
 
 L'objet et le corps peuvent être modifiés dans **Modifier le modèle pour les prochains messages**. La prévisualisation est mise à jour immédiatement. D'autres colonnes de la ligne peuvent également être utilisées avec la syntaxe `{{Nom_de_colonne}}`.
 
@@ -57,12 +59,14 @@ La précédente route historique `/?path=/mail/action/compose` a été abandonn�
 
 ## Limites assumées
 
-- le corps transmis au compositeur Outlook Web est du texte simple, pas du HTML ;
-- les URL complètes peuvent être incluses telles quelles dans le texte, mais leur rendu cliquable dépend d'Outlook et du client du destinataire ;
+- le paramètre `body` du deeplink Outlook Web est du texte simple : il n'est pas possible d'y transmettre un vrai lien HTML `<a href="…">Suivi des stages</a>` ;
+- la meilleure solution sans API Microsoft consiste donc à transmettre l'URL complète, qu'Outlook peut détecter comme lien cliquable selon son mode de composition ;
 - aucune information fiable de type « envoyé » ne peut être remontée automatiquement dans Grist, puisque l'envoi est confirmé ensuite dans Outlook ;
 - les pièces jointes ne sont pas prises en charge ;
 - le mécanisme repose sur une URL de composition : il convient donc aux messages de taille raisonnable ;
 - l'utilisateur doit être authentifié dans Outlook Web dans son navigateur. Une réauthentification Microsoft peut modifier ou perdre les paramètres du deeplink ; ce cas devra être testé séparément.
+
+Obtenir un lien masqué derrière un libellé nécessiterait de créer un brouillon HTML par une API Microsoft (par exemple Microsoft Graph) ou d'utiliser une extension Outlook, ce qui sort volontairement de l'architecture minimale de ce widget.
 
 ## Sécurité et données
 
