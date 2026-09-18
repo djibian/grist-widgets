@@ -12,7 +12,7 @@
 }
 
 .mail-work-grid {
-  align-items: stretch;
+  align-items: start;
 }
 
 .mail-field {
@@ -26,7 +26,8 @@
   margin-top: var(--gw-space-3);
 }
 
-.mail-field__label {
+.mail-field__label,
+.mail-setting-label {
   display: block;
   margin-bottom: var(--gw-space-2);
   color: var(--gw-color-text-muted);
@@ -59,39 +60,92 @@
   margin-top: var(--gw-space-4);
 }
 
-#openOutlook {
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-#openOutlook.is-disabled {
-  pointer-events: none;
-  opacity: .5;
+.status {
+  min-height: 2.5rem;
+  margin-top: var(--gw-space-3);
+  line-height: 1.5;
 }
 
 .context-state.ready,
-.status.success {
+.status.success,
+.settings-status.success {
   color: var(--gw-color-success);
 }
 
 .context-state.error,
-.status.error {
+.status.error,
+.settings-status.error {
   color: var(--gw-color-danger);
 }
 
-.status {
-  min-height: 3rem;
+.mail-settings-panel {
+  display: grid;
+  gap: var(--gw-space-3);
+}
+
+.mail-settings-panel .gw-step-heading {
+  margin-bottom: var(--gw-space-1);
+}
+
+.mail-setting-label {
+  margin: var(--gw-space-2) 0 0;
+}
+
+.mail-template-body {
+  min-height: 12rem;
+  resize: vertical;
+  font: inherit;
   line-height: 1.5;
 }
 
-.mail-info-panel .notice {
-  display: grid;
-  gap: var(--gw-space-2);
-  margin-top: var(--gw-space-4);
+.mail-variables {
+  padding: var(--gw-space-3);
+  border: 1px solid var(--gw-color-border-subtle);
+  border-radius: var(--gw-radius-md);
+  background: var(--gw-color-surface-subtle);
 }
 
-.notice--plain-text {
-  margin-top: var(--gw-space-3) !important;
+.mail-variables summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.mail-variables p {
+  margin: var(--gw-space-3) 0;
+  color: var(--gw-color-text-muted);
+  font-size: var(--gw-font-size-sm);
+}
+
+.mail-variable-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gw-space-2);
+  max-height: 11rem;
+  overflow: auto;
+  color: var(--gw-color-text-muted);
+  font-size: var(--gw-font-size-sm);
+}
+
+.mail-variable-list code {
+  padding: 3px 7px;
+  border: 1px solid var(--gw-color-border);
+  border-radius: var(--gw-radius-sm);
+  background: var(--gw-color-surface);
+  color: var(--gw-color-text);
+  overflow-wrap: anywhere;
+}
+
+.settings-status {
+  min-height: 2.5rem;
+  color: var(--gw-color-text-muted);
+  font-size: var(--gw-font-size-sm);
+  line-height: 1.45;
+}
+
+.mail-settings-panel .notice {
+  display: grid;
+  gap: var(--gw-space-2);
+  margin-top: var(--gw-space-2);
 }
 
 @media (max-width: 760px) {
@@ -99,8 +153,8 @@
     align-items: stretch;
   }
 
-  #openOutlook {
+  #openOutlook,
+  #saveTemplates {
     width: 100%;
-    text-align: center;
   }
 }
