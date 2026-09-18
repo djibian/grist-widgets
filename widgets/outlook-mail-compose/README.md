@@ -6,26 +6,46 @@ Widget Grist minimal pour ouvrir Outlook Web avec un message prérempli à parti
 
 Le widget ne fait aucun envoi lui-même et n'utilise ni API Microsoft, ni secret, ni serveur intermédiaire.
 
-Il construit localement dans le navigateur une URL de composition Outlook Web :
+Il ouvre le compositeur Outlook Web de Microsoft 365 avec :
 
-`https://outlook.office.com/mail/deeplink/compose`
-
-puis ouvre Outlook avec :
-
-- le destinataire ;
-- l'objet ;
-- le corps du message.
+- le destinataire issu d'une colonne Grist ;
+- l'objet défini directement dans les réglages du widget ;
+- le corps défini directement dans les réglages du widget.
 
 L'utilisateur vérifie ensuite le message et clique lui-même sur **Envoyer** dans Outlook.
 
 ## Colonnes à associer
 
 - **Destinataire** — adresse de courriel ;
-- **Objet** — objet du message ;
-- **Corps** — corps texte du message ;
 - **Libellé de la ligne** — facultatif, uniquement pour l'affichage dans le widget.
 
+Il n'est pas nécessaire de créer de colonne Grist pour l'objet ou le corps.
+
 Le widget demande seulement l'accès `read table`.
+
+## Modèle du message
+
+L'objet et le corps sont enregistrés comme options du widget. Ils peuvent contenir des variables correspondant aux identifiants de colonnes de la ligne sélectionnée :
+
+```text
+Bonjour {{Prenom}},
+
+Voici votre lien : {{Lien_Stages}}
+
+Cordialement
+```
+
+Le widget affiche les variables disponibles pour la ligne sélectionnée. Une variable inconnue bloque l'ouverture d'Outlook afin d'éviter d'envoyer un message incomplet.
+
+Après **Appliquer les réglages**, Grist considère les options du widget comme modifiées : utilisez également l'action **Enregistrer** de Grist pour les rendre persistantes après rechargement.
+
+## Ouverture d'Outlook
+
+Le widget utilise la route Microsoft 365 destinée aux comptes professionnels :
+
+`https://outlook.office.com/?path=/mail/action/compose`
+
+L'ouverture est déclenchée directement par le clic utilisateur afin d'éviter le blocage des fenêtres surgissantes. Le destinataire, l'objet et le corps sont encodés dans l'URL.
 
 ## Limites assumées
 
