@@ -4,6 +4,12 @@ function text(value) {
   return value === null || value === undefined ? '' : String(value);
 }
 
+export function extractHyperlinkUrl(value) {
+  const source = text(value).trim();
+  const match = source.match(/https?:\/\/\S+$/i);
+  return match ? match[0] : source;
+}
+
 export function validateComposeData({ recipient, subject, body } = {}) {
   const missing = [];
   if (!text(recipient).trim()) missing.push('Destinataire');
