@@ -1,0 +1,106 @@
+.mail-shell {
+  min-height: 100vh;
+}
+
+.mapping-error {
+  display: none;
+  margin-bottom: var(--gw-space-4);
+}
+
+.mapping-error.visible {
+  display: block;
+}
+
+.mail-work-grid {
+  align-items: stretch;
+}
+
+.mail-field {
+  padding: var(--gw-space-4);
+  border: 1px solid var(--gw-border);
+  border-radius: var(--gw-radius-lg);
+  background: var(--gw-surface);
+}
+
+.mail-field + .mail-field {
+  margin-top: var(--gw-space-3);
+}
+
+.mail-field__label {
+  display: block;
+  margin-bottom: var(--gw-space-2);
+  color: var(--gw-text-muted);
+  font-size: var(--gw-font-size-sm);
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.mail-field__value {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.mail-body-preview {
+  max-height: 18rem;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--gw-text);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.mail-action-dock {
+  margin-top: var(--gw-space-4);
+}
+
+#openOutlook {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+#openOutlook.is-disabled {
+  pointer-events: none;
+  opacity: .5;
+}
+
+.context-state.ready,
+.status.success {
+  color: var(--gw-success, #17803d);
+}
+
+.context-state.error,
+.status.error {
+  color: var(--gw-danger, #b42318);
+}
+
+.status {
+  min-height: 3rem;
+  line-height: 1.5;
+}
+
+.mail-info-panel .notice {
+  display: grid;
+  gap: var(--gw-space-2);
+  margin-top: var(--gw-space-4);
+}
+
+.notice--plain-text {
+  margin-top: var(--gw-space-3) !important;
+}
+
+@media (max-width: 760px) {
+  .mail-action-dock {
+    align-items: stretch;
+  }
+
+  #openOutlook {
+    width: 100%;
+    text-align: center;
+  }
+}
