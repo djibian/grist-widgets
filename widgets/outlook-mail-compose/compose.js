@@ -1,4 +1,5 @@
-export const OUTLOOK_COMPOSE_BASE = 'https://outlook.office.com/mail/deeplink/compose';
+export const OUTLOOK_COMPOSE_BASE = 'https://outlook.office.com/';
+export const OUTLOOK_COMPOSE_PATH = '/mail/action/compose';
 
 function text(value) {
   return value === null || value === undefined ? '' : String(value);
@@ -16,6 +17,29 @@ export function validateComposeData({ recipient, subject, body } = {}) {
   };
 }
 
+export function renderTemplate(template, record = {}) {
+  const missingFields = [];
+  const seen = new Set();
+
+  const rendered = text(template).replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (_match, rawField) => {
+    const field = String(rawField).trim();
+    const hasField = Object.prototype.hasOwnProperty.call(record ?? {}, field);
+    const value = hasField ? record[field] : undefined;
+
+    if (!hasField || value === null || value === undefined) {
+      if (!seen.has(field)) {
+        seen.add(field);
+        missingFields.push(field);
+      }
+      return '';
+    }
+
+    return text(value);
+  });
+
+  return { text: rendered, missingFields };
+}
+
 export function buildOutlookComposeUrl({ recipient, subject, body } = {}) {
   const validation = validateComposeData({ recipient, subject, body });
   if (!validation.valid) {
@@ -30,5 +54,5 @@ export function buildOutlookComposeUrl({ recipient, subject, body } = {}) {
     .map(([name, value]) => `${name}=${encodeURIComponent(value)}`)
     .join('&');
 
-  return `${OUTLOOK_COMPOSE_BASE}?${query}`;
+  return `${OUTLOOK_COMPOSE_BASE}?path=${OUTLOOK_COMPOSE_PATH}&${query}`;
 }
