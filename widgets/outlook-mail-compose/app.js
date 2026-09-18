@@ -7,9 +7,20 @@ import {
 
 const OPTION_KEY = 'outlookMailComposeV1';
 const DEFAULT_TEMPLATES = Object.freeze({
-  subject: "Votre lien d'accès",
-  body: "Bonjour,\n\nVoici votre lien d'accès :\nSuivi des stages : {{Lien}}\n\nCordialement"
+  subject: 'Votre lien personnel pour le suivi des stages',
+  body: 'Bonjour,\n\nVoici votre lien personnel pour le suivi des stages :\n{{Lien}}\n\nCe lien est personnel. Merci de ne pas le transmettre ni de le diffuser.\n\nCordialement'
 });
+
+const LEGACY_DEFAULT_TEMPLATES = Object.freeze([
+  {
+    subject: "Votre lien d'accès",
+    body: "Bonjour,\n\nVoici votre lien d'accès :\n{{Lien}}\n\nCordialement"
+  },
+  {
+    subject: "Votre lien d'accès",
+    body: "Bonjour,\n\nVoici votre lien d'accès :\nSuivi des stages : {{Lien}}\n\nCordialement"
+  }
+]);
 
 const elements = Object.fromEntries([
   'mappingError',
@@ -21,13 +32,11 @@ const elements = Object.fromEntries([
   'subjectTemplate',
   'bodyTemplate',
   'saveTemplates',
-  'settingsStatus',
-  'availableFields'
+  'settingsStatus'
 ].map((id) => [id, document.getElementById(id)]));
 
 const state = {
   selected: null,
-  rawRecord: null,
   mappings: null,
   composeUrl: null,
   templates: { ...DEFAULT_TEMPLATES }
@@ -76,35 +85,11 @@ function enableComposeLink(url) {
 }
 
 function templateContext() {
-  if (!state.rawRecord || !state.selected) return {};
+  if (!state.selected) return {};
   return {
-    ...state.rawRecord,
     Destinataire: state.selected.Recipient ?? '',
     Lien: extractHyperlinkUrl(state.selected.Link ?? '')
   };
-}
-
-function renderAvailableFields() {
-  elements.availableFields.replaceChildren();
-  if (!state.rawRecord || !state.selected) {
-    elements.availableFields.textContent = 'Sélectionnez une ligne pour afficher les variables disponibles.';
-    return;
-  }
-
-  const fields = Object.keys(templateContext())
-    .filter((field) => field !== 'id')
-    .sort((left, right) => left.localeCompare(right, 'fr'));
-
-  if (fields.length === 0) {
-    elements.availableFields.textContent = 'Aucune variable disponible.';
-    return;
-  }
-
-  for (const field of fields) {
-    const code = document.createElement('code');
-    code.textContent = `{{${field}}}`;
-    elements.availableFields.appendChild(code);
-  }
 }
 
 function renderTemplateInputs() {
@@ -113,7 +98,7 @@ function renderTemplateInputs() {
 }
 
 function prepareMessage() {
-  if (!state.selected || !state.rawRecord || !templatesAreComplete()) {
+  if (!state.selected || !templatesAreComplete()) {
     return null;
   }
 
@@ -132,14 +117,13 @@ function prepareMessage() {
 
 function renderSelected() {
   disableComposeLink();
-  renderAvailableFields();
 
   if (!mappingIsComplete()) {
     elements.mappingError.classList.add('visible');
     elements.recipientValue.textContent = '—';
     elements.subjectValue.textContent = state.templates.subject || '—';
     elements.bodyPreview.textContent = state.templates.body || '—';
-    setStatus('Associez les colonnes Destinataire et Lien dans la configuration du widget.', 'error');
+    setStatus('Associez obligatoirement les colonnes Destinataire et Lien dans la configuration du widget.', 'error');
     return;
   }
 
@@ -168,7 +152,10 @@ function renderSelected() {
   elements.bodyPreview.textContent = message.body || 'Corps du message manquant';
 
   if (message.missingFields.length > 0) {
-    setStatus(`Variables absentes de la ligne : ${message.missingFields.join(', ')}.`, 'error');
+    setStatus(
+      `Variable non mappée : ${message.missingFields.join(', ')}. Seules {{Destinataire}} et {{Lien}} sont disponibles.`,
+      'error'
+    );
     return;
   }
 
@@ -202,12 +189,21 @@ async function saveTemplates() {
     return;
   }
 
+  const preview = prepareMessage();
+  if (preview?.missingFields.length) {
+    setSettingsStatus(
+      `Variable non mappée : ${preview.missingFields.join(', ')}. Ajoutez d’abord un mapping au widget avant d’utiliser un nouveau champ.`,
+      'error'
+    );
+    return;
+  }
+
   elements.saveTemplates.disabled = true;
   setSettingsStatus('Application du modèle…');
 
   try {
     const value = {
-      version: 3,
+      version: 4,
       subject: state.templates.subject,
       body: state.templates.body
     };
@@ -218,6 +214,10 @@ async function saveTemplates() {
   } finally {
     elements.saveTemplates.disabled = false;
   }
+}
+
+function isLegacyDefault(subject, body) {
+  return LEGACY_DEFAULT_TEMPLATES.some((legacy) => legacy.subject === subject && legacy.body === body);
 }
 
 elements.subjectTemplate.addEventListener('input', updateTemplatesFromInputs);
@@ -238,21 +238,20 @@ grist.ready({
       name: 'Recipient',
       title: 'Destinataire',
       type: 'Text',
-      optional: true,
-      description: 'Adresse de courriel du destinataire.'
+      optional: false,
+      description: 'Obligatoire — adresse de courriel du destinataire.'
     },
     {
       name: 'Link',
       title: 'Lien',
       type: 'Text',
-      optional: true,
-      description: 'Lien personnalisé à insérer dans le message avec la variable {{Lien}}.'
+      optional: false,
+      description: 'Obligatoire — lien personnel inséré dans le message avec la variable {{Lien}}.'
     }
   ]
 });
 
 grist.onRecord((record, mappings) => {
-  state.rawRecord = record || null;
   state.mappings = mappings || null;
   state.selected = record ? grist.mapColumnNames(record, { mappings }) : null;
   renderSelected();
@@ -262,13 +261,10 @@ async function loadStoredTemplates() {
   try {
     const stored = await grist.widgetApi.getOption(OPTION_KEY);
     if (stored && typeof stored === 'object') {
-      const subject = String(stored.subject ?? '').trim();
-      const body = String(stored.body ?? '').trim();
-      if (subject && body) {
-        state.templates = {
-          subject: String(stored.subject),
-          body: String(stored.body)
-        };
+      const subject = String(stored.subject ?? '');
+      const body = String(stored.body ?? '');
+      if (subject.trim() && body.trim() && !isLegacyDefault(subject, body)) {
+        state.templates = { subject, body };
       }
     }
   } catch {
