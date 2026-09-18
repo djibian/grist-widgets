@@ -43,7 +43,7 @@
 }
 
 .mail-body-preview {
-  max-height: 18rem;
+  max-height: 22rem;
   margin: 0;
   padding: 0;
   overflow: auto;
@@ -56,71 +56,52 @@
   line-height: 1.55;
 }
 
-.mail-action-dock {
+.mail-template-editor {
   margin-top: var(--gw-space-4);
+  padding: var(--gw-space-4);
+  border: 1px solid var(--gw-color-border-subtle);
+  border-radius: var(--gw-radius-lg);
+  background: var(--gw-color-surface-subtle);
 }
 
-.status {
-  min-height: 2.5rem;
-  margin-top: var(--gw-space-3);
-  line-height: 1.5;
+.mail-template-editor > summary,
+.mail-variables > summary {
+  cursor: pointer;
+  font-weight: 700;
 }
 
-.context-state.ready,
-.status.success,
-.settings-status.success {
-  color: var(--gw-color-success);
-}
-
-.context-state.error,
-.status.error,
-.settings-status.error {
-  color: var(--gw-color-danger);
-}
-
-.mail-settings-panel {
-  display: grid;
-  gap: var(--gw-space-3);
-}
-
-.mail-settings-panel .gw-step-heading {
-  margin-bottom: var(--gw-space-1);
+.mail-template-help,
+.mail-variables p {
+  margin: var(--gw-space-3) 0;
+  color: var(--gw-color-text-muted);
+  font-size: var(--gw-font-size-sm);
+  line-height: 1.45;
 }
 
 .mail-setting-label {
-  margin: var(--gw-space-2) 0 0;
+  margin-top: var(--gw-space-3);
 }
 
 .mail-template-body {
-  min-height: 12rem;
+  min-height: 11rem;
   resize: vertical;
   font: inherit;
   line-height: 1.5;
 }
 
 .mail-variables {
+  margin-top: var(--gw-space-3);
   padding: var(--gw-space-3);
   border: 1px solid var(--gw-color-border-subtle);
   border-radius: var(--gw-radius-md);
-  background: var(--gw-color-surface-subtle);
-}
-
-.mail-variables summary {
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.mail-variables p {
-  margin: var(--gw-space-3) 0;
-  color: var(--gw-color-text-muted);
-  font-size: var(--gw-font-size-sm);
+  background: var(--gw-color-surface);
 }
 
 .mail-variable-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--gw-space-2);
-  max-height: 11rem;
+  max-height: 10rem;
   overflow: auto;
   color: var(--gw-color-text-muted);
   font-size: var(--gw-font-size-sm);
@@ -130,37 +111,69 @@
   padding: 3px 7px;
   border: 1px solid var(--gw-color-border);
   border-radius: var(--gw-radius-sm);
-  background: var(--gw-color-surface);
+  background: var(--gw-color-surface-subtle);
   color: var(--gw-color-text);
   overflow-wrap: anywhere;
 }
 
-.settings-status {
+.mail-template-save {
+  display: grid;
+  gap: var(--gw-space-2);
+  margin-top: var(--gw-space-4);
+}
+
+.settings-status,
+.status {
   min-height: 2.5rem;
   color: var(--gw-color-text-muted);
   font-size: var(--gw-font-size-sm);
   line-height: 1.45;
 }
 
-.mail-settings-panel .notice {
-  display: grid;
-  gap: var(--gw-space-2);
-  margin-top: var(--gw-space-2);
+.status {
+  margin-top: var(--gw-space-3);
 }
 
-#openOutlook:disabled,
+.status.success,
+.settings-status.success {
+  color: var(--gw-color-success);
+}
+
+.status.error,
+.settings-status.error {
+  color: var(--gw-color-danger);
+}
+
+.mail-send-panel {
+  display: grid;
+  gap: var(--gw-space-4);
+}
+
+.mail-send-panel #openOutlook {
+  justify-content: center;
+  text-decoration: none;
+}
+
+#openOutlook.is-disabled {
+  pointer-events: none;
+  cursor: not-allowed;
+  opacity: .55;
+}
+
 #saveTemplates:disabled {
   cursor: not-allowed;
   opacity: .55;
 }
 
-@media (max-width: 760px) {
-  .mail-action-dock {
-    align-items: stretch;
-  }
+.mail-send-panel .notice {
+  display: grid;
+  gap: var(--gw-space-2);
+}
 
+@media (max-width: 760px) {
   #openOutlook,
   #saveTemplates {
     width: 100%;
+    text-align: center;
   }
 }
