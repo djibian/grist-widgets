@@ -5,13 +5,15 @@ import {
 } from './compose.js';
 
 const OPTION_KEY = 'outlookMailComposeV1';
+const DEFAULT_TEMPLATES = Object.freeze({
+  subject: "Votre lien d'accès",
+  body: "Bonjour,\n\nVoici votre lien d'accès :\n{{Lien}}\n\nCordialement"
+});
 
 const elements = Object.fromEntries([
   'mappingError',
-  'recordLabel',
   'recipientValue',
   'subjectValue',
-  'composeContextState',
   'bodyPreview',
   'openOutlook',
   'status',
@@ -27,10 +29,7 @@ const state = {
   rawRecord: null,
   mappings: null,
   composeUrl: null,
-  templates: {
-    subject: '',
-    body: ''
-  }
+  templates: { ...DEFAULT_TEMPLATES }
 };
 
 function displayText(value, fallback) {
@@ -40,7 +39,11 @@ function displayText(value, fallback) {
 }
 
 function mappingIsComplete() {
-  return Boolean(state.mappings && state.mappings.Recipient);
+  return Boolean(
+    state.mappings &&
+    state.mappings.Recipient &&
+    state.mappings.Link
+  );
 }
 
 function templatesAreComplete() {
@@ -57,29 +60,37 @@ function setSettingsStatus(message, type = '') {
   elements.settingsStatus.className = 'settings-status' + (type ? ` ${type}` : '');
 }
 
-function setContextState(message, type = '') {
-  elements.composeContextState.textContent = message;
-  elements.composeContextState.className = 'gw-context-value context-state' + (type ? ` ${type}` : '');
-}
-
-function disableComposeButton() {
+function disableComposeLink() {
   state.composeUrl = null;
-  elements.openOutlook.disabled = true;
+  elements.openOutlook.removeAttribute('href');
+  elements.openOutlook.setAttribute('aria-disabled', 'true');
+  elements.openOutlook.classList.add('is-disabled');
 }
 
-function enableComposeButton(url) {
+function enableComposeLink(url) {
   state.composeUrl = url;
-  elements.openOutlook.disabled = false;
+  elements.openOutlook.href = url;
+  elements.openOutlook.setAttribute('aria-disabled', 'false');
+  elements.openOutlook.classList.remove('is-disabled');
+}
+
+function templateContext() {
+  if (!state.rawRecord || !state.selected) return {};
+  return {
+    ...state.rawRecord,
+    Destinataire: state.selected.Recipient ?? '',
+    Lien: state.selected.Link ?? ''
+  };
 }
 
 function renderAvailableFields() {
   elements.availableFields.replaceChildren();
-  if (!state.rawRecord) {
+  if (!state.rawRecord || !state.selected) {
     elements.availableFields.textContent = 'Sélectionnez une ligne pour afficher les variables disponibles.';
     return;
   }
 
-  const fields = Object.keys(state.rawRecord)
+  const fields = Object.keys(templateContext())
     .filter((field) => field !== 'id')
     .sort((left, right) => left.localeCompare(right, 'fr'));
 
@@ -105,8 +116,9 @@ function prepareMessage() {
     return null;
   }
 
-  const subjectResult = renderTemplate(state.templates.subject, state.rawRecord);
-  const bodyResult = renderTemplate(state.templates.body, state.rawRecord);
+  const context = templateContext();
+  const subjectResult = renderTemplate(state.templates.subject, context);
+  const bodyResult = renderTemplate(state.templates.body, context);
   const missingFields = [...new Set([...subjectResult.missingFields, ...bodyResult.missingFields])];
 
   return {
@@ -118,43 +130,35 @@ function prepareMessage() {
 }
 
 function renderSelected() {
-  disableComposeButton();
+  disableComposeLink();
   renderAvailableFields();
 
   if (!mappingIsComplete()) {
     elements.mappingError.classList.add('visible');
-    elements.recordLabel.textContent = 'Configuration requise';
     elements.recipientValue.textContent = '—';
-    elements.subjectValue.textContent = '—';
-    elements.bodyPreview.textContent = 'Associez la colonne Destinataire dans Grist.';
-    setContextState('Mapping requis', 'error');
-    setStatus('Associez la colonne Destinataire dans la configuration du widget.', 'error');
+    elements.subjectValue.textContent = state.templates.subject || '—';
+    elements.bodyPreview.textContent = state.templates.body || '—';
+    setStatus('Associez les colonnes Destinataire et Lien dans la configuration du widget.', 'error');
     return;
   }
 
   elements.mappingError.classList.remove('visible');
 
   if (!state.selected) {
-    elements.recordLabel.textContent = 'Sélectionnez une ligne';
     elements.recipientValue.textContent = '—';
     elements.subjectValue.textContent = state.templates.subject || '—';
-    elements.bodyPreview.textContent = state.templates.body || 'Configurez le modèle du message ci-dessous.';
-    setContextState('Sélection requise');
+    elements.bodyPreview.textContent = state.templates.body || '—';
     setStatus('Sélectionnez une ligne Grist pour préparer le message.');
     return;
   }
 
-  const label = displayText(state.selected.Label, displayText(state.selected.Recipient, 'Ligne sélectionnée'));
   const recipient = state.selected.Recipient ?? '';
-
-  elements.recordLabel.textContent = label;
   elements.recipientValue.textContent = displayText(recipient, 'Destinataire manquant');
 
   if (!templatesAreComplete()) {
     elements.subjectValue.textContent = 'Modèle à configurer';
-    elements.bodyPreview.textContent = 'Renseignez l’objet et le corps dans les réglages du widget.';
-    setContextState('Modèle requis');
-    setStatus('Configurez l’objet et le corps du message dans le widget.');
+    elements.bodyPreview.textContent = 'Renseignez l’objet et le corps dans le modèle du message.';
+    setStatus('Configurez l’objet et le corps du message.', 'error');
     return;
   }
 
@@ -163,46 +167,51 @@ function renderSelected() {
   elements.bodyPreview.textContent = message.body || 'Corps du message manquant';
 
   if (message.missingFields.length > 0) {
-    setContextState('Variable inconnue', 'error');
     setStatus(`Variables absentes de la ligne : ${message.missingFields.join(', ')}.`, 'error');
     return;
   }
 
   const validation = validateComposeData(message);
   if (!validation.valid) {
-    setContextState('Message incomplet', 'error');
     setStatus(`Éléments manquants : ${validation.missing.join(', ')}.`, 'error');
     return;
   }
 
   try {
-    enableComposeButton(buildOutlookComposeUrl(message));
-    setContextState('Prêt', 'ready');
-    setStatus('Le message est prêt. Ouvrez-le dans Outlook puis vérifiez-le avant envoi.');
+    enableComposeLink(buildOutlookComposeUrl(message));
+    setStatus('Le message ci-dessus est prêt à être ouvert dans Outlook.', 'success');
   } catch (error) {
-    setContextState('Préparation impossible', 'error');
     setStatus(error?.message ? error.message : String(error), 'error');
   }
 }
 
-async function saveTemplates() {
-  const subject = elements.subjectTemplate.value;
-  const body = elements.bodyTemplate.value;
+function updateTemplatesFromInputs() {
+  state.templates = {
+    subject: elements.subjectTemplate.value,
+    body: elements.bodyTemplate.value
+  };
+  renderSelected();
+}
 
-  if (!subject.trim() || !body.trim()) {
+async function saveTemplates() {
+  updateTemplatesFromInputs();
+
+  if (!templatesAreComplete()) {
     setSettingsStatus('Renseignez un objet et un corps de message.', 'error');
     return;
   }
 
   elements.saveTemplates.disabled = true;
-  setSettingsStatus('Application des réglages…');
+  setSettingsStatus('Application du modèle…');
 
   try {
-    const value = { version: 1, subject, body };
+    const value = {
+      version: 2,
+      subject: state.templates.subject,
+      body: state.templates.body
+    };
     await grist.widgetApi.setOption(OPTION_KEY, value);
-    state.templates = { subject, body };
-    renderSelected();
-    setSettingsStatus('Réglages appliqués. Utilisez ensuite Enregistrer dans Grist pour les conserver après rechargement.', 'success');
+    setSettingsStatus('Modèle appliqué. Pour le conserver après rechargement, utilisez ensuite Enregistrer dans Grist.', 'success');
   } catch (error) {
     setSettingsStatus(error?.message ? error.message : String(error), 'error');
   } finally {
@@ -210,25 +219,16 @@ async function saveTemplates() {
   }
 }
 
-function openOutlook() {
-  if (!state.composeUrl) return;
-
-  try {
-    if (window.parent && window.parent !== window) {
-      window.parent.open(state.composeUrl, '_blank');
-    } else {
-      window.open(state.composeUrl, '_blank');
-    }
-    setContextState('Ouvert dans Outlook', 'ready');
-    setStatus('Outlook a été ouvert. Vérifiez le destinataire, l’objet et le corps puis cliquez sur Envoyer dans Outlook.', 'success');
-  } catch {
-    setContextState('Ouverture impossible', 'error');
-    setStatus('Le navigateur a empêché l’ouverture d’Outlook. Autorisez les fenêtres surgissantes pour ce site.', 'error');
-  }
-}
-
-elements.openOutlook.addEventListener('click', openOutlook);
+elements.subjectTemplate.addEventListener('input', updateTemplatesFromInputs);
+elements.bodyTemplate.addEventListener('input', updateTemplatesFromInputs);
 elements.saveTemplates.addEventListener('click', saveTemplates);
+elements.openOutlook.addEventListener('click', (event) => {
+  if (!state.composeUrl) {
+    event.preventDefault();
+    return;
+  }
+  setStatus('Outlook va s’ouvrir avec ce message. Vérifiez-le puis cliquez sur Envoyer dans Outlook.', 'success');
+});
 
 grist.ready({
   requiredAccess: 'read table',
@@ -241,11 +241,11 @@ grist.ready({
       description: 'Adresse de courriel du destinataire.'
     },
     {
-      name: 'Label',
-      title: 'Libellé de la ligne',
+      name: 'Link',
+      title: 'Lien',
       type: 'Text',
       optional: true,
-      description: 'Libellé facultatif affiché dans le widget.'
+      description: 'Lien personnalisé à insérer dans le message avec la variable {{Lien}}.'
     }
   ]
 });
@@ -261,17 +261,23 @@ async function loadStoredTemplates() {
   try {
     const stored = await grist.widgetApi.getOption(OPTION_KEY);
     if (stored && typeof stored === 'object') {
-      state.templates = {
-        subject: String(stored.subject ?? ''),
-        body: String(stored.body ?? '')
-      };
+      const subject = String(stored.subject ?? '').trim();
+      const body = String(stored.body ?? '').trim();
+      if (subject && body) {
+        state.templates = {
+          subject: String(stored.subject),
+          body: String(stored.body)
+        };
+      }
     }
   } catch {
-    setSettingsStatus('Impossible de relire les réglages enregistrés.', 'error');
+    setSettingsStatus('Impossible de relire le modèle enregistré ; le modèle par défaut est utilisé.', 'error');
   }
 
   renderTemplateInputs();
   renderSelected();
 }
 
+renderTemplateInputs();
+renderSelected();
 loadStoredTemplates();
