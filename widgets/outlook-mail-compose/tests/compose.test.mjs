@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   OUTLOOK_COMPOSE_BASE,
   buildOutlookComposeUrl,
+  extractHyperlinkUrl,
   renderTemplate,
   validateComposeData
 } from '../compose.js';
@@ -22,6 +23,17 @@ test('validateComposeData requires recipient, subject and body', () => {
     valid: true,
     missing: []
   });
+});
+
+test('extractHyperlinkUrl removes the Grist hyperlink label', () => {
+  assert.equal(
+    extractHyperlinkUrl('Suivi des stages https://grist.example.fr/doc/p/8?Token_=abc'),
+    'https://grist.example.fr/doc/p/8?Token_=abc'
+  );
+  assert.equal(
+    extractHyperlinkUrl('https://grist.example.fr/doc/p/8?Token_=abc'),
+    'https://grist.example.fr/doc/p/8?Token_=abc'
+  );
 });
 
 test('renderTemplate substitutes Grist column identifiers', () => {
@@ -47,7 +59,7 @@ test('renderTemplate reports unknown variables once', () => {
   );
 });
 
-test('buildOutlookComposeUrl uses Outlook Web compose deeplink', () => {
+test('buildOutlookComposeUrl uses the Microsoft 365 deeplink compose route', () => {
   const url = buildOutlookComposeUrl({
     recipient: ' agent@example.fr ',
     subject: 'Suivi & accès élève',
