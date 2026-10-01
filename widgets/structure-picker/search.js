@@ -8,6 +8,7 @@ export const LOCAL_LIMIT = 8;
 export const EXTERNAL_LIMIT = 10;
 
 const NEARBY_QUERY_PREFIX = "__near_point__:";
+const TARGETED_TEXT_QUERY_PREFIX = "__targeted_text__:";
 let externalRankingContext = { mode: "text", query: "", codePostal: "", targetAddress: "", latitude: null, longitude: null, radius: null };
 
 export function normalize(value) {
@@ -265,9 +266,25 @@ function haversineKm(latitude1, longitude1, latitude2, longitude2) {
 }
 
 function candidateNameScore(candidate, targetName) {
-  const publicScore = fuzzyTextScore(targetName, candidate?.nomCommercial);
-  const legalScore = fuzzyTextScore(targetName, candidate?.raisonSociale);
+  const normalizedTarget = normalize(targetName);
+  const normalizedPublicName = normalize(candidate?.nomCommercial);
+  let publicScore = fuzzyTextScore(targetName, candidate?.nomCommercial);
   const publicCoverage = queryTokenCoverage(targetName, candidate?.nomCommercial);
+
+  if (normalizedTarget && normalizedPublicName && (
+    normalizedTarget === normalizedPublicName
+    || normalizedTarget.includes(normalizedPublicName)
+    || normalizedPublicName.includes(normalizedTarget)
+  )) {
+    publicScore = Math.max(publicScore, 0.98);
+  }
+
+  // Dès qu'un établissement publie une enseigne ou un nom commercial, celui-ci
+  // porte son identité. La raison sociale de l'unité légale ne doit pas rendre
+  // tous ses établissements équivalents (ex. EHPAD vs SSIAD).
+  if (candidate?.nomUsuelDistinct) return Math.max(publicScore, publicCoverage * 0.96);
+
+  const legalScore = fuzzyTextScore(targetName, candidate?.raisonSociale);
   const legalCoverage = queryTokenCoverage(targetName, candidate?.raisonSociale);
   return Math.max(publicScore, legalScore, publicCoverage * 0.96, legalCoverage * 0.92);
 }
@@ -317,6 +334,27 @@ export function rankNearbyCandidates(candidates, context) {
     .map(item => item.candidate);
 }
 
+export function rankTargetedTextCandidates(candidates, context) {
+  const targetName = String(context?.query ?? "").trim();
+  const targetAddress = String(context?.targetAddress ?? "").trim();
+  const codePostal = String(context?.codePostal ?? "").trim();
+  return (Array.isArray(candidates) ? candidates : [])
+    .map((candidate, index) => {
+      const nameScore = candidateNameScore(candidate, targetName);
+      const addressScore = targetAddress ? fuzzyTextScore(targetAddress, candidate?.adresse) : 0;
+      const postalScore = codePostal && String(candidate?.codePostal ?? "") === codePostal ? 1 : 0;
+      return {
+        candidate,
+        index,
+        nameScore,
+        score: nameScore * 0.84 + addressScore * 0.11 + postalScore * 0.05,
+      };
+    })
+    .filter(item => item.nameScore >= 0.32)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(item => item.candidate);
+}
+
 export function buildNearbySearchQuery({ latitude, longitude, radius = 0.25, name = "", address = "" } = {}) {
   const lat = Number(latitude);
   const lon = Number(longitude);
@@ -324,6 +362,17 @@ export function buildNearbySearchQuery({ latitude, longitude, radius = 0.25, nam
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(distance) || distance <= 0) return "";
   const payload = [lat, lon, distance, encodeURIComponent(String(name ?? "").trim()), encodeURIComponent(String(address ?? "").trim())];
   return `${NEARBY_QUERY_PREFIX}${payload.join("|")}`;
+}
+
+export function buildTargetedTextSearchQuery({ query = "", name = "", address = "" } = {}) {
+  const apiQuery = String(query ?? "").trim();
+  const targetName = String(name ?? "").trim();
+  if (!apiQuery || !targetName) return "";
+  return `${TARGETED_TEXT_QUERY_PREFIX}${[
+    encodeURIComponent(apiQuery),
+    encodeURIComponent(targetName),
+    encodeURIComponent(String(address ?? "").trim()),
+  ].join("|")}`;
 }
 
 function parseNearbySearchQuery(query) {
@@ -341,6 +390,24 @@ function parseNearbySearchQuery(query) {
       radius,
       name: decodeURIComponent(nameRaw),
       address: decodeURIComponent(addressRaw),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseTargetedTextSearchQuery(query) {
+  const raw = String(query ?? "");
+  if (!raw.startsWith(TARGETED_TEXT_QUERY_PREFIX)) return null;
+  const [queryRaw = "", nameRaw = "", addressRaw = ""] = raw.slice(TARGETED_TEXT_QUERY_PREFIX.length).split("|");
+  try {
+    const apiQuery = decodeURIComponent(queryRaw).trim();
+    const name = decodeURIComponent(nameRaw).trim();
+    if (!apiQuery || !name) return null;
+    return {
+      query: apiQuery,
+      name,
+      address: decodeURIComponent(addressRaw).trim(),
     };
   } catch {
     return null;
@@ -367,9 +434,11 @@ export function flattenExternalResults(payload, localIdentifiers = new Set(), li
 
   const ranked = externalRankingContext.mode === "nearby"
     ? rankNearbyCandidates(candidates, externalRankingContext)
-    : externalRankingContext.query
-      ? rankExternalCandidates(candidates, externalRankingContext.query, externalRankingContext.codePostal)
-      : candidates;
+    : externalRankingContext.mode === "targeted_text"
+      ? rankTargetedTextCandidates(candidates, externalRankingContext)
+      : externalRankingContext.query
+        ? rankExternalCandidates(candidates, externalRankingContext.query, externalRankingContext.codePostal)
+        : candidates;
   return ranked.slice(0, limit);
 }
 
@@ -399,22 +468,35 @@ export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10
     return `https://recherche-entreprises.api.gouv.fr/near_point?${params.toString()}`;
   }
 
-  externalRankingContext = {
-    mode: "text",
-    query: String(query ?? "").trim(),
-    codePostal: normalizedPostalCode,
-    targetAddress: "",
-    latitude: null,
-    longitude: null,
-    radius: null,
-  };
+  const targetedText = parseTargetedTextSearchQuery(query);
+  const apiQuery = targetedText?.query || String(query ?? "").trim();
+  externalRankingContext = targetedText
+    ? {
+        mode: "targeted_text",
+        query: targetedText.name,
+        codePostal: normalizedPostalCode,
+        targetAddress: targetedText.address,
+        latitude: null,
+        longitude: null,
+        radius: null,
+      }
+    : {
+        mode: "text",
+        query: apiQuery,
+        codePostal: normalizedPostalCode,
+        targetAddress: "",
+        latitude: null,
+        longitude: null,
+        radius: null,
+      };
+
   const requestedPerPage = Number.isFinite(Number(perPage)) ? Number(perPage) : 10;
   const effectivePerPage = normalizedPostalCode
     ? Math.min(25, Math.max(20, requestedPerPage))
     : Math.min(25, Math.max(1, requestedPerPage));
 
   const params = new URLSearchParams({
-    q: externalRankingContext.query,
+    q: apiQuery,
     departement: departments.join(","),
     etat_administratif: "A",
     minimal: "true",
