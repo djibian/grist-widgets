@@ -158,18 +158,19 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   if (!rawName) return [];
 
   const name = stripPostalTokens(rawName);
+  const locationNeutralName = stripLocationEdgeWords(name, commune) || normalize(name);
   const attempts = [];
 
-  // L'adresse géocodée est un signal d'établissement bien plus discriminant que
-  // le moteur plein texte. On interroge d'abord les établissements réellement
-  // voisins, puis on ne conserve côté client que ceux dont le nom correspond.
+  // La proximité sert à trouver des établissements, mais la commune ne doit pas
+  // faire partie de l'identité recherchée. Sinon "Super U Machecoul" peut faire
+  // remonter n'importe quelle entité municipale contenant "Machecoul".
   if (geocodeCandidate && coordinatesAreUsable(geocodeCandidate.latitude, geocodeCandidate.longitude)) {
     for (const radius of [0.25, 0.75]) {
       addSearchAttempt(attempts, buildNearbySearchQuery({
         latitude: geocodeCandidate.latitude,
         longitude: geocodeCandidate.longitude,
         radius,
-        name,
+        name: locationNeutralName,
         address: sourceAddress,
       }), codePostal);
     }
@@ -177,7 +178,7 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
 
   const variants = [];
   addSearchVariant(variants, name);
-  addSearchVariant(variants, stripLocationEdgeWords(name, commune));
+  addSearchVariant(variants, locationNeutralName);
 
   const shortestUsefulName = variants.at(-1) || name;
   addSearchVariant(variants, dropLeadingQualifier(shortestUsefulName));
@@ -187,6 +188,9 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   if (streetHint) {
     addSearchAttempt(attempts, `${variants[0]} ${streetHint}`, codePostal);
     if (variants.length > 1) addSearchAttempt(attempts, `${variants.at(-1)} ${streetHint}`, codePostal);
+    // Pour les enseignes comportant un token d'un seul caractère ("Super U"),
+    // combine le nom robuste avec la voie avant le repli large.
+    if (weakTokenFallback) addSearchAttempt(attempts, `${weakTokenFallback} ${streetHint}`, codePostal);
   }
 
   for (const query of variants) addSearchAttempt(attempts, query, codePostal);
