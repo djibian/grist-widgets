@@ -1,0 +1,162 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { buildGeocodeUrl, geocodeResultsFromPayload } from "../widgets/structure-picker/geocode.js";
+import { fetchOfficialRequest, resetOfficialClientForTests } from "../widgets/structure-picker/enterprise-client.js";
+import { resolveStructureIdentity } from "../widgets/structure-picker/identity-orchestrator.js";
+import { findOsmIdentityPois } from "../widgets/structure-picker/osm-identity.js";
+
+const cases = [
+  {
+    id: "super-u-machecoul",
+    expectedSiret: "41091808000020",
+    row: {
+      NomCommercial: "Super U Machecoul",
+      Adresse: "Boulevard Des Prises Zone Commerciale 44270 MACHECOUL ST MEME",
+      SirenSiret: "",
+      RaisonSociale: "",
+      Latitude: "",
+      Longitude: "",
+    },
+  },
+  {
+    id: "ehpad-la-reynerie",
+    expectedSiret: "26850025300011",
+    row: {
+      NomCommercial: "EHPAD La Reynerie Bouin 85230",
+      Adresse: "8bis Rue du Pays de Retz 85230 Bouin",
+      SirenSiret: "",
+      RaisonSociale: "",
+      Latitude: "",
+      Longitude: "",
+    },
+  },
+  {
+    id: "o-pre-d-vous",
+    expectedSiret: "89306104400028",
+    row: {
+      NomCommercial: "ô Pré d’Vous",
+      Adresse: "24 rue des fosses 44270 La Marne",
+      SirenSiret: "",
+      RaisonSociale: "",
+      Latitude: "",
+      Longitude: "",
+    },
+  },
+  {
+    id: "pom-de-rainette",
+    expectedSiret: "88493583400033",
+    row: {
+      NomCommercial: "CRECHE POM'DE RAINETTE",
+      Adresse: "10 BIS RUE DES MARGOTINS 85300 SALLERTAINE",
+      SirenSiret: "",
+      RaisonSociale: "",
+      Latitude: "",
+      Longitude: "",
+    },
+  },
+];
+
+const capture = {
+  capturedAt: new Date().toISOString(),
+  commit: process.env.GITHUB_SHA || "local",
+  note: "Capture réseau expérimentale. Les expectedSiret sont des annotations du corpus, jamais injectées dans les requêtes.",
+  cases: [],
+};
+
+async function recordingFetch(url, options = {}, network = []) {
+  const startedAt = new Date().toISOString();
+  const response = await fetch(url, options);
+  const clone = response.clone();
+  let body = null;
+  const contentType = clone.headers.get("content-type") || "";
+  try {
+    body = contentType.includes("json") ? await clone.json() : await clone.text();
+  } catch (error) {
+    body = { captureError: error?.message || String(error) };
+  }
+  network.push({
+    startedAt,
+    method: options.method || "GET",
+    url: String(url),
+    status: response.status,
+    contentType,
+    body,
+  });
+  return response;
+}
+
+async function liveGeocode(address, options, network) {
+  const url = buildGeocodeUrl(address, { limit: options?.limit ?? 3 });
+  const response = await recordingFetch(url, { method: "GET", headers: { Accept: "application/json" }, signal: options?.signal }, network);
+  if (!response.ok) throw new Error(`Géocodage indisponible (HTTP ${response.status}).`);
+  const payload = await response.json();
+  return geocodeResultsFromPayload(payload, options?.limit ?? 3);
+}
+
+for (const scenario of cases) {
+  resetOfficialClientForTests();
+  const network = [];
+  let result = null;
+  let error = null;
+  const controller = new AbortController();
+  try {
+    result = await resolveStructureIdentity({
+      row: scenario.row,
+      signal: controller.signal,
+      geocode: (address, options) => liveGeocode(address, options, network),
+      fetchOfficial: (request, options) => fetchOfficialRequest(request, {
+        ...options,
+        cacheTtlMs: 0,
+        fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network),
+      }),
+      findPoiLinks: options => findOsmIdentityPois({
+        ...options,
+        fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network),
+      }),
+    });
+  } catch (caught) {
+    error = { name: caught?.name || "Error", message: caught?.message || String(caught) };
+  }
+
+  capture.cases.push({
+    id: scenario.id,
+    expectedSiret: scenario.expectedSiret,
+    row: scenario.row,
+    decision: result?.decision ? {
+      status: result.decision.status,
+      reason: result.decision.reason,
+      selectedSiret: result.decision.candidate?.siret || null,
+      alternatives: (result.decision.alternatives || []).map(item => item.siret),
+      certificates: (result.decision.certificates || []).map(item => ({
+        siret: item.siret,
+        level: item.level,
+        admissible: item.admissible,
+        conflict: item.conflict,
+        explanations: item.explanations,
+      })),
+    } : null,
+    requests: result?.requests || [],
+    diagnostics: result?.diagnostics || [],
+    links: (result?.links || []).map(link => ({
+      source: link.source,
+      sourceRecordId: link.sourceRecordId,
+      publicNames: link.publicNames,
+      siret: link.siret,
+      adresse: link.adresse,
+      latitude: link.latitude,
+      longitude: link.longitude,
+      verifiedOfficial: link.verifiedOfficial,
+    })),
+    geocodeCandidates: result?.geocodeCandidates || [],
+    error,
+    network,
+  });
+}
+
+await mkdir("artifacts", { recursive: true });
+await writeFile("artifacts/structure-picker-identity-live.json", JSON.stringify(capture, null, 2));
+
+for (const scenario of capture.cases) {
+  console.log(`${scenario.id}: ${scenario.decision?.status || "ERROR"} -> ${scenario.decision?.selectedSiret || "—"} (expected ${scenario.expectedSiret})`);
+  if (scenario.error) console.log(`  error: ${scenario.error.message}`);
+  if (scenario.diagnostics?.length) console.log(`  diagnostics: ${scenario.diagnostics.join(" | ")}`);
+}
