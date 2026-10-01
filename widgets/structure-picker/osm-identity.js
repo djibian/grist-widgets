@@ -8,10 +8,6 @@ function clean(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function escapeOverpassString(value) {
-  return String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-}
-
 export function buildNearbyIdentityOverpassQuery(latitude, longitude, radius = DEFAULT_IDENTITY_RADIUS_METERS) {
   const coordinates = usableCoordinates(latitude, longitude);
   if (!coordinates) return "";
@@ -114,13 +110,12 @@ export function rankIdentityPois(elements, row, { latitude, longitude, radius = 
 
 async function requestOverpass(query, { signal, fetchImpl = fetch } = {}) {
   if (!query) return [];
-  const response = await fetchImpl(OVERPASS_IDENTITY_URL, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-    },
-    body: new URLSearchParams({ data: query }).toString(),
+  // GET évite certains 406 observés sur l'interpréteur Overpass avec les POST
+  // urlencoded, tout en restant compatible avec ces requêtes locales courtes.
+  const url = new URL(OVERPASS_IDENTITY_URL);
+  url.searchParams.set("data", query);
+  const response = await fetchImpl(url.toString(), {
+    method: "GET",
     signal,
   });
   if (response.status === 429) throw new Error("OpenStreetMap limite temporairement la recherche d’identité.");
