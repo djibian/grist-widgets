@@ -2,7 +2,11 @@ import { fetchOfficialRequest } from "./enterprise-client.js";
 import { resolveStructureIdentity } from "./identity-orchestrator.js";
 import { IDENTITY_STATES, decideIdentity, decisionCandidates } from "./identity-resolution.js";
 import { findPublishedIdentityLinks } from "./published-identity-links.js";
-import { buildOfficialIdentifierSearchRequest, normalizeIdentifier } from "./search.js";
+import {
+  buildOfficialIdentifierSearchRequest,
+  buildOfficialTextSearchRequest,
+  normalizeIdentifier,
+} from "./search.js";
 
 function abortError() {
   return new DOMException("Aborted", "AbortError");
@@ -28,6 +32,26 @@ function officialCoverage(source, result) {
   };
 }
 
+function exactCandidate(result, siret) {
+  return (result?.items ?? []).find(item => normalizeIdentifier(item?.siret) === siret) ?? null;
+}
+
+function publishedVerificationRequests(link, siret) {
+  const requests = [];
+  const identifier = buildOfficialIdentifierSearchRequest(siret);
+  if (identifier) requests.push(identifier);
+  const legalName = String(link?.legalName ?? "").trim();
+  if (legalName) {
+    const text = buildOfficialTextSearchRequest(legalName, {
+      codePostal: String(link?.postcode ?? "").trim(),
+      perPage: 25,
+      matchingLimit: 100,
+    });
+    if (text) requests.push(text);
+  }
+  return requests;
+}
+
 export async function resolveIdentityForEnrichment({
   row,
   signal,
@@ -47,15 +71,39 @@ export async function resolveIdentityForEnrichment({
       for (const link of links) {
         const siret = normalizeIdentifier(link?.siret);
         if (siret.length !== 14) continue;
-        const request = buildOfficialIdentifierSearchRequest(siret);
-        // A published SIRET is legal-identity evidence, not a search convenience.
-        // Always revalidate it against the current Annuaire response instead of
-        // trusting sessionStorage populated by an earlier implementation/run.
-        const verified = await fetchOfficial(request, { signal, cacheTtlMs: 0 });
-        const exact = (verified?.items ?? []).find(item => normalizeIdentifier(item?.siret) === siret);
-        if (!exact) continue;
+
+        const attempts = publishedVerificationRequests(link, siret);
+        let exact = null;
+        let verified = null;
+        let verifiedRequest = null;
+        let successfulAttempt = false;
+
+        for (const request of attempts) {
+          try {
+            // A published SIRET is legal-identity evidence, not a search convenience.
+            // Always revalidate it against a fresh current Annuaire response.
+            const result = await fetchOfficial(request, { signal, cacheTtlMs: 0 });
+            successfulAttempt = true;
+            const candidate = exactCandidate(result, siret);
+            if (!candidate) continue;
+            exact = candidate;
+            verified = result;
+            verifiedRequest = request;
+            break;
+          } catch (error) {
+            if (signal?.aborted || error?.name === "AbortError") throw abortError();
+            diagnostics.push(`Revalidation Annuaire (${request.kind}) : ${error?.message || "indisponible"}`);
+          }
+        }
+
+        if (!exact) {
+          if (!successfulAttempt && attempts.length) publishedFailed = true;
+          continue;
+        }
+
         const verifiedLink = { ...link, siret, verifiedOfficial: true };
-        const coverage = [publishedCoverage(), officialCoverage(`annuaire:verify:${siret}`, verified)];
+        const source = `annuaire:verify:${siret}:${verifiedRequest.kind}`;
+        const coverage = [publishedCoverage(), officialCoverage(source, verified)];
         const decision = decideIdentity({ row, candidates: [exact], links: [verifiedLink], coverage });
         if (decision.status === IDENTITY_STATES.MATCH_VERIFIED) {
           return {
@@ -66,7 +114,7 @@ export async function resolveIdentityForEnrichment({
             selectedGeocode: null,
             links: [verifiedLink],
             coverage,
-            requests: [{ source: `annuaire:verify:${siret}`, kind: request.kind, url: request.url }],
+            requests: [{ source, kind: verifiedRequest.kind, url: verifiedRequest.url }],
             diagnostics,
           };
         }
