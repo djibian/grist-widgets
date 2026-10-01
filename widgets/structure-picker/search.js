@@ -7,7 +7,8 @@ import {
 export const LOCAL_LIMIT = 8;
 export const EXTERNAL_LIMIT = 10;
 
-let externalRankingContext = { query: "", codePostal: "" };
+const NEARBY_QUERY_PREFIX = "__near_point__:";
+let externalRankingContext = { mode: "text", query: "", codePostal: "", targetAddress: "", latitude: null, longitude: null, radius: null };
 
 export function normalize(value) {
   return String(value ?? "")
@@ -253,36 +254,31 @@ function queryTokenCoverage(query, text) {
   return bestPerQuery.reduce((sum, value) => sum + value, 0) / bestPerQuery.length;
 }
 
-function externalIdentityScore(candidate, query) {
-  const names = [candidate?.nomCommercial, candidate?.raisonSociale].filter(Boolean);
-  let best = 0;
-  for (const name of names) {
-    // The Annuaire query may deliberately contain a street hint. Compare in
-    // both directions so a published establishment name contained in that
-    // richer query remains a strong identity signal.
-    best = Math.max(
-      best,
-      fuzzyTextScore(query, name),
-      fuzzyTextScore(name, query),
-      queryTokenCoverage(name, query) * 0.95,
-    );
-  }
-  return best;
+function haversineKm(latitude1, longitude1, latitude2, longitude2) {
+  const values = [latitude1, longitude1, latitude2, longitude2].map(Number);
+  if (!values.every(Number.isFinite)) return null;
+  const [lat1, lon1, lat2, lon2] = values.map(value => value * Math.PI / 180);
+  const deltaLat = lat2 - lat1;
+  const deltaLon = lon2 - lon1;
+  const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function candidateNameScore(candidate, targetName) {
+  const publicScore = fuzzyTextScore(targetName, candidate?.nomCommercial);
+  const legalScore = fuzzyTextScore(targetName, candidate?.raisonSociale);
+  const publicCoverage = queryTokenCoverage(targetName, candidate?.nomCommercial);
+  const legalCoverage = queryTokenCoverage(targetName, candidate?.raisonSociale);
+  return Math.max(publicScore, legalScore, publicCoverage * 0.96, legalCoverage * 0.92);
 }
 
 export function scoreExternalCandidate(candidate, query, codePostal = "") {
-  const contextText = [candidate?.nomCommercial, candidate?.raisonSociale, candidate?.adresse, candidate?.commune, candidate?.codePostal]
-    .filter(Boolean)
-    .join(" ");
-  const identityScore = externalIdentityScore(candidate, query);
-  const contextCoverage = queryTokenCoverage(query, contextText);
+  const nameText = [candidate?.nomCommercial, candidate?.raisonSociale].filter(Boolean).join(" ");
+  const nameCoverage = queryTokenCoverage(query, nameText);
+  const commercialScore = fuzzyTextScore(query, candidate?.nomCommercial);
+  const legalScore = fuzzyTextScore(query, candidate?.raisonSociale);
   const postalScore = codePostal && String(candidate?.codePostal ?? "") === String(codePostal) ? 1 : 0;
-
-  // Identity is deliberately dominant. Address/context may disambiguate two
-  // branches, but must not turn an unrelated association at the right street
-  // into a better identity match than the establishment whose published name
-  // actually matches the selected Grist row.
-  return identityScore * 0.72 + contextCoverage * 0.18 + postalScore * 0.10;
+  return nameCoverage * 0.67 + commercialScore * 0.20 + legalScore * 0.08 + postalScore * 0.05;
 }
 
 export function rankExternalCandidates(candidates, query, codePostal = "") {
@@ -290,6 +286,65 @@ export function rankExternalCandidates(candidates, query, codePostal = "") {
     .map((candidate, index) => ({ candidate, index, score: scoreExternalCandidate(candidate, query, codePostal) }))
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .map(item => item.candidate);
+}
+
+export function scoreNearbyCandidate(candidate, context) {
+  const targetName = String(context?.query ?? "").trim();
+  const targetAddress = String(context?.targetAddress ?? "").trim();
+  const codePostal = String(context?.codePostal ?? "").trim();
+  const nameScore = candidateNameScore(candidate, targetName);
+  const addressScore = targetAddress ? fuzzyTextScore(targetAddress, candidate?.adresse) : 0;
+  const postalScore = codePostal && String(candidate?.codePostal ?? "") === codePostal ? 1 : 0;
+  const distance = haversineKm(context?.latitude, context?.longitude, candidate?.latitude, candidate?.longitude);
+  const radius = Number(context?.radius);
+  const distanceScore = distance === null || !Number.isFinite(radius) || radius <= 0
+    ? 0.5
+    : Math.max(0, 1 - distance / radius);
+  return nameScore * 0.72 + addressScore * 0.18 + distanceScore * 0.07 + postalScore * 0.03;
+}
+
+export function rankNearbyCandidates(candidates, context) {
+  return (Array.isArray(candidates) ? candidates : [])
+    .map((candidate, index) => ({
+      candidate,
+      index,
+      nameScore: candidateNameScore(candidate, context?.query),
+      score: scoreNearbyCandidate(candidate, context),
+    }))
+    // Une proximité géographique seule ne suffit jamais à identifier une structure.
+    .filter(item => item.nameScore >= 0.32)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(item => item.candidate);
+}
+
+export function buildNearbySearchQuery({ latitude, longitude, radius = 0.25, name = "", address = "" } = {}) {
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+  const distance = Number(radius);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(distance) || distance <= 0) return "";
+  const payload = [lat, lon, distance, encodeURIComponent(String(name ?? "").trim()), encodeURIComponent(String(address ?? "").trim())];
+  return `${NEARBY_QUERY_PREFIX}${payload.join("|")}`;
+}
+
+function parseNearbySearchQuery(query) {
+  const raw = String(query ?? "");
+  if (!raw.startsWith(NEARBY_QUERY_PREFIX)) return null;
+  const [latitudeRaw, longitudeRaw, radiusRaw, nameRaw = "", addressRaw = ""] = raw.slice(NEARBY_QUERY_PREFIX.length).split("|");
+  const latitude = Number(latitudeRaw);
+  const longitude = Number(longitudeRaw);
+  const radius = Number(radiusRaw);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(radius) || radius <= 0) return null;
+  try {
+    return {
+      latitude,
+      longitude,
+      radius,
+      name: decodeURIComponent(nameRaw),
+      address: decodeURIComponent(addressRaw),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function flattenExternalResults(payload, localIdentifiers = new Set(), limit = EXTERNAL_LIMIT, departments = getActiveDepartments()) {
@@ -310,15 +365,49 @@ export function flattenExternalResults(payload, localIdentifiers = new Set(), li
     }
   }
 
-  const ranked = externalRankingContext.query
-    ? rankExternalCandidates(candidates, externalRankingContext.query, externalRankingContext.codePostal)
-    : candidates;
+  const ranked = externalRankingContext.mode === "nearby"
+    ? rankNearbyCandidates(candidates, externalRankingContext)
+    : externalRankingContext.query
+      ? rankExternalCandidates(candidates, externalRankingContext.query, externalRankingContext.codePostal)
+      : candidates;
   return ranked.slice(0, limit);
 }
 
 export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10, codePostal = "", departments = getActiveDepartments() } = {}) {
   const normalizedPostalCode = /^\d{5}$/.test(String(codePostal).trim()) ? String(codePostal).trim() : "";
-  externalRankingContext = { query: String(query ?? "").trim(), codePostal: normalizedPostalCode };
+  const nearby = parseNearbySearchQuery(query);
+  if (nearby) {
+    externalRankingContext = {
+      mode: "nearby",
+      query: nearby.name,
+      targetAddress: nearby.address,
+      codePostal: normalizedPostalCode,
+      latitude: nearby.latitude,
+      longitude: nearby.longitude,
+      radius: nearby.radius,
+    };
+    const params = new URLSearchParams({
+      lat: String(nearby.latitude),
+      long: String(nearby.longitude),
+      radius: String(nearby.radius),
+      page: "1",
+      per_page: "25",
+      minimal: "true",
+      include: "matching_etablissements,siege",
+      limite_matching_etablissements: String(Math.min(25, Math.max(10, Number(matchingLimit) || 10))),
+    });
+    return `https://recherche-entreprises.api.gouv.fr/near_point?${params.toString()}`;
+  }
+
+  externalRankingContext = {
+    mode: "text",
+    query: String(query ?? "").trim(),
+    codePostal: normalizedPostalCode,
+    targetAddress: "",
+    latitude: null,
+    longitude: null,
+    radius: null,
+  };
   const requestedPerPage = Number.isFinite(Number(perPage)) ? Number(perPage) : 10;
   const effectivePerPage = normalizedPostalCode
     ? Math.min(25, Math.max(20, requestedPerPage))
