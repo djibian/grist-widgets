@@ -314,8 +314,6 @@ function candidateNameScore(candidate, targetName) {
     publicScore = Math.max(publicScore, 0.98);
   }
 
-  // Dès qu'un établissement publie une enseigne ou un nom commercial réellement
-  // distinct de la raison sociale, ce nom public porte son identité.
   if (candidateHasIndependentPublicName(candidate)) {
     return Math.max(publicScore, publicCoverage * 0.96);
   }
@@ -378,6 +376,8 @@ function evidenceForCandidate(candidate, context, withDistance) {
     addressScore,
     postalScore,
     distanceScore,
+    strongName,
+    addressOnly,
     eligible: strongName || addressOnly,
   };
 }
@@ -404,10 +404,9 @@ export function rankNearbyCandidates(candidates, context) {
           + evidence.postalScore * 0.03,
       };
     })
-    // La proximité seule ne suffit jamais. Un candidat doit avoir soit une
-    // identité convaincante, soit une concordance de voie quasi exacte lorsque
-    // l'Annuaire ne publie pas l'enseigne sous laquelle le public le connaît.
-    .filter(item => item.eligible)
+    // Le voisinage sert uniquement à confirmer une identité. Une simple adresse
+    // proche ne doit jamais interrompre les replis textuels plus discriminants.
+    .filter(item => item.strongName)
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .map(item => item.candidate);
 }
@@ -581,6 +580,7 @@ export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10
     page: "1",
     per_page: String(effectivePerPage),
   });
+  if (targetedText) params.set("sort_by_size", "true");
   if (normalizedPostalCode) params.set("code_postal", normalizedPostalCode);
   return `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
 }
