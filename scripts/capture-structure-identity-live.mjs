@@ -1,15 +1,19 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { buildGeocodeUrl, geocodeResultsFromPayload } from "../widgets/structure-picker/geocode.js";
 import { fetchOfficialRequest } from "../widgets/structure-picker/enterprise-client.js";
-import { resolveStructureIdentity } from "../widgets/structure-picker/identity-orchestrator.js";
-import { findOsmIdentityPois } from "../widgets/structure-picker/osm-identity.js";
-import { buildOfficialIdentifierSearchRequest, buildOfficialNearbySearchRequest, buildOfficialTextSearchRequest } from "../widgets/structure-picker/search.js";
+import { resolveIdentityForEnrichment } from "../widgets/structure-picker/identity-service.js";
+import { matchPublishedIdentityLinks } from "../widgets/structure-picker/published-identity-links.js";
+import { buildOfficialIdentifierSearchRequest } from "../widgets/structure-picker/search.js";
+
+const publishedPayload = JSON.parse(await readFile(
+  new URL("../widgets/structure-picker/identity-links/published.json", import.meta.url),
+  "utf8",
+));
 
 const cases = [
   {
     id: "super-u-machecoul",
     expectedSiret: "41091808000020",
-    knownPoi: { latitude: 46.99808, longitude: -1.815576, source: "Overture review fixture" },
     row: {
       NomCommercial: "Super U Machecoul",
       Adresse: "Boulevard Des Prises Zone Commerciale 44270 MACHECOUL ST MEME",
@@ -60,7 +64,8 @@ const cases = [
 const capture = {
   capturedAt: new Date().toISOString(),
   commit: process.env.GITHUB_SHA || "local",
-  note: "Capture réseau expérimentale. Les expectedSiret et knownPoi sont des annotations diagnostiques du corpus : ils ne sont jamais injectés dans le résolveur runtime.",
+  note: "Capture réseau du service d’identité utilisé par le widget. Les expectedSiret sont des annotations du corpus et ne sont jamais injectés dans les requêtes de résolution.",
+  publishedIdentityGeneratedAt: publishedPayload.generatedAt || null,
   cases: [],
 };
 
@@ -88,7 +93,11 @@ async function recordingFetch(url, options = {}, network = []) {
 
 async function liveGeocode(address, options, network) {
   const url = buildGeocodeUrl(address, { limit: options?.limit ?? 3 });
-  const response = await recordingFetch(url, { method: "GET", headers: { Accept: "application/json" }, signal: options?.signal }, network);
+  const response = await recordingFetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    signal: options?.signal,
+  }, network);
   if (!response.ok) throw new Error(`Géocodage indisponible (HTTP ${response.status}).`);
   const payload = await response.json();
   return geocodeResultsFromPayload(payload, options?.limit ?? 3);
@@ -104,16 +113,6 @@ async function officialProbe(request, network) {
     return {
       request: { kind: request.kind, url: request.url },
       sirets: (result.items || []).map(item => item.siret),
-      candidates: (result.items || []).map(item => ({
-        siret: item.siret,
-        siren: item.siren,
-        nomCommercial: item.nomCommercial,
-        aliases: item.aliases,
-        raisonSociale: item.raisonSociale,
-        adresse: item.adresse,
-        latitude: item.latitude,
-        longitude: item.longitude,
-      })),
       coverage: result.coverage,
     };
   } catch (error) {
@@ -121,47 +120,13 @@ async function officialProbe(request, network) {
   }
 }
 
-async function nominatimProbe(row, network) {
-  try {
-    const search = new URL("https://nominatim.openstreetmap.org/search");
-    search.searchParams.set("format", "jsonv2");
-    search.searchParams.set("q", `${row.NomCommercial} ${row.Adresse}`);
-    search.searchParams.set("limit", "5");
-    search.searchParams.set("addressdetails", "1");
-    search.searchParams.set("extratags", "1");
-    const headers = {
-      Accept: "application/json",
-      "Accept-Language": "fr",
-      "User-Agent": "grist-widgets-identity-live/1.0 (https://github.com/djibian/grist-widgets)",
-    };
-    const response = await recordingFetch(search.toString(), { headers }, network);
-    if (!response.ok) return { error: `Nominatim HTTP ${response.status}` };
-    const results = await response.json();
-    const objects = [];
-    for (const result of Array.isArray(results) ? results.slice(0, 3) : []) {
-      const type = result.osm_type === "node" ? "node" : result.osm_type === "way" ? "way" : result.osm_type === "relation" ? "relation" : "";
-      if (!type || !result.osm_id) continue;
-      const url = `https://api.openstreetmap.org/api/0.6/${type}/${result.osm_id}.json`;
-      const raw = await recordingFetch(url, { headers }, network);
-      const payload = raw.ok ? await raw.json() : null;
-      const element = payload?.elements?.[0] ?? null;
-      objects.push({
-        search: {
-          osmType: result.osm_type,
-          osmId: result.osm_id,
-          displayName: result.display_name,
-          lat: result.lat,
-          lon: result.lon,
-          extratags: result.extratags ?? null,
-        },
-        status: raw.status,
-        tags: element?.tags ?? null,
-      });
-    }
-    return { count: Array.isArray(results) ? results.length : 0, objects };
-  } catch (error) {
-    return { error: error?.message || String(error) };
-  }
+function publishedLinksFor(row) {
+  return {
+    source: "published-identity",
+    complete: true,
+    generatedAt: publishedPayload.generatedAt || "",
+    candidates: matchPublishedIdentityLinks(publishedPayload.records, row),
+  };
 }
 
 for (const scenario of cases) {
@@ -170,7 +135,7 @@ for (const scenario of cases) {
   let error = null;
   const controller = new AbortController();
   try {
-    result = await resolveStructureIdentity({
+    result = await resolveIdentityForEnrichment({
       row: scenario.row,
       signal: controller.signal,
       geocode: (address, options) => liveGeocode(address, options, network),
@@ -179,31 +144,16 @@ for (const scenario of cases) {
         cacheTtlMs: 0,
         fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network),
       }),
-      findPoiLinks: options => findOsmIdentityPois({
-        ...options,
-        fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network),
-      }),
+      findPublishedLinks: async ({ row }) => publishedLinksFor(row),
     });
   } catch (caught) {
     error = { name: caught?.name || "Error", message: caught?.message || String(caught) };
   }
 
-  const diagnosticProbes = {};
-  diagnosticProbes.expectedSiret = await officialProbe(buildOfficialIdentifierSearchRequest(scenario.expectedSiret), network);
-  if (scenario.id === "super-u-machecoul") {
-    diagnosticProbes.legalName = await officialProbe(buildOfficialTextSearchRequest("SIDONAM", { codePostal: "44270" }), network);
-    diagnosticProbes.knownPoiNearby = await officialProbe(buildOfficialNearbySearchRequest({
-      latitude: scenario.knownPoi.latitude,
-      longitude: scenario.knownPoi.longitude,
-      radius: 0.1,
-    }), network);
-    diagnosticProbes.nominatim = await nominatimProbe(scenario.row, network);
-  }
-
+  const exactProbe = await officialProbe(buildOfficialIdentifierSearchRequest(scenario.expectedSiret), network);
   capture.cases.push({
     id: scenario.id,
     expectedSiret: scenario.expectedSiret,
-    knownPoi: scenario.knownPoi || null,
     row: scenario.row,
     decision: result?.decision ? {
       status: result.decision.status,
@@ -222,29 +172,30 @@ for (const scenario of cases) {
     diagnostics: result?.diagnostics || [],
     links: (result?.links || []).map(link => ({
       source: link.source,
+      sourceLabel: link.sourceLabel,
       sourceRecordId: link.sourceRecordId,
+      sourcePublishedAt: link.sourcePublishedAt || null,
       publicNames: link.publicNames,
       siret: link.siret,
       adresse: link.adresse,
-      latitude: link.latitude,
-      longitude: link.longitude,
       verifiedOfficial: link.verifiedOfficial,
     })),
     geocodeCandidates: result?.geocodeCandidates || [],
-    diagnosticProbes,
+    exactProbe,
     error,
     network,
   });
 }
 
 await mkdir("artifacts", { recursive: true });
-await writeFile("artifacts/structure-picker-identity-live.json", JSON.stringify(capture, null, 2));
+await writeFile("artifacts/structure-picker-identity-live.json", `${JSON.stringify(capture, null, 2)}\n`);
 
 for (const scenario of capture.cases) {
   console.log(`${scenario.id}: ${scenario.decision?.status || "ERROR"} -> ${scenario.decision?.selectedSiret || "—"} (expected ${scenario.expectedSiret})`);
+  if (scenario.links.length) {
+    console.log(`  links: ${scenario.links.map(link => `${link.sourceLabel}:${link.siret}:${link.verifiedOfficial ? "verified" : "unverified"}`).join(" | ")}`);
+  }
   if (scenario.error) console.log(`  error: ${scenario.error.message}`);
   if (scenario.diagnostics?.length) console.log(`  diagnostics: ${scenario.diagnostics.join(" | ")}`);
-  const exact = scenario.diagnosticProbes?.expectedSiret;
-  if (exact) console.log(`  exact-probe: ${exact.error || exact.sirets?.join(",") || "no candidate"}`);
-  if (scenario.diagnosticProbes?.nominatim) console.log(`  nominatim: ${JSON.stringify(scenario.diagnosticProbes.nominatim)}`);
+  if (scenario.exactProbe) console.log(`  exact-probe: ${scenario.exactProbe.error || scenario.exactProbe.sirets?.join(",") || "no candidate"}`);
 }
