@@ -30,7 +30,7 @@ function assertSingleNearbyFirst(attempts, postalCode) {
   assert.equal(attempts.filter(item => item.query.startsWith("__near_point__:")).length, 1);
 }
 
-test("Super U uses address-targeted lookup when IGN geocoding is weak", () => {
+test("Super U keeps nearby lookup even when IGN score is weak and adds one address fallback", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "Super U Machecoul",
@@ -44,12 +44,16 @@ test("Super U uses address-targeted lookup when IGN geocoding is weak", () => {
     score: 0.64,
   });
 
-  assert.ok(attempts[0]?.query.startsWith("__targeted_text__:"));
-  assert.equal(attempts[0]?.codePostal, "44270");
-  const [apiQueryRaw, identityRaw] = attempts[0].query.slice("__targeted_text__:".length).split("|");
+  assertSingleNearbyFirst(attempts, "44270");
+  const nearby = attempts[0].query.split("|");
+  assert.equal(Number(nearby[2]), 0.25);
+  assert.equal(decodeURIComponent(nearby[3]), "super u");
+
+  const targeted = attempts.find(item => item.query.startsWith("__targeted_text__:"));
+  assert.ok(targeted);
+  const [apiQueryRaw, identityRaw] = targeted.query.slice("__targeted_text__:".length).split("|");
   assert.equal(decodeURIComponent(apiQueryRaw), "prises");
   assert.equal(decodeURIComponent(identityRaw), "super u");
-  assert.equal(attempts.some(item => item.query.startsWith("__near_point__:")), false);
   assert.ok(attempts.some(item => item.query === "super prises" && item.codePostal === "44270"));
 });
 
