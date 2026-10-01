@@ -16,6 +16,15 @@ function hasValue(value) {
   return value !== undefined && value !== null && String(value).trim() !== "";
 }
 
+function coordinatesAreUsable(latitudeValue, longitudeValue) {
+  if (!hasValue(latitudeValue) || !hasValue(longitudeValue)) return false;
+  const latitude = Number(latitudeValue);
+  const longitude = Number(longitudeValue);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return false;
+  return !(Math.abs(latitude) < 1e-12 && Math.abs(longitude) < 1e-12);
+}
+
 function numericEqual(a, b) {
   const left = Number(a);
   const right = Number(b);
@@ -32,12 +41,48 @@ function valuesEqual(field, current, proposed) {
   return normalize(current) === normalize(proposed);
 }
 
+function normalizedWords(value) {
+  return normalize(value).split(/\s+/).filter(Boolean);
+}
+
+function stripLocationEdgeWords(name, commune) {
+  const words = normalizedWords(name);
+  const locationWords = new Set(normalizedWords(commune));
+  if (!words.length || !locationWords.size) return normalize(name);
+
+  let start = 0;
+  let end = words.length;
+  while (end - start > 1 && locationWords.has(words[end - 1])) end -= 1;
+  while (end - start > 1 && locationWords.has(words[start])) start += 1;
+  return words.slice(start, end).join(" ");
+}
+
+function dropLeadingQualifier(name) {
+  const words = normalizedWords(name);
+  if (words.length < 3) return "";
+  return words.slice(1).join(" ");
+}
+
+function addSearchVariant(variants, value) {
+  const query = String(value ?? "").trim();
+  if (!query) return;
+  const key = normalize(query);
+  if (!key || variants.some(item => normalize(item) === key)) return;
+  variants.push(query);
+}
+
+function addSearchAttempt(attempts, query, codePostal) {
+  const normalizedQuery = normalize(query);
+  const postal = /^\d{5}$/.test(String(codePostal ?? "").trim()) ? String(codePostal).trim() : "";
+  if (!normalizedQuery) return;
+  if (attempts.some(item => normalize(item.query) === normalizedQuery && item.codePostal === postal)) return;
+  attempts.push({ query: String(query).trim(), codePostal: postal });
+}
+
 export function diagnoseRow(row) {
   if (!row) return null;
   const identifier = identifierParts(row.SirenSiret);
-  const latitude = Number(row.Latitude);
-  const longitude = Number(row.Longitude);
-  const coordinatesComplete = hasValue(row.Latitude) && hasValue(row.Longitude) && Number.isFinite(latitude) && Number.isFinite(longitude);
+  const coordinatesComplete = coordinatesAreUsable(row.Latitude, row.Longitude);
   const location = extractLocationFromAddress(row.Adresse);
 
   return {
@@ -54,16 +99,36 @@ export function diagnoseRow(row) {
   };
 }
 
-export function enterpriseSearchContext(row, geocodeCandidate = null) {
+export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   const identifier = identifierParts(row?.SirenSiret);
-  if (identifier.identifier) return { query: identifier.identifier, codePostal: "" };
+  if (identifier.identifier) return [{ query: identifier.identifier, codePostal: "" }];
 
   const fromAddress = extractLocationFromAddress(geocodeCandidate?.adresse || row?.Adresse);
   const codePostal = geocodeCandidate?.codePostal || fromAddress.codePostal;
   const commune = geocodeCandidate?.commune || fromAddress.commune;
   const name = String(row?.NomCommercial ?? "").trim();
-  const query = [name, commune].filter(Boolean).join(" ").trim();
-  return { query, codePostal };
+  if (!name) return [];
+
+  const variants = [];
+  addSearchVariant(variants, name);
+
+  const withoutLocation = stripLocationEdgeWords(name, commune);
+  addSearchVariant(variants, withoutLocation);
+
+  const shortestUsefulName = variants.at(-1) || name;
+  addSearchVariant(variants, dropLeadingQualifier(shortestUsefulName));
+
+  const attempts = [];
+  for (const query of variants) addSearchAttempt(attempts, query, codePostal);
+
+  // Dernier recours borné : on retire seulement le filtre postal, sans multiplier
+  // les variantes larges sur l'ensemble des départements configurés.
+  if (codePostal) addSearchAttempt(attempts, name, "");
+  return attempts;
+}
+
+export function enterpriseSearchContext(row, geocodeCandidate = null) {
+  return enterpriseSearchAttempts(row, geocodeCandidate)[0] ?? { query: "", codePostal: "" };
 }
 
 function proposal(field, current, proposed, source) {
