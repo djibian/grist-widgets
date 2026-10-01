@@ -129,9 +129,12 @@ async function nominatimProbe(row, network) {
     search.searchParams.set("limit", "5");
     search.searchParams.set("addressdetails", "1");
     search.searchParams.set("extratags", "1");
-    const response = await recordingFetch(search.toString(), {
-      headers: { Accept: "application/json", "Accept-Language": "fr" },
-    }, network);
+    const headers = {
+      Accept: "application/json",
+      "Accept-Language": "fr",
+      "User-Agent": "grist-widgets-identity-live/1.0 (https://github.com/djibian/grist-widgets)",
+    };
+    const response = await recordingFetch(search.toString(), { headers }, network);
     if (!response.ok) return { error: `Nominatim HTTP ${response.status}` };
     const results = await response.json();
     const objects = [];
@@ -139,7 +142,7 @@ async function nominatimProbe(row, network) {
       const type = result.osm_type === "node" ? "node" : result.osm_type === "way" ? "way" : result.osm_type === "relation" ? "relation" : "";
       if (!type || !result.osm_id) continue;
       const url = `https://api.openstreetmap.org/api/0.6/${type}/${result.osm_id}.json`;
-      const raw = await recordingFetch(url, { headers: { Accept: "application/json" } }, network);
+      const raw = await recordingFetch(url, { headers }, network);
       const payload = raw.ok ? await raw.json() : null;
       const element = payload?.elements?.[0] ?? null;
       objects.push({
