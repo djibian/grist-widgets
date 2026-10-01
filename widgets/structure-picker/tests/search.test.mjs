@@ -76,7 +76,7 @@ test("street evidence recognizes the Super U legal address while rejecting anoth
   assert.equal(scoreAddressEvidence(target, school), 0);
 });
 
-test("Super U keeps SIDONAM from nearby results even when SIRENE exposes no Super U trade name", () => {
+test("nearby Super U lookup does not stop on address-only legal entities", () => {
   const payload = { results: [
     {
       siren: "410918080",
@@ -115,10 +115,22 @@ test("Super U keeps SIDONAM from nearby results even when SIRENE exposes no Supe
     address: "Boulevard Des Prises Zone Commerciale 44270 MACHECOUL ST MEME",
   });
   buildExternalSearchUrl(query, { codePostal: "44270" });
+  assert.deepEqual(flattenExternalResults(payload), []);
+});
+
+test("Super U text fallback can recover SIDONAM after the API matched hidden trade-name/address evidence", () => {
+  const payload = { results: [{
+    siren: "410918080",
+    nom_raison_sociale: "SIDONAM",
+    matching_etablissements: [{
+      siret: "41091808000020", etat_administratif: "A",
+      adresse: "ZONE COMMERCIALE BD DES PRISES 44270 MACHECOUL-SAINT-MEME", code_postal: "44270", libelle_commune: "MACHECOUL-SAINT-MEME",
+    }],
+  }] };
+  buildExternalSearchUrl("super prises", { codePostal: "44270" });
   const candidates = flattenExternalResults(payload);
   assert.equal(candidates[0]?.siret, "41091808000020");
   assert.equal(candidates[0]?.raisonSociale, "SIDONAM");
-  assert.equal(candidates.some(item => item.siret === "20005645500047"), false);
 });
 
 test("nearby EHPAD keeps only the matching establishment and rejects unrelated Bouin addresses", () => {
@@ -180,24 +192,26 @@ test("nearby EHPAD keeps only the matching establishment and rejects unrelated B
   assert.deepEqual(candidates.map(item => item.siret), ["26850025300011"]);
 });
 
-test("nearby ranking preserves O PRE D'VOUS and POM DE RAINETTE as first choices", () => {
+test("nearby ranking keeps only O PRE D'VOUS and POM DE RAINETTE, not same-street neighbors", () => {
   const oPre = [
     { nomCommercial: "PH DISTRIBUTION", raisonSociale: "PH DISTRIBUTION", adresse: "LA MORTIERE 44270 SAINT-ETIENNE-DE-MER-MORTE", codePostal: "44270", commune: "SAINT-ETIENNE-DE-MER-MORTE", latitude: 46.99, longitude: -1.73, siret: "89306104400010" },
     { nomCommercial: "O PRE D'VOUS", nomUsuelDistinct: true, raisonSociale: "PH DISTRIBUTION", adresse: "24 RUE DES FOSSES 44270 LA MARNE", codePostal: "44270", commune: "LA MARNE", latitude: 46.997657, longitude: -1.736921, siret: "89306104400028" },
+    { nomCommercial: "COIFF & MOI", raisonSociale: "COIFF & MOI", adresse: "26 RUE DES FOSSES 44270 LA MARNE", codePostal: "44270", commune: "LA MARNE", latitude: 46.9977, longitude: -1.7369, siret: "79825660800018" },
   ];
-  assert.equal(rankNearbyCandidates(oPre, {
+  assert.deepEqual(rankNearbyCandidates(oPre, {
     query: "ô Pré d’Vous", targetAddress: "24 Rue des Fosses 44270 La Marne", codePostal: "44270",
     latitude: 46.997657, longitude: -1.736921, radius: 0.25,
-  })[0]?.siret, "89306104400028");
+  }).map(item => item.siret), ["89306104400028"]);
 
   const rainette = [
     { nomCommercial: "PICOTI PICOTA", raisonSociale: "PICOTI PICOTA", adresse: "8 RUE DU FIEF DE LA REINE 85300 SALLERTAINE", codePostal: "85300", commune: "SALLERTAINE", latitude: 46.86, longitude: -1.95, siret: "88493583400017" },
     { nomCommercial: "POM' DE RAINETTE", nomUsuelDistinct: true, raisonSociale: "PICOTI PICOTA", adresse: "10 B RUE DES MARGOTINS 85300 SALLERTAINE", codePostal: "85300", commune: "SALLERTAINE", latitude: 46.868553, longitude: -1.94211, siret: "88493583400033" },
+    { nomCommercial: "HILLEREAU PEINTURE", raisonSociale: "HILLEREAU PEINTURE", adresse: "10 RUE DES MARGOTINS 85300 SALLERTAINE", codePostal: "85300", commune: "SALLERTAINE", latitude: 46.8685, longitude: -1.9420, siret: "79342709700035" },
   ];
-  assert.equal(rankNearbyCandidates(rainette, {
+  assert.deepEqual(rankNearbyCandidates(rainette, {
     query: "CRECHE POM'DE RAINETTE", targetAddress: "10 bis Rue des Margotins 85300 Sallertaine", codePostal: "85300",
     latitude: 46.868553, longitude: -1.94211, radius: 0.25,
-  })[0]?.siret, "88493583400033");
+  }).map(item => item.siret), ["88493583400033"]);
 });
 
 test("O PRE D'VOUS branch is ranked before another PH DISTRIBUTION establishment in text fallback", () => {
