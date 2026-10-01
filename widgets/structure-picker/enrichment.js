@@ -170,30 +170,33 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   const streetHint = codePostal ? addressSearchHint(sourceAddress) : "";
 
   const geocodeScore = Number(geocodeCandidate?.score);
-  const hasReliableGeocode = Boolean(
+  const hasGeocode = Boolean(
     geocodeCandidate
     && coordinatesAreUsable(geocodeCandidate.latitude, geocodeCandidate.longitude)
-    && (!Number.isFinite(geocodeScore) || geocodeScore >= 0.80)
   );
 
-  // Un géocodage précis est un excellent raccourci : une seule recherche de
-  // voisinage suffit. Les noms publics d'établissement restent ensuite le
-  // critère d'identité principal côté client.
-  if (hasReliableGeocode) {
+  // Toute coordonnée exploitable constitue une preuve géographique utile, même
+  // quand le score IGN est modeste. Pour Super U Machecoul, le point IGN de la
+  // voie est à moins de 200 m du magasin réel : l'écarter était une erreur.
+  if (hasGeocode) {
     addSearchAttempt(attempts, buildNearbySearchQuery({
       latitude: geocodeCandidate.latitude,
       longitude: geocodeCandidate.longitude,
-      radius: 0.35,
+      radius: 0.25,
       name: locationNeutralName,
       address: sourceAddress,
     }), codePostal);
   }
 
-  // Quand le géocodeur renvoie un point de voie ou de zone peu précis, on ne
-  // multiplie plus les rayons. On demande à l'Annuaire les établissements de
-  // la voie, puis on les filtre localement sur le nom recherché. C'est le cas
-  // typique de "Super U Machecoul" / boulevard des Prises.
-  if (!hasReliableGeocode && streetHint) {
+  // Un score IGN faible ajoute un seul secours par voie/adresse. Il ne remplace
+  // plus la recherche de proximité et n'entraîne plus plusieurs élargissements.
+  if (hasGeocode && Number.isFinite(geocodeScore) && geocodeScore < 0.80 && streetHint) {
+    addSearchAttempt(attempts, buildTargetedTextSearchQuery({
+      query: streetHint,
+      name: locationNeutralName,
+      address: sourceAddress,
+    }), codePostal);
+  } else if (!hasGeocode && streetHint) {
     addSearchAttempt(attempts, buildTargetedTextSearchQuery({
       query: streetHint,
       name: locationNeutralName,
