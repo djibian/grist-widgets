@@ -30,7 +30,7 @@ function assertSingleNearbyFirst(attempts, postalCode) {
   assert.equal(attempts.filter(item => item.query.startsWith("__near_point__:")).length, 1);
 }
 
-test("Super U keeps nearby lookup even when IGN score is weak and adds one address fallback", () => {
+test("Super U tries nearby, then identity plus street, then address-only rescue", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "Super U Machecoul",
@@ -49,12 +49,15 @@ test("Super U keeps nearby lookup even when IGN score is weak and adds one addre
   assert.equal(Number(nearby[2]), 0.25);
   assert.equal(decodeURIComponent(nearby[3]), "super u");
 
-  const targeted = attempts.find(item => item.query.startsWith("__targeted_text__:"));
-  assert.ok(targeted);
+  const superStreetIndex = attempts.findIndex(item => item.query === "super prises" && item.codePostal === "44270");
+  const targetedIndex = attempts.findIndex(item => item.query.startsWith("__targeted_text__:"));
+  assert.ok(superStreetIndex > 0);
+  assert.ok(targetedIndex > superStreetIndex);
+
+  const targeted = attempts[targetedIndex];
   const [apiQueryRaw, identityRaw] = targeted.query.slice("__targeted_text__:".length).split("|");
   assert.equal(decodeURIComponent(apiQueryRaw), "prises");
   assert.equal(decodeURIComponent(identityRaw), "super u");
-  assert.ok(attempts.some(item => item.query === "super prises" && item.codePostal === "44270"));
 });
 
 test("Pom de Rainette keeps one fast nearby attempt and text fallbacks", () => {
