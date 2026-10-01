@@ -12,6 +12,26 @@ const FIELD_LABELS = {
   SiteWeb: "Site web",
 };
 
+const GENERIC_LEADING_QUALIFIERS = new Set([
+  "creche",
+  "microcreche",
+  "micro",
+  "ehpad",
+  "restaurant",
+  "garage",
+  "hotel",
+  "association",
+  "societe",
+  "sarl",
+  "sas",
+]);
+
+const ADDRESS_STOP_WORDS = new Set([
+  "rue", "route", "avenue", "av", "boulevard", "bd", "chemin", "impasse", "place", "allee",
+  "zone", "commerciale", "za", "zi", "lotissement", "lieu", "dit", "de", "des", "du", "la", "le", "les",
+  "bis", "ter",
+]);
+
 function hasValue(value) {
   return value !== undefined && value !== null && String(value).trim() !== "";
 }
@@ -45,6 +65,14 @@ function normalizedWords(value) {
   return normalize(value).split(/\s+/).filter(Boolean);
 }
 
+function stripPostalTokens(value) {
+  return String(value ?? "")
+    .split(/\s+/)
+    .filter(token => !/^\d{5}$/.test(token))
+    .join(" ")
+    .trim();
+}
+
 function stripLocationEdgeWords(name, commune) {
   const words = normalizedWords(name);
   const locationWords = new Set(normalizedWords(commune));
@@ -59,8 +87,20 @@ function stripLocationEdgeWords(name, commune) {
 
 function dropLeadingQualifier(name) {
   const words = normalizedWords(name);
-  if (words.length < 3) return "";
+  if (words.length < 2 || !GENERIC_LEADING_QUALIFIERS.has(words[0])) return "";
+  if (words[0] === "micro" && words[1] === "creche") return words.slice(2).join(" ");
   return words.slice(1).join(" ");
+}
+
+function addressSearchHint(address) {
+  const raw = String(address ?? "").trim();
+  if (!raw) return "";
+  const postalMatch = raw.match(/\b\d{5}\b/);
+  const streetPart = postalMatch ? raw.slice(0, postalMatch.index) : raw;
+  const words = normalizedWords(streetPart)
+    .filter(word => !/^\d+[a-z]*$/.test(word))
+    .filter(word => !ADDRESS_STOP_WORDS.has(word));
+  return words.slice(-3).join(" ");
 }
 
 function addSearchVariant(variants, value) {
@@ -103,32 +143,42 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   const identifier = identifierParts(row?.SirenSiret);
   if (identifier.identifier) return [{ query: identifier.identifier, codePostal: "" }];
 
-  const fromAddress = extractLocationFromAddress(geocodeCandidate?.adresse || row?.Adresse);
+  const sourceAddress = geocodeCandidate?.adresse || row?.Adresse;
+  const fromAddress = extractLocationFromAddress(sourceAddress);
   const codePostal = geocodeCandidate?.codePostal || fromAddress.codePostal;
   const commune = geocodeCandidate?.commune || fromAddress.commune;
-  const name = String(row?.NomCommercial ?? "").trim();
-  if (!name) return [];
+  const rawName = String(row?.NomCommercial ?? "").trim();
+  if (!rawName) return [];
 
+  const name = stripPostalTokens(rawName);
   const variants = [];
   addSearchVariant(variants, name);
-
-  const withoutLocation = stripLocationEdgeWords(name, commune);
-  addSearchVariant(variants, withoutLocation);
+  addSearchVariant(variants, stripLocationEdgeWords(name, commune));
 
   const shortestUsefulName = variants.at(-1) || name;
   addSearchVariant(variants, dropLeadingQualifier(shortestUsefulName));
 
   const attempts = [];
+  const streetHint = codePostal ? addressSearchHint(sourceAddress) : "";
+  if (streetHint) {
+    addSearchAttempt(attempts, `${variants[0]} ${streetHint}`, codePostal);
+    if (variants.length > 1) addSearchAttempt(attempts, `${variants.at(-1)} ${streetHint}`, codePostal);
+  }
+
   for (const query of variants) addSearchAttempt(attempts, query, codePostal);
 
   // Dernier recours borné : on retire seulement le filtre postal, sans multiplier
   // les variantes larges sur l'ensemble des départements configurés.
   if (codePostal) addSearchAttempt(attempts, name, "");
-  return attempts;
+  return attempts.slice(0, 6);
 }
 
 export function enterpriseSearchContext(row, geocodeCandidate = null) {
-  return enterpriseSearchAttempts(row, geocodeCandidate)[0] ?? { query: "", codePostal: "" };
+  const identifier = identifierParts(row?.SirenSiret);
+  if (identifier.identifier) return { query: identifier.identifier, codePostal: "" };
+  const fromAddress = extractLocationFromAddress(geocodeCandidate?.adresse || row?.Adresse);
+  const codePostal = geocodeCandidate?.codePostal || fromAddress.codePostal;
+  return { query: stripPostalTokens(String(row?.NomCommercial ?? "").trim()), codePostal };
 }
 
 function proposal(field, current, proposed, source) {
