@@ -25,7 +25,7 @@ import { geocodeAddress } from "./geocode.js";
 import {
   buildEnrichmentProposals,
   diagnoseRow,
-  enterpriseSearchContext,
+  enterpriseSearchAttempts,
   selectedChanges,
 } from "./enrichment.js";
 import {
@@ -619,16 +619,14 @@ async function runEnrichment() {
     state.geocodeCandidates = geocodeCandidates;
     state.selectedGeocode = geocodeCandidates[0] ?? null;
 
-    const context = enterpriseSearchContext(row, state.selectedGeocode);
+    const attempts = enterpriseSearchAttempts(row, state.selectedGeocode);
     let enterpriseCandidates = [];
-    if (context.query) {
-      const options = { perPage: 6, matchingLimit: 10, codePostal: context.codePostal, limit: 10 };
-      let response = await fetchExternal(context.query, signal, options);
+    for (const attempt of attempts) {
+      const options = { perPage: 6, matchingLimit: 10, codePostal: attempt.codePostal, limit: 10 };
+      const response = await fetchExternal(attempt.query, signal, options);
+      if (generation !== state.enrichmentGeneration) return;
       enterpriseCandidates = response.items;
-      if (!enterpriseCandidates.length && context.codePostal) {
-        response = await fetchExternal(context.query, signal, { ...options, codePostal: "" });
-        enterpriseCandidates = response.items;
-      }
+      if (enterpriseCandidates.length) break;
     }
     if (generation !== state.enrichmentGeneration) return;
 
