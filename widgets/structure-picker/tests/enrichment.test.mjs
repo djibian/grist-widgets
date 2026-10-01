@@ -24,14 +24,13 @@ test("enterprise lookup uses identifier first and address context otherwise", ()
   assert.deepEqual(enterpriseSearchContext({ SirenSiret: "", NomCommercial: "Garage Martin", Adresse: "12 rue X 44270 Machecoul" }), { query: "Garage Martin", codePostal: "44270" });
 });
 
-function assertNearbyFirst(attempts, postalCode) {
+function assertSingleNearbyFirst(attempts, postalCode) {
   assert.ok(attempts[0]?.query.startsWith("__near_point__:"));
-  assert.ok(attempts[1]?.query.startsWith("__near_point__:"));
   assert.equal(attempts[0]?.codePostal, postalCode);
-  assert.equal(attempts[1]?.codePostal, postalCode);
+  assert.equal(attempts.filter(item => item.query.startsWith("__near_point__:")).length, 1);
 }
 
-test("Super U separates identity from locality and adds a street-aware weak-token fallback", () => {
+test("Super U uses address-targeted lookup when IGN geocoding is weak", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "Super U Machecoul",
@@ -42,16 +41,19 @@ test("Super U separates identity from locality and adds a street-aware weak-toke
     commune: "Machecoul-Saint-Même",
     latitude: 46.996561,
     longitude: -1.815374,
+    score: 0.64,
   });
 
-  assertNearbyFirst(attempts, "44270");
-  const nearbyIdentity = decodeURIComponent(attempts[0].query.split("|")[3]);
-  assert.equal(nearbyIdentity, "super u");
+  assert.ok(attempts[0]?.query.startsWith("__targeted_text__:"));
+  assert.equal(attempts[0]?.codePostal, "44270");
+  const [apiQueryRaw, identityRaw] = attempts[0].query.slice("__targeted_text__:".length).split("|");
+  assert.equal(decodeURIComponent(apiQueryRaw), "prises");
+  assert.equal(decodeURIComponent(identityRaw), "super u");
+  assert.equal(attempts.some(item => item.query.startsWith("__near_point__:")), false);
   assert.ok(attempts.some(item => item.query === "super prises" && item.codePostal === "44270"));
-  assert.ok(attempts.some(item => item.query === "super" && item.codePostal === "44270"));
 });
 
-test("Pom de Rainette tries nearby establishments and preserves text fallback", () => {
+test("Pom de Rainette keeps one fast nearby attempt and text fallbacks", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "CRECHE POM'DE RAINETTE ",
@@ -62,13 +64,14 @@ test("Pom de Rainette tries nearby establishments and preserves text fallback", 
     commune: "Sallertaine",
     latitude: 46.868553,
     longitude: -1.94211,
+    score: 0.89,
   });
 
-  assertNearbyFirst(attempts, "85300");
+  assertSingleNearbyFirst(attempts, "85300");
   assert.ok(attempts.some(item => item.query === "pom de rainette" && item.codePostal === "85300"));
 });
 
-test("O Pre d'Vous tries proximity before its street-targeted fallback", () => {
+test("O Pre d'Vous keeps one fast nearby attempt", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "ô Pré d’Vous",
@@ -79,12 +82,13 @@ test("O Pre d'Vous tries proximity before its street-targeted fallback", () => {
     commune: "La Marne",
     latitude: 46.997657,
     longitude: -1.736921,
+    score: 0.95,
   });
-  assertNearbyFirst(attempts, "44270");
+  assertSingleNearbyFirst(attempts, "44270");
   assert.ok(attempts.some(item => item.query === "ô Pré d’Vous fosses"));
 });
 
-test("EHPAD tries proximity before text ranking", () => {
+test("EHPAD keeps one nearby attempt instead of widening the radius", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "EHPAD La Reynerie Bouin 85230",
@@ -95,20 +99,21 @@ test("EHPAD tries proximity before text ranking", () => {
     commune: "Bouin",
     latitude: 46.974141,
     longitude: -1.994981,
+    score: 0.96,
   });
-  assertNearbyFirst(attempts, "85230");
+  assertSingleNearbyFirst(attempts, "85230");
   const nearbyIdentity = decodeURIComponent(attempts[0].query.split("|")[3]);
   assert.equal(nearbyIdentity, "ehpad la reynerie");
-  assert.ok(attempts.some(item => item.query === "EHPAD La Reynerie Bouin pays retz"));
+  assert.ok(attempts.some(item => item.query === "ehpad la reynerie pays retz"));
 });
 
-test("enterprise lookup remains bounded and deduplicated", () => {
+test("enterprise lookup remains short and deduplicated", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "CRECHE POM'DE RAINETTE",
     Adresse: "Sallertaine",
   });
-  assert.ok(attempts.length <= 8);
+  assert.ok(attempts.length <= 5);
   assert.equal(new Set(attempts.map(item => `${item.query}|${item.codePostal}`)).size, attempts.length);
 });
 
