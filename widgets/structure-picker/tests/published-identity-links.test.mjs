@@ -11,7 +11,10 @@ const officialLink = {
   recordId: "magasins-u:PL00660",
   siret: "41091808000020",
   publicNames: ["Super U Machecoul", "Super U"],
+  legalName: "SIDONAM",
   address: "BOULEVARD DES PRISES 44270 MACHECOUL ST MEME",
+  postcode: "44270",
+  city: "MACHECOUL ST MEME",
   sourceLabel: "Magasins U",
   sourceUrl: "https://example.test/u.pdf",
   sourcePublishedAt: "2023-12-21",
@@ -25,9 +28,11 @@ test("published identity link requires both public identity and compatible site 
   assert.equal(matches.length, 1);
   assert.equal(matches[0].siret, "41091808000020");
   assert.equal(matches[0].sourceLabel, "Magasins U");
+  assert.equal(matches[0].legalName, "SIDONAM");
+  assert.equal(matches[0].postcode, "44270");
 });
 
-test("published link loader preserves provenance", async () => {
+test("published link loader preserves provenance and legal revalidation hints", async () => {
   const result = await findPublishedIdentityLinks({
     row,
     fetchImpl: async () => ({
@@ -37,6 +42,8 @@ test("published link loader preserves provenance", async () => {
   });
   assert.equal(result.complete, true);
   assert.equal(result.candidates[0].siret, "41091808000020");
+  assert.equal(result.candidates[0].legalName, "SIDONAM");
+  assert.equal(result.candidates[0].postcode, "44270");
   assert.equal(result.candidates[0].sourceUrl, "https://example.test/u.pdf");
   assert.equal(result.candidates[0].sourcePublishedAt, "2023-12-21");
 });
