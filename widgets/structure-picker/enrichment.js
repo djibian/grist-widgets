@@ -175,9 +175,9 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
     && coordinatesAreUsable(geocodeCandidate.latitude, geocodeCandidate.longitude)
   );
 
-  // Toute coordonnée exploitable constitue une preuve géographique utile, même
-  // quand le score IGN est modeste. Pour Super U Machecoul, le point IGN de la
-  // voie est à moins de 200 m du magasin réel : l'écarter était une erreur.
+  // Le voisinage est le chemin rapide, mais il ne doit confirmer qu'une identité
+  // réellement compatible. Les simples voisins de la même rue sont filtrés dans
+  // search.js afin que les replis suivants puissent encore s'exécuter.
   if (hasGeocode) {
     addSearchAttempt(attempts, buildNearbySearchQuery({
       latitude: geocodeCandidate.latitude,
@@ -188,26 +188,27 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
     }), codePostal);
   }
 
-  // Un score IGN faible ajoute un seul secours par voie/adresse. Il ne remplace
-  // plus la recherche de proximité et n'entraîne plus plusieurs élargissements.
-  if (hasGeocode && Number.isFinite(geocodeScore) && geocodeScore < 0.80 && streetHint) {
-    addSearchAttempt(attempts, buildTargetedTextSearchQuery({
-      query: streetHint,
-      name: locationNeutralName,
-      address: sourceAddress,
-    }), codePostal);
-  } else if (!hasGeocode && streetHint) {
-    addSearchAttempt(attempts, buildTargetedTextSearchQuery({
-      query: streetHint,
-      name: locationNeutralName,
-      address: sourceAddress,
-    }), codePostal);
-  }
-
+  // Ensuite on combine l'identité et la voie. Ce repli est plus discriminant
+  // qu'une recherche d'adresse seule et permet notamment de retrouver SIDONAM
+  // via l'index public de l'enseigne SUPER U, même si l'enseigne n'est pas
+  // exposée dans la réponse minimale de SIRENE.
   if (streetHint) {
     if (weakTokenFallback) addSearchAttempt(attempts, `${weakTokenFallback} ${streetHint}`, codePostal);
     addSearchAttempt(attempts, `${locationNeutralName} ${streetHint}`, codePostal);
     if (normalize(name) !== normalize(locationNeutralName)) addSearchAttempt(attempts, `${name} ${streetHint}`, codePostal);
+  }
+
+  // L'adresse seule n'est qu'un dernier secours pour les fiches dont le nom
+  // public n'est pas indexé. Elle n'est utilisée qu'après les requêtes identité + voie.
+  if (streetHint && (
+    !hasGeocode
+    || (Number.isFinite(geocodeScore) && geocodeScore < 0.80)
+  )) {
+    addSearchAttempt(attempts, buildTargetedTextSearchQuery({
+      query: streetHint,
+      name: locationNeutralName,
+      address: sourceAddress,
+    }), codePostal);
   }
 
   for (const query of variants) addSearchAttempt(attempts, query, codePostal);
