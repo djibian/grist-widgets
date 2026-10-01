@@ -47,7 +47,7 @@ test("Super U Machecoul Annuaire payload yields SIDONAM candidate", () => {
     }],
   }] };
 
-  buildExternalSearchUrl("super u prises", { codePostal: "44270" });
+  buildExternalSearchUrl("super", { codePostal: "44270" });
   const [candidate] = flattenExternalResults(payload);
   assert.equal(candidate.nomCommercial, "SUPER U");
   assert.equal(candidate.raisonSociale, "SIDONAM");
@@ -84,10 +84,32 @@ test("POM' DE RAINETTE branch is ranked before the other PICOTI PICOTA establish
   assert.equal(candidates[0].siret, "88493583400033");
 });
 
-test("EHPAD public establishment name breaks the tie between same-legal-name branches", () => {
+test("EHPAD identity outranks an association whose address happens to contain the EHPAD name", () => {
   const candidates = [
-    { nomCommercial: "SOINS INFIRMIERS DOMICILE SSIDPA", raisonSociale: "EHPAD LA REYNERIE BOUIN", adresse: "14 RUE DU PAYS DE RETZ 85230 BOUIN", codePostal: "85230", commune: "BOUIN", siret: "26850025300045" },
-    { nomCommercial: "EHPAD", raisonSociale: "EHPAD LA REYNERIE BOUIN", adresse: "LA REYNERIE RUE DU PAYS DE RETZ 85230 BOUIN", codePostal: "85230", commune: "BOUIN", siret: "26850025300011" },
+    {
+      nomCommercial: "ASSOCIATION DES AMIS DE LA MADELEINE ET DE LA REYNERIE (ALAMAREY)",
+      raisonSociale: "ASSOCIATION DES AMIS DE LA MADELEINE ET DE LA REYNERIE (ALAMAREY)",
+      adresse: "EHPAD LA REYNERIE 8 RUE DU PAYS DE RETZ 85230 BOUIN",
+      codePostal: "85230",
+      commune: "BOUIN",
+      siret: "89405714000010",
+    },
+    {
+      nomCommercial: "EHPAD",
+      raisonSociale: "EHPAD LA REYNERIE BOUIN",
+      adresse: "LA REYNERIE RUE DU PAYS DE RETZ 85230 BOUIN",
+      codePostal: "85230",
+      commune: "BOUIN",
+      siret: "26850025300011",
+    },
+    {
+      nomCommercial: "SOINS INFIRMIERS DOMICILE SSIDPA",
+      raisonSociale: "EHPAD LA REYNERIE BOUIN",
+      adresse: "14 RUE DU PAYS DE RETZ 85230 BOUIN",
+      codePostal: "85230",
+      commune: "BOUIN",
+      siret: "26850025300045",
+    },
   ];
   const ranked = rankExternalCandidates(candidates, "ehpad la reynerie bouin pays retz", "85230");
   assert.equal(ranked[0].siret, "26850025300011");
