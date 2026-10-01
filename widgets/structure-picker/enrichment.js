@@ -1,4 +1,4 @@
-import { extractLocationFromAddress, identifierParts, normalize } from "./search.js";
+import { buildNearbySearchQuery, extractLocationFromAddress, identifierParts, normalize } from "./search.js";
 
 const FIELD_LABELS = {
   NomCommercial: "Nom usuel",
@@ -158,6 +158,23 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   if (!rawName) return [];
 
   const name = stripPostalTokens(rawName);
+  const attempts = [];
+
+  // L'adresse géocodée est un signal d'établissement bien plus discriminant que
+  // le moteur plein texte. On interroge d'abord les établissements réellement
+  // voisins, puis on ne conserve côté client que ceux dont le nom correspond.
+  if (geocodeCandidate && coordinatesAreUsable(geocodeCandidate.latitude, geocodeCandidate.longitude)) {
+    for (const radius of [0.25, 0.75]) {
+      addSearchAttempt(attempts, buildNearbySearchQuery({
+        latitude: geocodeCandidate.latitude,
+        longitude: geocodeCandidate.longitude,
+        radius,
+        name,
+        address: sourceAddress,
+      }), codePostal);
+    }
+  }
+
   const variants = [];
   addSearchVariant(variants, name);
   addSearchVariant(variants, stripLocationEdgeWords(name, commune));
@@ -166,7 +183,6 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   addSearchVariant(variants, dropLeadingQualifier(shortestUsefulName));
   const weakTokenFallback = dropSingleLetterTokens(variants.at(-1) || shortestUsefulName);
 
-  const attempts = [];
   const streetHint = codePostal ? addressSearchHint(sourceAddress) : "";
   if (streetHint) {
     addSearchAttempt(attempts, `${variants[0]} ${streetHint}`, codePostal);
@@ -174,17 +190,9 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   }
 
   for (const query of variants) addSearchAttempt(attempts, query, codePostal);
-
-  // Some public brands contain a one-letter token (for example "Super U").
-  // The Annuaire text engine combines terms with AND; a final postal-scoped
-  // fallback without those weak tokens avoids making the whole search depend
-  // on a token that may be ignored by the analyzer.
   if (weakTokenFallback) addSearchAttempt(attempts, weakTokenFallback, codePostal);
-
-  // Dernier recours borné : on retire seulement le filtre postal, sans multiplier
-  // les variantes larges sur l'ensemble des départements configurés.
   if (codePostal) addSearchAttempt(attempts, name, "");
-  return attempts.slice(0, 6);
+  return attempts.slice(0, 8);
 }
 
 export function enterpriseSearchContext(row, geocodeCandidate = null) {
