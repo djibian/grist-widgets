@@ -1,7 +1,10 @@
 import { fuzzyTextScore, normalizeIdentifier } from "./search.js";
 import { targetNameVariants, usableCoordinates } from "./identity-resolution.js";
 
-export const OVERPASS_IDENTITY_URL = "https://overpass-api.de/api/interpreter";
+export const OVERPASS_IDENTITY_URLS = Object.freeze([
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+]);
 export const DEFAULT_IDENTITY_RADIUS_METERS = 500;
 
 function clean(value) {
@@ -108,26 +111,63 @@ export function rankIdentityPois(elements, row, { latitude, longitude, radius = 
     .slice(0, 3);
 }
 
-async function requestOverpass(query, { signal, fetchImpl = fetch } = {}) {
-  if (!query) return [];
-  // GET évite certains 406 observés sur l'interpréteur Overpass avec les POST
-  // urlencoded, tout en restant compatible avec ces requêtes locales courtes.
-  const url = new URL(OVERPASS_IDENTITY_URL);
-  url.searchParams.set("data", query);
-  const response = await fetchImpl(url.toString(), {
-    method: "GET",
-    signal,
-  });
-  if (response.status === 429) throw new Error("OpenStreetMap limite temporairement la recherche d’identité.");
-  if (!response.ok) throw new Error(`Recherche d’identité OpenStreetMap indisponible (HTTP ${response.status}).`);
-  const payload = await response.json();
-  return Array.isArray(payload?.elements) ? payload.elements : [];
+function retryableStatus(status) {
+  return status === 406 || status === 408 || status === 429 || status >= 500;
 }
 
-export async function findOsmIdentityPois({ row, latitude, longitude, radius = DEFAULT_IDENTITY_RADIUS_METERS, signal, fetchImpl = fetch } = {}) {
+async function requestOverpass(query, {
+  signal,
+  fetchImpl = fetch,
+  endpoints = OVERPASS_IDENTITY_URLS,
+} = {}) {
+  if (!query) return [];
+  const body = new URLSearchParams({ data: query }).toString();
+  const failures = [];
+
+  for (const endpoint of endpoints) {
+    let response;
+    try {
+      response = await fetchImpl(endpoint, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        body,
+        signal,
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      failures.push(`${endpoint}: ${error?.message || "erreur réseau"}`);
+      continue;
+    }
+
+    if (response.ok) {
+      const payload = await response.json();
+      return Array.isArray(payload?.elements) ? payload.elements : [];
+    }
+
+    failures.push(`${endpoint}: HTTP ${response.status}`);
+    if (!retryableStatus(response.status)) {
+      throw new Error(`Recherche d’identité OpenStreetMap indisponible (HTTP ${response.status}).`);
+    }
+  }
+
+  throw new Error(`Recherche d’identité OpenStreetMap indisponible (${failures.join(" ; ") || "aucune instance disponible"}).`);
+}
+
+export async function findOsmIdentityPois({
+  row,
+  latitude,
+  longitude,
+  radius = DEFAULT_IDENTITY_RADIUS_METERS,
+  signal,
+  fetchImpl = fetch,
+  endpoints = OVERPASS_IDENTITY_URLS,
+} = {}) {
   const query = buildNearbyIdentityOverpassQuery(latitude, longitude, radius);
   if (!query) return { source: "osm", candidates: [], complete: true };
-  const elements = await requestOverpass(query, { signal, fetchImpl });
+  const elements = await requestOverpass(query, { signal, fetchImpl, endpoints });
   return {
     source: "osm",
     candidates: rankIdentityPois(elements, row, { latitude, longitude, radius }),
