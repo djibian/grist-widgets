@@ -2,7 +2,8 @@ import { applyEnrichmentChanges, fetchFullSnapshot, findRowById, watchSelection,
 import { geocodeAddress } from "./geocode.js";
 import { buildEnrichmentProposals, selectedChanges } from "./enrichment.js";
 import { fetchOfficialRequest } from "./enterprise-client.js";
-import { resolveStructureIdentity } from "./identity-orchestrator.js";
+import { IDENTITY_BUDGET, resolveStructureIdentity } from "./identity-orchestrator.js";
+import { resolveIdentityForEnrichment } from "./identity-service.js";
 import { IDENTITY_STATES, decisionEvidence } from "./identity-resolution.js";
 import { findOsmIdentityPois } from "./osm-identity.js";
 
@@ -296,17 +297,21 @@ async function runIdentityAnalysis() {
   if (!row) return;
   resetAnalysis();
   const generation = ++state.generation;
-  state.controller = new AbortController();
+  const controller = new AbortController();
+  state.controller = controller;
+  const timeout = setTimeout(() => {
+    controller.abort(new DOMException("Le délai maximal de l’analyse a été atteint.", "TimeoutError"));
+  }, IDENTITY_BUDGET.deadlineMs);
   ui.enrichButton.disabled = true;
   setStatus("Analyse de l’identité de l’établissement…");
 
   try {
-    const result = await resolveStructureIdentity({
+    const result = await resolveIdentityForEnrichment({
       row,
-      signal: state.controller.signal,
+      signal: controller.signal,
       geocode: geocodeAddress,
       fetchOfficial: fetchOfficialRequest,
-      findPoiLinks: findOsmIdentityPois,
+      resolveFallback: options => resolveStructureIdentity({ ...options, findPoiLinks: findOsmIdentityPois }),
     });
     if (generation !== state.generation) return;
 
@@ -325,10 +330,16 @@ async function runIdentityAnalysis() {
     const message = [result.decision?.reason, ...diagnostics].filter(Boolean).join(" ");
     setStatus(message || "Analyse terminée.", result.decision?.status === IDENTITY_STATES.INCOMPLETE ? "error" : "");
   } catch (error) {
+    if (generation !== state.generation) return;
+    if (controller.signal.reason?.name === "TimeoutError") {
+      setStatus(controller.signal.reason.message, "error");
+      return;
+    }
     if (error?.name === "AbortError") return;
     console.error(error);
     setStatus(error.message || "Impossible d’analyser cette structure.", "error");
   } finally {
+    clearTimeout(timeout);
     if (generation === state.generation) ui.enrichButton.disabled = !selectedRow();
   }
 }
