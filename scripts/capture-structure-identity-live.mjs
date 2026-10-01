@@ -121,6 +121,46 @@ async function officialProbe(request, network) {
   }
 }
 
+async function nominatimProbe(row, network) {
+  try {
+    const search = new URL("https://nominatim.openstreetmap.org/search");
+    search.searchParams.set("format", "jsonv2");
+    search.searchParams.set("q", `${row.NomCommercial} ${row.Adresse}`);
+    search.searchParams.set("limit", "5");
+    search.searchParams.set("addressdetails", "1");
+    search.searchParams.set("extratags", "1");
+    const response = await recordingFetch(search.toString(), {
+      headers: { Accept: "application/json", "Accept-Language": "fr" },
+    }, network);
+    if (!response.ok) return { error: `Nominatim HTTP ${response.status}` };
+    const results = await response.json();
+    const objects = [];
+    for (const result of Array.isArray(results) ? results.slice(0, 3) : []) {
+      const type = result.osm_type === "node" ? "node" : result.osm_type === "way" ? "way" : result.osm_type === "relation" ? "relation" : "";
+      if (!type || !result.osm_id) continue;
+      const url = `https://api.openstreetmap.org/api/0.6/${type}/${result.osm_id}.json`;
+      const raw = await recordingFetch(url, { headers: { Accept: "application/json" } }, network);
+      const payload = raw.ok ? await raw.json() : null;
+      const element = payload?.elements?.[0] ?? null;
+      objects.push({
+        search: {
+          osmType: result.osm_type,
+          osmId: result.osm_id,
+          displayName: result.display_name,
+          lat: result.lat,
+          lon: result.lon,
+          extratags: result.extratags ?? null,
+        },
+        status: raw.status,
+        tags: element?.tags ?? null,
+      });
+    }
+    return { count: Array.isArray(results) ? results.length : 0, objects };
+  } catch (error) {
+    return { error: error?.message || String(error) };
+  }
+}
+
 for (const scenario of cases) {
   const network = [];
   let result = null;
@@ -145,8 +185,6 @@ for (const scenario of cases) {
     error = { name: caught?.name || "Error", message: caught?.message || String(caught) };
   }
 
-  // Diagnostic expérimental séparé : ces probes utilisent la vérité terrain annotée
-  // uniquement pour mesurer la couverture réelle des APIs, jamais pour décider.
   const diagnosticProbes = {};
   diagnosticProbes.expectedSiret = await officialProbe(buildOfficialIdentifierSearchRequest(scenario.expectedSiret), network);
   if (scenario.id === "super-u-machecoul") {
@@ -156,6 +194,7 @@ for (const scenario of cases) {
       longitude: scenario.knownPoi.longitude,
       radius: 0.1,
     }), network);
+    diagnosticProbes.nominatim = await nominatimProbe(scenario.row, network);
   }
 
   capture.cases.push({
@@ -204,4 +243,5 @@ for (const scenario of capture.cases) {
   if (scenario.diagnostics?.length) console.log(`  diagnostics: ${scenario.diagnostics.join(" | ")}`);
   const exact = scenario.diagnosticProbes?.expectedSiret;
   if (exact) console.log(`  exact-probe: ${exact.error || exact.sirets?.join(",") || "no candidate"}`);
+  if (scenario.diagnosticProbes?.nominatim) console.log(`  nominatim: ${JSON.stringify(scenario.diagnosticProbes.nominatim)}`);
 }
