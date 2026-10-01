@@ -1,13 +1,15 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { buildGeocodeUrl, geocodeResultsFromPayload } from "../widgets/structure-picker/geocode.js";
-import { fetchOfficialRequest, resetOfficialClientForTests } from "../widgets/structure-picker/enterprise-client.js";
+import { fetchOfficialRequest } from "../widgets/structure-picker/enterprise-client.js";
 import { resolveStructureIdentity } from "../widgets/structure-picker/identity-orchestrator.js";
 import { findOsmIdentityPois } from "../widgets/structure-picker/osm-identity.js";
+import { buildOfficialIdentifierSearchRequest, buildOfficialNearbySearchRequest, buildOfficialTextSearchRequest } from "../widgets/structure-picker/search.js";
 
 const cases = [
   {
     id: "super-u-machecoul",
     expectedSiret: "41091808000020",
+    knownPoi: { latitude: 46.99808, longitude: -1.815576, source: "Overture review fixture" },
     row: {
       NomCommercial: "Super U Machecoul",
       Adresse: "Boulevard Des Prises Zone Commerciale 44270 MACHECOUL ST MEME",
@@ -58,7 +60,7 @@ const cases = [
 const capture = {
   capturedAt: new Date().toISOString(),
   commit: process.env.GITHUB_SHA || "local",
-  note: "Capture réseau expérimentale. Les expectedSiret sont des annotations du corpus, jamais injectées dans les requêtes.",
+  note: "Capture réseau expérimentale. Les expectedSiret et knownPoi sont des annotations diagnostiques du corpus : ils ne sont jamais injectés dans le résolveur runtime.",
   cases: [],
 };
 
@@ -92,8 +94,34 @@ async function liveGeocode(address, options, network) {
   return geocodeResultsFromPayload(payload, options?.limit ?? 3);
 }
 
+async function officialProbe(request, network) {
+  if (!request) return null;
+  try {
+    const result = await fetchOfficialRequest(request, {
+      cacheTtlMs: 0,
+      fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network),
+    });
+    return {
+      request: { kind: request.kind, url: request.url },
+      sirets: (result.items || []).map(item => item.siret),
+      candidates: (result.items || []).map(item => ({
+        siret: item.siret,
+        siren: item.siren,
+        nomCommercial: item.nomCommercial,
+        aliases: item.aliases,
+        raisonSociale: item.raisonSociale,
+        adresse: item.adresse,
+        latitude: item.latitude,
+        longitude: item.longitude,
+      })),
+      coverage: result.coverage,
+    };
+  } catch (error) {
+    return { request: { kind: request.kind, url: request.url }, error: error?.message || String(error) };
+  }
+}
+
 for (const scenario of cases) {
-  resetOfficialClientForTests();
   const network = [];
   let result = null;
   let error = null;
@@ -117,9 +145,23 @@ for (const scenario of cases) {
     error = { name: caught?.name || "Error", message: caught?.message || String(caught) };
   }
 
+  // Diagnostic expérimental séparé : ces probes utilisent la vérité terrain annotée
+  // uniquement pour mesurer la couverture réelle des APIs, jamais pour décider.
+  const diagnosticProbes = {};
+  diagnosticProbes.expectedSiret = await officialProbe(buildOfficialIdentifierSearchRequest(scenario.expectedSiret), network);
+  if (scenario.id === "super-u-machecoul") {
+    diagnosticProbes.legalName = await officialProbe(buildOfficialTextSearchRequest("SIDONAM", { codePostal: "44270" }), network);
+    diagnosticProbes.knownPoiNearby = await officialProbe(buildOfficialNearbySearchRequest({
+      latitude: scenario.knownPoi.latitude,
+      longitude: scenario.knownPoi.longitude,
+      radius: 0.1,
+    }), network);
+  }
+
   capture.cases.push({
     id: scenario.id,
     expectedSiret: scenario.expectedSiret,
+    knownPoi: scenario.knownPoi || null,
     row: scenario.row,
     decision: result?.decision ? {
       status: result.decision.status,
@@ -147,6 +189,7 @@ for (const scenario of cases) {
       verifiedOfficial: link.verifiedOfficial,
     })),
     geocodeCandidates: result?.geocodeCandidates || [],
+    diagnosticProbes,
     error,
     network,
   });
@@ -159,4 +202,6 @@ for (const scenario of capture.cases) {
   console.log(`${scenario.id}: ${scenario.decision?.status || "ERROR"} -> ${scenario.decision?.selectedSiret || "—"} (expected ${scenario.expectedSiret})`);
   if (scenario.error) console.log(`  error: ${scenario.error.message}`);
   if (scenario.diagnostics?.length) console.log(`  diagnostics: ${scenario.diagnostics.join(" | ")}`);
+  const exact = scenario.diagnosticProbes?.expectedSiret;
+  if (exact) console.log(`  exact-probe: ${exact.error || exact.sirets?.join(",") || "no candidate"}`);
 }
