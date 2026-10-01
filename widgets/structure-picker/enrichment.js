@@ -1,4 +1,4 @@
-import { buildNearbySearchQuery, extractLocationFromAddress, identifierParts, normalize } from "./search.js";
+import { buildNearbySearchQuery, buildTargetedTextSearchQuery, extractLocationFromAddress, identifierParts, normalize } from "./search.js";
 
 const FIELD_LABELS = {
   NomCommercial: "Nom usuel",
@@ -160,22 +160,6 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   const name = stripPostalTokens(rawName);
   const locationNeutralName = stripLocationEdgeWords(name, commune) || normalize(name);
   const attempts = [];
-
-  // La proximité sert à trouver des établissements, mais la commune ne doit pas
-  // faire partie de l'identité recherchée. Sinon "Super U Machecoul" peut faire
-  // remonter n'importe quelle entité municipale contenant "Machecoul".
-  if (geocodeCandidate && coordinatesAreUsable(geocodeCandidate.latitude, geocodeCandidate.longitude)) {
-    for (const radius of [0.25, 0.75]) {
-      addSearchAttempt(attempts, buildNearbySearchQuery({
-        latitude: geocodeCandidate.latitude,
-        longitude: geocodeCandidate.longitude,
-        radius,
-        name: locationNeutralName,
-        address: sourceAddress,
-      }), codePostal);
-    }
-  }
-
   const variants = [];
   addSearchVariant(variants, name);
   addSearchVariant(variants, locationNeutralName);
@@ -183,20 +167,50 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   const shortestUsefulName = variants.at(-1) || name;
   addSearchVariant(variants, dropLeadingQualifier(shortestUsefulName));
   const weakTokenFallback = dropSingleLetterTokens(variants.at(-1) || shortestUsefulName);
-
   const streetHint = codePostal ? addressSearchHint(sourceAddress) : "";
+
+  const geocodeScore = Number(geocodeCandidate?.score);
+  const hasReliableGeocode = Boolean(
+    geocodeCandidate
+    && coordinatesAreUsable(geocodeCandidate.latitude, geocodeCandidate.longitude)
+    && (!Number.isFinite(geocodeScore) || geocodeScore >= 0.80)
+  );
+
+  // Un géocodage précis est un excellent raccourci : une seule recherche de
+  // voisinage suffit. Les noms publics d'établissement restent ensuite le
+  // critère d'identité principal côté client.
+  if (hasReliableGeocode) {
+    addSearchAttempt(attempts, buildNearbySearchQuery({
+      latitude: geocodeCandidate.latitude,
+      longitude: geocodeCandidate.longitude,
+      radius: 0.35,
+      name: locationNeutralName,
+      address: sourceAddress,
+    }), codePostal);
+  }
+
+  // Quand le géocodeur renvoie un point de voie ou de zone peu précis, on ne
+  // multiplie plus les rayons. On demande à l'Annuaire les établissements de
+  // la voie, puis on les filtre localement sur le nom recherché. C'est le cas
+  // typique de "Super U Machecoul" / boulevard des Prises.
+  if (!hasReliableGeocode && streetHint) {
+    addSearchAttempt(attempts, buildTargetedTextSearchQuery({
+      query: streetHint,
+      name: locationNeutralName,
+      address: sourceAddress,
+    }), codePostal);
+  }
+
   if (streetHint) {
-    addSearchAttempt(attempts, `${variants[0]} ${streetHint}`, codePostal);
-    if (variants.length > 1) addSearchAttempt(attempts, `${variants.at(-1)} ${streetHint}`, codePostal);
-    // Pour les enseignes comportant un token d'un seul caractère ("Super U"),
-    // combine le nom robuste avec la voie avant le repli large.
     if (weakTokenFallback) addSearchAttempt(attempts, `${weakTokenFallback} ${streetHint}`, codePostal);
+    addSearchAttempt(attempts, `${locationNeutralName} ${streetHint}`, codePostal);
+    if (normalize(name) !== normalize(locationNeutralName)) addSearchAttempt(attempts, `${name} ${streetHint}`, codePostal);
   }
 
   for (const query of variants) addSearchAttempt(attempts, query, codePostal);
   if (weakTokenFallback) addSearchAttempt(attempts, weakTokenFallback, codePostal);
   if (codePostal) addSearchAttempt(attempts, name, "");
-  return attempts.slice(0, 8);
+  return attempts.slice(0, 5);
 }
 
 export function enterpriseSearchContext(row, geocodeCandidate = null) {
