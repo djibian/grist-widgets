@@ -24,7 +24,7 @@ test("enterprise lookup uses identifier first and address context otherwise", ()
   assert.deepEqual(enterpriseSearchContext({ SirenSiret: "", NomCommercial: "Garage Martin", Adresse: "12 rue X 44270 Machecoul" }), { query: "Garage Martin", codePostal: "44270" });
 });
 
-test("Super U Machecoul uses a street-targeted query before broad fallbacks", () => {
+test("Super U Machecoul uses a street-targeted query and a weak-token fallback", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "Super U Machecoul",
@@ -40,6 +40,7 @@ test("Super U Machecoul uses a street-targeted query before broad fallbacks", ()
     { query: "super u prises", codePostal: "44270" },
     { query: "Super U Machecoul", codePostal: "44270" },
     { query: "super u", codePostal: "44270" },
+    { query: "super", codePostal: "44270" },
     { query: "Super U Machecoul", codePostal: "" },
   ]);
 });
