@@ -80,8 +80,6 @@ export async function resolveIdentityForEnrichment({
 
         for (const request of attempts) {
           try {
-            // A published SIRET is legal-identity evidence, not a search convenience.
-            // Always revalidate it against a fresh current Annuaire response.
             const result = await fetchOfficial(request, { signal, cacheTtlMs: 0 });
             successfulAttempt = true;
             const candidate = exactCandidate(result, siret);
