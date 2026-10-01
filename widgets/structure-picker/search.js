@@ -6,6 +6,7 @@ import {
 
 export const LOCAL_LIMIT = 8;
 export const EXTERNAL_LIMIT = 10;
+export const IDENTITY_CANDIDATE_LIMIT = 250;
 
 export function normalize(value) {
   return String(value ?? "")
@@ -173,11 +174,28 @@ export function isAllowedDepartment(establishment, departments = getActiveDepart
   return departments.includes(departmentOf(establishment));
 }
 
-function firstNonEmpty(values) {
+function nonEmptyString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function uniqueStrings(values) {
+  const seen = new Set();
+  const result = [];
   for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value.trim();
+    const clean = nonEmptyString(value);
+    if (!clean) continue;
+    const key = normalize(clean);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(clean);
   }
-  return "";
+  return result;
+}
+
+function coordinate(value, min, max) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= min && number <= max ? number : null;
 }
 
 export function candidateFrom(unit, establishment, departments = getActiveDepartments()) {
@@ -185,19 +203,17 @@ export function candidateFrom(unit, establishment, departments = getActiveDepart
   if (establishment.etat_administratif && establishment.etat_administratif !== "A") return null;
   if (!isAllowedDepartment(establishment, departments)) return null;
 
-  const enseigne = Array.isArray(establishment.liste_enseignes) ? firstNonEmpty(establishment.liste_enseignes) : "";
-  const nomUsuelPublic = firstNonEmpty([enseigne, establishment.nom_commercial]);
-  const raisonSociale = firstNonEmpty([unit?.nom_raison_sociale, unit?.nom_complet]);
-  const nomCommercial = firstNonEmpty([
-    nomUsuelPublic,
-    raisonSociale,
-    unit?.nom_complet,
-  ]) || "Structure sans nom";
-  const latitude = Number(establishment.latitude);
-  const longitude = Number(establishment.longitude);
+  const aliases = uniqueStrings([
+    ...(Array.isArray(establishment.liste_enseignes) ? establishment.liste_enseignes : []),
+    establishment.nom_commercial,
+  ]);
+  const raisonSociale = nonEmptyString(unit?.nom_raison_sociale) || nonEmptyString(unit?.nom_complet);
+  const nomUsuelPublic = aliases[0] || "";
+  const nomCommercial = nomUsuelPublic || raisonSociale || nonEmptyString(unit?.nom_complet) || "Structure sans nom";
 
   return {
     nomCommercial,
+    aliases,
     nomUsuelDistinct: Boolean(nomUsuelPublic),
     raisonSociale,
     siren: String(unit?.siren ?? ""),
@@ -206,8 +222,10 @@ export function candidateFrom(unit, establishment, departments = getActiveDepart
     codePostal: String(establishment.code_postal ?? ""),
     commune: String(establishment.libelle_commune ?? ""),
     departement: departmentOf(establishment),
-    latitude: Number.isFinite(latitude) ? latitude : null,
-    longitude: Number.isFinite(longitude) ? longitude : null,
+    latitude: coordinate(establishment.latitude, -90, 90),
+    longitude: coordinate(establishment.longitude, -180, 180),
+    etatAdministratif: String(establishment.etat_administratif ?? ""),
+    activitePrincipale: String(establishment.activite_principale ?? ""),
   };
 }
 
@@ -235,38 +253,172 @@ export function candidateIsAlreadyLocal(candidate, localIdentifiers) {
   return false;
 }
 
-export function flattenExternalResults(payload, localIdentifiers = new Set(), limit = EXTERNAL_LIMIT, departments = getActiveDepartments()) {
+function matchingEstablishmentsFor(unit, { requestedSiret = "", allowSiegeFallback = false } = {}) {
+  const matching = Array.isArray(unit?.matching_etablissements) ? [...unit.matching_etablissements] : [];
+  const targetSiret = normalizeIdentifier(requestedSiret);
+  if (targetSiret && normalizeIdentifier(unit?.siege?.siret) === targetSiret) matching.push(unit.siege);
+  else if (!matching.length && allowSiegeFallback && unit?.siege) matching.push(unit.siege);
+  return matching;
+}
+
+export function extractOfficialCandidates(payload, {
+  localIdentifiers = new Set(),
+  limit = IDENTITY_CANDIDATE_LIMIT,
+  departments = getActiveDepartments(),
+  requestedSiret = "",
+  allowSiegeFallback = false,
+  page = 1,
+  perPage = 25,
+  matchingLimit = 100,
+} = {}) {
   const candidates = [];
   const seenSirets = new Set();
+  let matchingLimitReached = false;
+  let candidateLimitHit = false;
 
   for (const unit of payload?.results ?? []) {
-    let establishments = Array.isArray(unit.matching_etablissements) ? unit.matching_etablissements : [];
-    if (!establishments.length && unit.siege) establishments = [unit.siege];
-
+    const establishments = matchingEstablishmentsFor(unit, { requestedSiret, allowSiegeFallback });
+    if (establishments.length >= matchingLimit) matchingLimitReached = true;
     for (const establishment of establishments) {
       const candidate = candidateFrom(unit, establishment, departments);
       if (!candidate) continue;
       const siret = normalizeIdentifier(candidate.siret);
       if (!siret || seenSirets.has(siret) || candidateIsAlreadyLocal(candidate, localIdentifiers)) continue;
+      if (candidates.length >= limit) {
+        candidateLimitHit = true;
+        break;
+      }
       seenSirets.add(siret);
       candidates.push(candidate);
-      if (candidates.length >= limit) return candidates;
     }
+    if (candidateLimitHit) break;
   }
-  return candidates;
+
+  const totalResultsRaw = Number(payload?.total_results ?? payload?.totalResults);
+  const totalResults = Number.isFinite(totalResultsRaw) ? totalResultsRaw : null;
+  const safePage = Math.max(1, Number(page) || 1);
+  const safePerPage = Math.max(1, Number(perPage) || 25);
+  const hasNextPage = totalResults !== null ? safePage * safePerPage < totalResults : false;
+  const completenessKnown = totalResults !== null;
+  const complete = !candidateLimitHit && !matchingLimitReached && (!completenessKnown || !hasNextPage);
+
+  return {
+    items: candidates,
+    coverage: {
+      source: "annuaire",
+      page: safePage,
+      perPage: safePerPage,
+      totalResults,
+      returnedUnits: Array.isArray(payload?.results) ? payload.results.length : 0,
+      unitSirens: uniqueStrings((payload?.results ?? []).map(unit => String(unit?.siren ?? ""))).filter(value => normalizeIdentifier(value).length === 9),
+      candidateCount: candidates.length,
+      candidateLimitHit,
+      matchingLimitReached,
+      hasNextPage,
+      completenessKnown,
+      complete,
+    },
+  };
+}
+
+export function flattenExternalResults(payload, localIdentifiers = new Set(), limit = EXTERNAL_LIMIT, departments = getActiveDepartments()) {
+  return extractOfficialCandidates(payload, {
+    localIdentifiers,
+    limit,
+    departments,
+    allowSiegeFallback: true,
+    perPage: 10,
+    matchingLimit: 10,
+  }).items;
+}
+
+function officialCommonParams({ departments, page, perPage, matchingLimit } = {}) {
+  return {
+    departement: (departments ?? getActiveDepartments()).join(","),
+    etat_administratif: "A",
+    minimal: "true",
+    include: "matching_etablissements,siege",
+    limite_matching_etablissements: String(matchingLimit ?? 100),
+    page: String(page ?? 1),
+    per_page: String(perPage ?? 25),
+  };
 }
 
 export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10, codePostal = "", departments = getActiveDepartments() } = {}) {
   const params = new URLSearchParams({
     q: String(query ?? "").trim(),
-    departement: departments.join(","),
-    etat_administratif: "A",
-    minimal: "true",
-    include: "matching_etablissements,siege",
-    limite_matching_etablissements: String(matchingLimit),
-    page: "1",
-    per_page: String(perPage),
+    ...officialCommonParams({ departments, page: 1, perPage, matchingLimit }),
   });
   if (/^\d{5}$/.test(String(codePostal).trim())) params.set("code_postal", String(codePostal).trim());
   return `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
+}
+
+function freezeRequest(request) {
+  return Object.freeze({ ...request, cacheKey: request.url });
+}
+
+export function buildOfficialTextSearchRequest(query, {
+  codePostal = "",
+  departments = getActiveDepartments(),
+  page = 1,
+  perPage = 25,
+  matchingLimit = 100,
+} = {}) {
+  const text = String(query ?? "").trim();
+  if (!text) return null;
+  const params = new URLSearchParams({
+    q: text,
+    ...officialCommonParams({ departments, page, perPage, matchingLimit }),
+  });
+  const postal = /^\d{5}$/.test(String(codePostal).trim()) ? String(codePostal).trim() : "";
+  if (postal) params.set("code_postal", postal);
+  const url = `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
+  return freezeRequest({ kind: "text", query: text, codePostal: postal, page, perPage, matchingLimit, url });
+}
+
+export function buildOfficialIdentifierSearchRequest(value, {
+  departments = getActiveDepartments(),
+  page = 1,
+  perPage = 25,
+  matchingLimit = 100,
+} = {}) {
+  const identifier = identifierParts(value);
+  if (!identifier.identifier) return null;
+  const params = new URLSearchParams({
+    q: identifier.identifier,
+    ...officialCommonParams({ departments, page, perPage, matchingLimit }),
+  });
+  const url = `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
+  return freezeRequest({
+    kind: identifier.siret ? "siret" : "siren",
+    identifier: identifier.identifier,
+    requestedSiret: identifier.siret,
+    page,
+    perPage,
+    matchingLimit,
+    url,
+  });
+}
+
+export function buildOfficialNearbySearchRequest({
+  latitude,
+  longitude,
+  radius = 0.3,
+  departments = getActiveDepartments(),
+  page = 1,
+  perPage = 25,
+  matchingLimit = 100,
+} = {}) {
+  const lat = coordinate(latitude, -90, 90);
+  const lon = coordinate(longitude, -180, 180);
+  const distance = Number(radius);
+  if (lat === null || lon === null || !Number.isFinite(distance) || distance <= 0) return null;
+  const params = new URLSearchParams({
+    lat: String(lat),
+    long: String(lon),
+    radius: String(distance),
+    ...officialCommonParams({ departments, page, perPage, matchingLimit }),
+  });
+  const url = `https://recherche-entreprises.api.gouv.fr/near_point?${params.toString()}`;
+  return freezeRequest({ kind: "nearby", latitude: lat, longitude: lon, radius: distance, page, perPage, matchingLimit, url });
 }
