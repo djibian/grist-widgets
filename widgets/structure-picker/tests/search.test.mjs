@@ -9,6 +9,7 @@ import {
   normalize,
   rankExternalCandidates,
   rankNearbyCandidates,
+  scoreAddressEvidence,
   searchLocal,
 } from "../search.js";
 import { DEFAULT_DEPARTMENTS, setActiveDepartments } from "../departments.js";
@@ -41,7 +42,7 @@ test("DINUM candidate prefers a public-facing usual name and keeps coordinates",
   assert.equal(Object.prototype.hasOwnProperty.call(candidate, "ape"), false);
 });
 
-test("near-point query builds the official geographic Annuaire endpoint", () => {
+test("near-point query builds a compact size-sorted official geographic request", () => {
   const query = buildNearbySearchQuery({
     latitude: 46.996561,
     longitude: -1.815374,
@@ -55,27 +56,53 @@ test("near-point query builds the official geographic Annuaire endpoint", () => 
   assert.equal(url.searchParams.get("long"), "-1.815374");
   assert.equal(url.searchParams.get("radius"), "0.25");
   assert.equal(url.searchParams.get("per_page"), "25");
+  assert.equal(url.searchParams.get("sort_by_size"), "true");
   assert.equal(url.searchParams.has("q"), false);
 });
 
-test("Super U is selected from nearby establishments even when legal name is SIDONAM", () => {
+test("street evidence recognizes the Super U legal address while rejecting another street", () => {
+  const target = "Boulevard Des Prises Zone Commerciale 44270 MACHECOUL ST MEME";
+  const sidonam = {
+    adresse: "ZONE COMMERCIALE BD DES PRISES 44270 MACHECOUL-SAINT-MEME",
+    codePostal: "44270",
+    commune: "MACHECOUL-SAINT-MEME",
+  };
+  const school = {
+    adresse: "1 BD GABRIEL RELIQUET 44270 MACHECOUL-SAINT-MEME",
+    codePostal: "44270",
+    commune: "MACHECOUL-SAINT-MEME",
+  };
+  assert.ok(scoreAddressEvidence(target, sidonam) >= 0.90);
+  assert.equal(scoreAddressEvidence(target, school), 0);
+});
+
+test("Super U keeps SIDONAM from nearby results even when SIRENE exposes no Super U trade name", () => {
   const payload = { results: [
-    {
-      siren: "111111111",
-      nom_raison_sociale: "AUTRE COMMERCE",
-      matching_etablissements: [{
-        siret: "11111111100011", etat_administratif: "A", liste_enseignes: ["AUTRE COMMERCE"],
-        adresse: "BOULEVARD DES PRISES 44270 MACHECOUL-SAINT-MEME", code_postal: "44270", libelle_commune: "MACHECOUL-SAINT-MEME",
-        latitude: "46.99655", longitude: "-1.81537",
-      }],
-    },
     {
       siren: "410918080",
       nom_raison_sociale: "SIDONAM",
       matching_etablissements: [{
-        siret: "41091808000020", etat_administratif: "A", liste_enseignes: ["SUPER U"],
+        siret: "41091808000020", etat_administratif: "A",
         adresse: "ZONE COMMERCIALE BD DES PRISES 44270 MACHECOUL-SAINT-MEME", code_postal: "44270", libelle_commune: "MACHECOUL-SAINT-MEME",
-        latitude: "46.996561", longitude: "-1.815374",
+        latitude: "46.998186", longitude: "-1.815260",
+      }],
+    },
+    {
+      siren: "484616131",
+      nom_raison_sociale: "NOMADIS",
+      matching_etablissements: [{
+        siret: "48461613100013", etat_administratif: "A",
+        adresse: "ESPACE COMMERCIAL BD DES PRISES 44270 MACHECOUL-SAINT-MEME", code_postal: "44270", libelle_commune: "MACHECOUL-SAINT-MEME",
+        latitude: "46.9981", longitude: "-1.8153",
+      }],
+    },
+    {
+      siren: "200056455",
+      nom_raison_sociale: "COMMUNE DE MACHECOUL-SAINT-MEME",
+      matching_etablissements: [{
+        siret: "20005645500047", etat_administratif: "A", liste_enseignes: ["ECOLE PRIMAIRE PUBLIQUE JACQUES-YVES COUSTEAU"],
+        adresse: "1 BD GABRIEL RELIQUET 44270 MACHECOUL-SAINT-MEME", code_postal: "44270", libelle_commune: "MACHECOUL-SAINT-MEME",
+        latitude: "46.9965", longitude: "-1.8154",
       }],
     },
   ] };
@@ -84,17 +111,17 @@ test("Super U is selected from nearby establishments even when legal name is SID
     latitude: 46.996561,
     longitude: -1.815374,
     radius: 0.25,
-    name: "Super U Machecoul",
-    address: "Boulevard des Prises 44270 Machecoul-Saint-Même",
+    name: "Super U",
+    address: "Boulevard Des Prises Zone Commerciale 44270 MACHECOUL ST MEME",
   });
   buildExternalSearchUrl(query, { codePostal: "44270" });
   const candidates = flattenExternalResults(payload);
   assert.equal(candidates[0]?.siret, "41091808000020");
   assert.equal(candidates[0]?.raisonSociale, "SIDONAM");
-  assert.equal(candidates.some(item => item.siret === "11111111100011"), false);
+  assert.equal(candidates.some(item => item.siret === "20005645500047"), false);
 });
 
-test("nearby EHPAD identity outranks an association at the same address", () => {
+test("nearby EHPAD keeps only the matching establishment and rejects unrelated Bouin addresses", () => {
   const payload = { results: [
     {
       siren: "894057140",
@@ -121,24 +148,42 @@ test("nearby EHPAD identity outranks an association at the same address", () => 
         },
       ],
     },
+    {
+      siren: "298503574",
+      nom_raison_sociale: "ASS SYNDICALE AUTORISEE DE LA LOUIPPE",
+      matching_etablissements: [{
+        siret: "29850357400014", etat_administratif: "A",
+        adresse: "MAIRIE PLACE DE L EGLISE 85230 BOUIN", code_postal: "85230", libelle_commune: "BOUIN",
+        latitude: "46.9739", longitude: "-1.9951",
+      }],
+    },
+    {
+      siren: "103179834",
+      nom_raison_sociale: "LA PARISIENNE",
+      matching_etablissements: [{
+        siret: "10317983400017", etat_administratif: "A",
+        adresse: "19 RUE DU MARAIS DOUX 85230 BOUIN", code_postal: "85230", libelle_commune: "BOUIN",
+        latitude: "46.9740", longitude: "-1.9950",
+      }],
+    },
   ] };
 
   const query = buildNearbySearchQuery({
     latitude: 46.974141,
     longitude: -1.994981,
     radius: 0.25,
-    name: "EHPAD La Reynerie Bouin",
+    name: "EHPAD La Reynerie",
     address: "8bis Rue du Pays de Retz 85230 Bouin",
   });
   buildExternalSearchUrl(query, { codePostal: "85230" });
   const candidates = flattenExternalResults(payload);
-  assert.equal(candidates[0]?.siret, "26850025300011");
+  assert.deepEqual(candidates.map(item => item.siret), ["26850025300011"]);
 });
 
 test("nearby ranking preserves O PRE D'VOUS and POM DE RAINETTE as first choices", () => {
   const oPre = [
-    { nomCommercial: "PH DISTRIBUTION", raisonSociale: "PH DISTRIBUTION", adresse: "LA MORTIERE 44270 SAINT-ETIENNE-DE-MER-MORTE", codePostal: "44270", latitude: 46.99, longitude: -1.73, siret: "89306104400010" },
-    { nomCommercial: "O PRE D'VOUS", raisonSociale: "PH DISTRIBUTION", adresse: "24 RUE DES FOSSES 44270 LA MARNE", codePostal: "44270", latitude: 46.997657, longitude: -1.736921, siret: "89306104400028" },
+    { nomCommercial: "PH DISTRIBUTION", raisonSociale: "PH DISTRIBUTION", adresse: "LA MORTIERE 44270 SAINT-ETIENNE-DE-MER-MORTE", codePostal: "44270", commune: "SAINT-ETIENNE-DE-MER-MORTE", latitude: 46.99, longitude: -1.73, siret: "89306104400010" },
+    { nomCommercial: "O PRE D'VOUS", nomUsuelDistinct: true, raisonSociale: "PH DISTRIBUTION", adresse: "24 RUE DES FOSSES 44270 LA MARNE", codePostal: "44270", commune: "LA MARNE", latitude: 46.997657, longitude: -1.736921, siret: "89306104400028" },
   ];
   assert.equal(rankNearbyCandidates(oPre, {
     query: "ô Pré d’Vous", targetAddress: "24 Rue des Fosses 44270 La Marne", codePostal: "44270",
@@ -146,8 +191,8 @@ test("nearby ranking preserves O PRE D'VOUS and POM DE RAINETTE as first choices
   })[0]?.siret, "89306104400028");
 
   const rainette = [
-    { nomCommercial: "PICOTI PICOTA", raisonSociale: "PICOTI PICOTA", adresse: "8 RUE DU FIEF DE LA REINE 85300 SALLERTAINE", codePostal: "85300", latitude: 46.86, longitude: -1.95, siret: "88493583400017" },
-    { nomCommercial: "POM' DE RAINETTE", raisonSociale: "PICOTI PICOTA", adresse: "10 B RUE DES MARGOTINS 85300 SALLERTAINE", codePostal: "85300", latitude: 46.868553, longitude: -1.94211, siret: "88493583400033" },
+    { nomCommercial: "PICOTI PICOTA", raisonSociale: "PICOTI PICOTA", adresse: "8 RUE DU FIEF DE LA REINE 85300 SALLERTAINE", codePostal: "85300", commune: "SALLERTAINE", latitude: 46.86, longitude: -1.95, siret: "88493583400017" },
+    { nomCommercial: "POM' DE RAINETTE", nomUsuelDistinct: true, raisonSociale: "PICOTI PICOTA", adresse: "10 B RUE DES MARGOTINS 85300 SALLERTAINE", codePostal: "85300", commune: "SALLERTAINE", latitude: 46.868553, longitude: -1.94211, siret: "88493583400033" },
   ];
   assert.equal(rankNearbyCandidates(rainette, {
     query: "CRECHE POM'DE RAINETTE", targetAddress: "10 bis Rue des Margotins 85300 Sallertaine", codePostal: "85300",
@@ -196,6 +241,7 @@ test("EHPAD identity outranks an association whose address happens to contain th
     },
     {
       nomCommercial: "EHPAD",
+      nomUsuelDistinct: true,
       raisonSociale: "EHPAD LA REYNERIE BOUIN",
       adresse: "LA REYNERIE RUE DU PAYS DE RETZ 85230 BOUIN",
       codePostal: "85230",
@@ -204,6 +250,7 @@ test("EHPAD identity outranks an association whose address happens to contain th
     },
     {
       nomCommercial: "SOINS INFIRMIERS DOMICILE SSIDPA",
+      nomUsuelDistinct: true,
       raisonSociale: "EHPAD LA REYNERIE BOUIN",
       adresse: "14 RUE DU PAYS DE RETZ 85230 BOUIN",
       codePostal: "85230",
