@@ -24,7 +24,14 @@ test("enterprise lookup uses identifier first and address context otherwise", ()
   assert.deepEqual(enterpriseSearchContext({ SirenSiret: "", NomCommercial: "Garage Martin", Adresse: "12 rue X 44270 Machecoul" }), { query: "Garage Martin", codePostal: "44270" });
 });
 
-test("Super U Machecoul uses a street-targeted query and a weak-token fallback", () => {
+function assertNearbyFirst(attempts, postalCode) {
+  assert.ok(attempts[0]?.query.startsWith("__near_point__:"));
+  assert.ok(attempts[1]?.query.startsWith("__near_point__:"));
+  assert.equal(attempts[0]?.codePostal, postalCode);
+  assert.equal(attempts[1]?.codePostal, postalCode);
+}
+
+test("Super U Machecoul tries nearby establishments before text fallbacks", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "Super U Machecoul",
@@ -33,19 +40,15 @@ test("Super U Machecoul uses a street-targeted query and a weak-token fallback",
     adresse: "Boulevard des Prises 44270 Machecoul-Saint-Même",
     codePostal: "44270",
     commune: "Machecoul-Saint-Même",
+    latitude: 46.996561,
+    longitude: -1.815374,
   });
 
-  assert.deepEqual(attempts, [
-    { query: "Super U Machecoul prises", codePostal: "44270" },
-    { query: "super u prises", codePostal: "44270" },
-    { query: "Super U Machecoul", codePostal: "44270" },
-    { query: "super u", codePostal: "44270" },
-    { query: "super", codePostal: "44270" },
-    { query: "Super U Machecoul", codePostal: "" },
-  ]);
+  assertNearbyFirst(attempts, "44270");
+  assert.ok(attempts.some(item => item.query === "super" && item.codePostal === "44270"));
 });
 
-test("Pom de Rainette drops the descriptive prefix only after a targeted attempt", () => {
+test("Pom de Rainette tries nearby establishments and preserves text fallback", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "CRECHE POM'DE RAINETTE ",
@@ -54,18 +57,15 @@ test("Pom de Rainette drops the descriptive prefix only after a targeted attempt
     adresse: "10 bis Rue des Margotins 85300 Sallertaine",
     codePostal: "85300",
     commune: "Sallertaine",
+    latitude: 46.868553,
+    longitude: -1.94211,
   });
 
-  assert.deepEqual(attempts, [
-    { query: "CRECHE POM'DE RAINETTE margotins", codePostal: "85300" },
-    { query: "pom de rainette margotins", codePostal: "85300" },
-    { query: "CRECHE POM'DE RAINETTE", codePostal: "85300" },
-    { query: "pom de rainette", codePostal: "85300" },
-    { query: "CRECHE POM'DE RAINETTE", codePostal: "" },
-  ]);
+  assertNearbyFirst(attempts, "85300");
+  assert.ok(attempts.some(item => item.query === "pom de rainette" && item.codePostal === "85300"));
 });
 
-test("O Pre d'Vous targets the exact street before the broad name", () => {
+test("O Pre d'Vous tries proximity before its street-targeted fallback", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "ô Pré d’Vous",
@@ -74,11 +74,14 @@ test("O Pre d'Vous targets the exact street before the broad name", () => {
     adresse: "24 Rue des Fosses 44270 La Marne",
     codePostal: "44270",
     commune: "La Marne",
+    latitude: 46.997657,
+    longitude: -1.736921,
   });
-  assert.deepEqual(attempts[0], { query: "ô Pré d’Vous fosses", codePostal: "44270" });
+  assertNearbyFirst(attempts, "44270");
+  assert.ok(attempts.some(item => item.query === "ô Pré d’Vous fosses"));
 });
 
-test("EHPAD removes a postal token from the name and adds the street identity", () => {
+test("EHPAD tries proximity before text ranking", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "EHPAD La Reynerie Bouin 85230",
@@ -87,8 +90,11 @@ test("EHPAD removes a postal token from the name and adds the street identity", 
     adresse: "8bis Rue du Pays de Retz 85230 Bouin",
     codePostal: "85230",
     commune: "Bouin",
+    latitude: 46.974141,
+    longitude: -1.994981,
   });
-  assert.deepEqual(attempts[0], { query: "EHPAD La Reynerie Bouin pays retz", codePostal: "85230" });
+  assertNearbyFirst(attempts, "85230");
+  assert.ok(attempts.some(item => item.query === "EHPAD La Reynerie Bouin pays retz"));
 });
 
 test("enterprise lookup remains bounded and deduplicated", () => {
@@ -97,7 +103,7 @@ test("enterprise lookup remains bounded and deduplicated", () => {
     NomCommercial: "CRECHE POM'DE RAINETTE",
     Adresse: "Sallertaine",
   });
-  assert.ok(attempts.length <= 6);
+  assert.ok(attempts.length <= 8);
   assert.equal(new Set(attempts.map(item => `${item.query}|${item.codePostal}`)).size, attempts.length);
 });
 
