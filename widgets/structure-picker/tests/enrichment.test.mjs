@@ -31,7 +31,7 @@ function assertNearbyFirst(attempts, postalCode) {
   assert.equal(attempts[1]?.codePostal, postalCode);
 }
 
-test("Super U Machecoul tries nearby establishments before text fallbacks", () => {
+test("Super U separates identity from locality and adds a street-aware weak-token fallback", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "Super U Machecoul",
@@ -45,6 +45,9 @@ test("Super U Machecoul tries nearby establishments before text fallbacks", () =
   });
 
   assertNearbyFirst(attempts, "44270");
+  const nearbyIdentity = decodeURIComponent(attempts[0].query.split("|")[3]);
+  assert.equal(nearbyIdentity, "super u");
+  assert.ok(attempts.some(item => item.query === "super prises" && item.codePostal === "44270"));
   assert.ok(attempts.some(item => item.query === "super" && item.codePostal === "44270"));
 });
 
@@ -94,6 +97,8 @@ test("EHPAD tries proximity before text ranking", () => {
     longitude: -1.994981,
   });
   assertNearbyFirst(attempts, "85230");
+  const nearbyIdentity = decodeURIComponent(attempts[0].query.split("|")[3]);
+  assert.equal(nearbyIdentity, "ehpad la reynerie");
   assert.ok(attempts.some(item => item.query === "EHPAD La Reynerie Bouin pays retz"));
 });
 
