@@ -9,6 +9,15 @@ export const EXTERNAL_LIMIT = 10;
 
 const NEARBY_QUERY_PREFIX = "__near_point__:";
 const TARGETED_TEXT_QUERY_PREFIX = "__targeted_text__:";
+const IDENTITY_STOP_WORDS = new Set([
+  "a", "au", "aux", "d", "de", "des", "du", "et", "en", "l", "la", "le", "les", "sur",
+  "st", "ste", "saint", "sainte",
+]);
+const ADDRESS_STOP_WORDS = new Set([
+  "rue", "route", "avenue", "av", "boulevard", "bd", "chemin", "impasse", "place", "allee",
+  "zone", "commerciale", "espace", "cial", "za", "zi", "lotissement", "lieu", "dit",
+  "de", "des", "du", "la", "le", "les", "bis", "ter",
+]);
 let externalRankingContext = { mode: "text", query: "", codePostal: "", targetAddress: "", latitude: null, longitude: null, radius: null };
 
 export function normalize(value) {
@@ -59,6 +68,23 @@ export const extractLocationFromNormalizedAddress = extractLocationFromAddress;
 
 function tokens(value) {
   return normalize(value).split(/\s+/).filter(Boolean);
+}
+
+function identityText(value) {
+  return tokens(value)
+    .filter(token => token.length > 1 && !IDENTITY_STOP_WORDS.has(token))
+    .join(" ");
+}
+
+function streetText(value, codePostal = "", commune = "") {
+  const communeWords = new Set(tokens(commune));
+  const postal = String(codePostal ?? "").trim();
+  return tokens(value)
+    .filter(token => token !== postal)
+    .filter(token => !/^\d+[a-z]*$/.test(token))
+    .filter(token => !ADDRESS_STOP_WORDS.has(token))
+    .filter(token => !communeWords.has(token))
+    .join(" ");
 }
 
 function levenshtein(a, b) {
@@ -265,28 +291,50 @@ function haversineKm(latitude1, longitude1, latitude2, longitude2) {
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function candidateNameScore(candidate, targetName) {
-  const normalizedTarget = normalize(targetName);
-  const normalizedPublicName = normalize(candidate?.nomCommercial);
-  let publicScore = fuzzyTextScore(targetName, candidate?.nomCommercial);
-  const publicCoverage = queryTokenCoverage(targetName, candidate?.nomCommercial);
+function candidateHasIndependentPublicName(candidate) {
+  if (!candidate?.nomUsuelDistinct) return false;
+  const publicName = normalize(candidate?.nomCommercial);
+  const legalName = normalize(candidate?.raisonSociale);
+  return Boolean(publicName && (!legalName || publicName !== legalName));
+}
 
-  if (normalizedTarget && normalizedPublicName && (
-    normalizedTarget === normalizedPublicName
-    || normalizedTarget.includes(normalizedPublicName)
-    || normalizedPublicName.includes(normalizedTarget)
+function candidateNameScore(candidate, targetName) {
+  const targetIdentity = identityText(targetName) || normalize(targetName);
+  const publicIdentity = identityText(candidate?.nomCommercial) || normalize(candidate?.nomCommercial);
+  const legalIdentity = identityText(candidate?.raisonSociale) || normalize(candidate?.raisonSociale);
+
+  let publicScore = fuzzyTextScore(targetIdentity, publicIdentity);
+  const publicCoverage = queryTokenCoverage(targetIdentity, publicIdentity);
+
+  if (targetIdentity && publicIdentity && (
+    targetIdentity === publicIdentity
+    || targetIdentity.includes(publicIdentity)
+    || publicIdentity.includes(targetIdentity)
   )) {
     publicScore = Math.max(publicScore, 0.98);
   }
 
-  // Dès qu'un établissement publie une enseigne ou un nom commercial, celui-ci
-  // porte son identité. La raison sociale de l'unité légale ne doit pas rendre
-  // tous ses établissements équivalents (ex. EHPAD vs SSIAD).
-  if (candidate?.nomUsuelDistinct) return Math.max(publicScore, publicCoverage * 0.96);
+  // Dès qu'un établissement publie une enseigne ou un nom commercial réellement
+  // distinct de la raison sociale, ce nom public porte son identité.
+  if (candidateHasIndependentPublicName(candidate)) {
+    return Math.max(publicScore, publicCoverage * 0.96);
+  }
 
-  const legalScore = fuzzyTextScore(targetName, candidate?.raisonSociale);
-  const legalCoverage = queryTokenCoverage(targetName, candidate?.raisonSociale);
+  const legalScore = fuzzyTextScore(targetIdentity, legalIdentity);
+  const legalCoverage = queryTokenCoverage(targetIdentity, legalIdentity);
   return Math.max(publicScore, legalScore, publicCoverage * 0.96, legalCoverage * 0.92);
+}
+
+export function scoreAddressEvidence(targetAddress, candidate, fallbackPostalCode = "") {
+  const targetLocation = extractLocationFromAddress(targetAddress);
+  const targetPostal = targetLocation.codePostal || String(fallbackPostalCode ?? "").trim();
+  const candidatePostal = String(candidate?.codePostal ?? "").trim();
+  if (targetPostal && candidatePostal && targetPostal !== candidatePostal) return 0;
+
+  const targetStreet = streetText(targetAddress, targetPostal, targetLocation.commune);
+  const candidateStreet = streetText(candidate?.adresse, candidatePostal, candidate?.commune);
+  if (!targetStreet || !candidateStreet) return 0;
+  return fuzzyTextScore(targetStreet, candidateStreet);
 }
 
 export function scoreExternalCandidate(candidate, query, codePostal = "") {
@@ -305,52 +353,79 @@ export function rankExternalCandidates(candidates, query, codePostal = "") {
     .map(item => item.candidate);
 }
 
-export function scoreNearbyCandidate(candidate, context) {
-  const targetName = String(context?.query ?? "").trim();
-  const targetAddress = String(context?.targetAddress ?? "").trim();
-  const codePostal = String(context?.codePostal ?? "").trim();
-  const nameScore = candidateNameScore(candidate, targetName);
-  const addressScore = targetAddress ? fuzzyTextScore(targetAddress, candidate?.adresse) : 0;
-  const postalScore = codePostal && String(candidate?.codePostal ?? "") === codePostal ? 1 : 0;
-  const distance = haversineKm(context?.latitude, context?.longitude, candidate?.latitude, candidate?.longitude);
+function evidenceForCandidate(candidate, context, withDistance) {
+  const nameScore = candidateNameScore(candidate, context?.query);
+  const addressScore = scoreAddressEvidence(context?.targetAddress, candidate, context?.codePostal);
+  const postalScore = context?.codePostal && String(candidate?.codePostal ?? "") === String(context.codePostal) ? 1 : 0;
+  const distance = withDistance
+    ? haversineKm(context?.latitude, context?.longitude, candidate?.latitude, candidate?.longitude)
+    : null;
   const radius = Number(context?.radius);
-  const distanceScore = distance === null || !Number.isFinite(radius) || radius <= 0
-    ? 0.5
-    : Math.max(0, 1 - distance / radius);
-  return nameScore * 0.72 + addressScore * 0.18 + distanceScore * 0.07 + postalScore * 0.03;
+  const distanceScore = !withDistance
+    ? 0
+    : distance === null || !Number.isFinite(radius) || radius <= 0
+      ? 0.5
+      : Math.max(0, 1 - distance / radius);
+
+  const strongName = nameScore >= 0.55;
+  const addressOnly = !candidateHasIndependentPublicName(candidate)
+    && nameScore < 0.20
+    && addressScore >= 0.90
+    && (!context?.codePostal || postalScore === 1);
+
+  return {
+    nameScore,
+    addressScore,
+    postalScore,
+    distanceScore,
+    eligible: strongName || addressOnly,
+  };
+}
+
+export function scoreNearbyCandidate(candidate, context) {
+  const evidence = evidenceForCandidate(candidate, context, true);
+  return evidence.nameScore * 0.72
+    + evidence.addressScore * 0.20
+    + evidence.distanceScore * 0.05
+    + evidence.postalScore * 0.03;
 }
 
 export function rankNearbyCandidates(candidates, context) {
   return (Array.isArray(candidates) ? candidates : [])
-    .map((candidate, index) => ({
-      candidate,
-      index,
-      nameScore: candidateNameScore(candidate, context?.query),
-      score: scoreNearbyCandidate(candidate, context),
-    }))
-    // Une proximité géographique seule ne suffit jamais à identifier une structure.
-    .filter(item => item.nameScore >= 0.32)
+    .map((candidate, index) => {
+      const evidence = evidenceForCandidate(candidate, context, true);
+      return {
+        candidate,
+        index,
+        ...evidence,
+        score: evidence.nameScore * 0.72
+          + evidence.addressScore * 0.20
+          + evidence.distanceScore * 0.05
+          + evidence.postalScore * 0.03,
+      };
+    })
+    // La proximité seule ne suffit jamais. Un candidat doit avoir soit une
+    // identité convaincante, soit une concordance de voie quasi exacte lorsque
+    // l'Annuaire ne publie pas l'enseigne sous laquelle le public le connaît.
+    .filter(item => item.eligible)
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .map(item => item.candidate);
 }
 
 export function rankTargetedTextCandidates(candidates, context) {
-  const targetName = String(context?.query ?? "").trim();
-  const targetAddress = String(context?.targetAddress ?? "").trim();
-  const codePostal = String(context?.codePostal ?? "").trim();
   return (Array.isArray(candidates) ? candidates : [])
     .map((candidate, index) => {
-      const nameScore = candidateNameScore(candidate, targetName);
-      const addressScore = targetAddress ? fuzzyTextScore(targetAddress, candidate?.adresse) : 0;
-      const postalScore = codePostal && String(candidate?.codePostal ?? "") === codePostal ? 1 : 0;
+      const evidence = evidenceForCandidate(candidate, context, false);
       return {
         candidate,
         index,
-        nameScore,
-        score: nameScore * 0.84 + addressScore * 0.11 + postalScore * 0.05,
+        ...evidence,
+        score: evidence.nameScore * 0.76
+          + evidence.addressScore * 0.21
+          + evidence.postalScore * 0.03,
       };
     })
-    .filter(item => item.nameScore >= 0.32)
+    .filter(item => item.eligible)
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .map(item => item.candidate);
 }
@@ -461,6 +536,7 @@ export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10
       radius: String(nearby.radius),
       page: "1",
       per_page: "25",
+      sort_by_size: "true",
       minimal: "true",
       include: "matching_etablissements,siege",
       limite_matching_etablissements: String(Math.min(25, Math.max(10, Number(matchingLimit) || 10))),
