@@ -31,6 +31,53 @@ test("DINUM candidate prefers a public-facing usual name and keeps coordinates",
   assert.equal(Object.prototype.hasOwnProperty.call(candidate, "ape"), false);
 });
 
+test("Super U Machecoul Annuaire payload yields SIDONAM candidate", () => {
+  const payload = { results: [{
+    siren: "410918080",
+    nom_raison_sociale: "SIDONAM",
+    matching_etablissements: [{
+      siret: "41091808000020",
+      etat_administratif: "A",
+      liste_enseignes: ["SUPER U"],
+      adresse: "ZONE COMMERCIALE BD DES PRISES 44270 MACHECOUL-SAINT-MEME",
+      code_postal: "44270",
+      libelle_commune: "MACHECOUL-SAINT-MEME",
+      latitude: "46.996561",
+      longitude: "-1.815374",
+    }],
+  }] };
+
+  const [candidate] = flattenExternalResults(payload);
+  assert.equal(candidate.nomCommercial, "SUPER U");
+  assert.equal(candidate.raisonSociale, "SIDONAM");
+  assert.equal(candidate.siret, "41091808000020");
+  assert.equal(candidate.codePostal, "44270");
+});
+
+test("Pom de Rainette Annuaire payload yields PICOTI PICOTA candidate", () => {
+  const payload = { results: [{
+    siren: "884935834",
+    nom_raison_sociale: "PICOTI PICOTA",
+    matching_etablissements: [{
+      siret: "88493583400033",
+      etat_administratif: "A",
+      liste_enseignes: ["POM' DE RAINETTE"],
+      nom_commercial: "POM' DE RAINETTE",
+      adresse: "10 B RUE DES MARGOTINS 85300 SALLERTAINE",
+      code_postal: "85300",
+      libelle_commune: "SALLERTAINE",
+      latitude: "46.8601",
+      longitude: "-1.9521",
+    }],
+  }] };
+
+  const [candidate] = flattenExternalResults(payload);
+  assert.equal(candidate.nomCommercial, "POM' DE RAINETTE");
+  assert.equal(candidate.raisonSociale, "PICOTI PICOTA");
+  assert.equal(candidate.siret, "88493583400033");
+  assert.equal(candidate.codePostal, "85300");
+});
+
 test("legal name is only a fallback when no usual name is published", () => {
   const candidate = candidateFrom({ siren: "123456789", nom_raison_sociale: "MARTIN AUTOMOBILES SARL" }, {
     siret: "12345678900011", etat_administratif: "A", code_postal: "44000",
