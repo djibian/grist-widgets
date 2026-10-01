@@ -1,0 +1,43 @@
+name: Structure picker identity live capture
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/structure-picker-identity-resolution
+    paths:
+      - "scripts/capture-structure-identity-live.mjs"
+      - "widgets/structure-picker/search.js"
+      - "widgets/structure-picker/geocode.js"
+      - "widgets/structure-picker/enterprise-client.js"
+      - "widgets/structure-picker/identity-resolution.js"
+      - "widgets/structure-picker/identity-orchestrator.js"
+      - "widgets/structure-picker/osm-identity.js"
+      - ".github/workflows/structure-picker-identity-live.yml"
+
+permissions:
+  contents: read
+
+env:
+  NODE_OPTIONS: --no-warnings
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Capture public API responses
+        run: node scripts/capture-structure-identity-live.mjs
+      - name: Upload capture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: structure-picker-identity-live
+          path: artifacts/structure-picker-identity-live.json
+          if-no-files-found: warn
+          retention-days: 14
