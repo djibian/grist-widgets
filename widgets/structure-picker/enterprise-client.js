@@ -25,7 +25,7 @@ function cacheKey(request) {
 }
 
 function readCache(request, ttlMs = DEFAULT_CACHE_TTL_MS) {
-  if (!storageAvailable()) return null;
+  if (ttlMs <= 0 || !storageAvailable()) return null;
   try {
     const raw = sessionStorage.getItem(cacheKey(request));
     if (!raw) return null;
@@ -40,8 +40,8 @@ function readCache(request, ttlMs = DEFAULT_CACHE_TTL_MS) {
   }
 }
 
-function writeCache(request, value) {
-  if (!storageAvailable()) return;
+function writeCache(request, value, ttlMs = DEFAULT_CACHE_TTL_MS) {
+  if (ttlMs <= 0 || !storageAvailable()) return;
   try {
     sessionStorage.setItem(cacheKey(request), JSON.stringify({ at: Date.now(), value }));
   } catch {
@@ -130,7 +130,7 @@ export async function fetchOfficialRequest(request, {
     matchingLimit: request.matchingLimit ?? 100,
   });
   const value = { items: extracted.items, coverage: extracted.coverage };
-  writeCache(request, value);
+  writeCache(request, value, cacheTtlMs);
   return { ...value, cached: false };
 }
 
