@@ -48,7 +48,10 @@ export async function resolveIdentityForEnrichment({
         const siret = normalizeIdentifier(link?.siret);
         if (siret.length !== 14) continue;
         const request = buildOfficialIdentifierSearchRequest(siret);
-        const verified = await fetchOfficial(request, { signal });
+        // A published SIRET is legal-identity evidence, not a search convenience.
+        // Always revalidate it against the current Annuaire response instead of
+        // trusting sessionStorage populated by an earlier implementation/run.
+        const verified = await fetchOfficial(request, { signal, cacheTtlMs: 0 });
         const exact = (verified?.items ?? []).find(item => normalizeIdentifier(item?.siret) === siret);
         if (!exact) continue;
         const verifiedLink = { ...link, siret, verifiedOfficial: true };
