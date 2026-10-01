@@ -92,6 +92,13 @@ function dropLeadingQualifier(name) {
   return words.slice(1).join(" ");
 }
 
+function dropSingleLetterTokens(name) {
+  const words = normalizedWords(name);
+  const filtered = words.filter(word => word.length > 1);
+  if (!filtered.length || filtered.length === words.length) return "";
+  return filtered.join(" ");
+}
+
 function addressSearchHint(address) {
   const raw = String(address ?? "").trim();
   if (!raw) return "";
@@ -157,6 +164,7 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
 
   const shortestUsefulName = variants.at(-1) || name;
   addSearchVariant(variants, dropLeadingQualifier(shortestUsefulName));
+  const weakTokenFallback = dropSingleLetterTokens(variants.at(-1) || shortestUsefulName);
 
   const attempts = [];
   const streetHint = codePostal ? addressSearchHint(sourceAddress) : "";
@@ -166,6 +174,12 @@ export function enterpriseSearchAttempts(row, geocodeCandidate = null) {
   }
 
   for (const query of variants) addSearchAttempt(attempts, query, codePostal);
+
+  // Some public brands contain a one-letter token (for example "Super U").
+  // The Annuaire text engine combines terms with AND; a final postal-scoped
+  // fallback without those weak tokens avoids making the whole search depend
+  // on a token that may be ignored by the analyzer.
+  if (weakTokenFallback) addSearchAttempt(attempts, weakTokenFallback, codePostal);
 
   // Dernier recours borné : on retire seulement le filtre postal, sans multiplier
   // les variantes larges sur l'ensemble des départements configurés.
