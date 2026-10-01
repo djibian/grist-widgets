@@ -24,7 +24,7 @@ test("enterprise lookup uses identifier first and address context otherwise", ()
   assert.deepEqual(enterpriseSearchContext({ SirenSiret: "", NomCommercial: "Garage Martin", Adresse: "12 rue X 44270 Machecoul" }), { query: "Garage Martin", codePostal: "44270" });
 });
 
-test("Super U Machecoul gets a postal-scoped locality-stripped fallback", () => {
+test("Super U Machecoul uses a street-targeted query before broad fallbacks", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "Super U Machecoul",
@@ -36,13 +36,15 @@ test("Super U Machecoul gets a postal-scoped locality-stripped fallback", () => 
   });
 
   assert.deepEqual(attempts, [
+    { query: "Super U Machecoul prises", codePostal: "44270" },
+    { query: "super u prises", codePostal: "44270" },
     { query: "Super U Machecoul", codePostal: "44270" },
     { query: "super u", codePostal: "44270" },
     { query: "Super U Machecoul", codePostal: "" },
   ]);
 });
 
-test("Pom de Rainette gets a postal-scoped fallback without the descriptive prefix", () => {
+test("Pom de Rainette drops the descriptive prefix only after a targeted attempt", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "CRECHE POM'DE RAINETTE ",
@@ -54,19 +56,47 @@ test("Pom de Rainette gets a postal-scoped fallback without the descriptive pref
   });
 
   assert.deepEqual(attempts, [
+    { query: "CRECHE POM'DE RAINETTE margotins", codePostal: "85300" },
+    { query: "pom de rainette margotins", codePostal: "85300" },
     { query: "CRECHE POM'DE RAINETTE", codePostal: "85300" },
     { query: "pom de rainette", codePostal: "85300" },
     { query: "CRECHE POM'DE RAINETTE", codePostal: "" },
   ]);
 });
 
-test("enterprise lookup remains bounded when no postal code is available", () => {
+test("O Pre d'Vous targets the exact street before the broad name", () => {
+  const attempts = enterpriseSearchAttempts({
+    SirenSiret: "",
+    NomCommercial: "ô Pré d’Vous",
+    Adresse: "24 rue des fosses 44270 La Marne",
+  }, {
+    adresse: "24 Rue des Fosses 44270 La Marne",
+    codePostal: "44270",
+    commune: "La Marne",
+  });
+  assert.deepEqual(attempts[0], { query: "ô Pré d’Vous fosses", codePostal: "44270" });
+});
+
+test("EHPAD removes a postal token from the name and adds the street identity", () => {
+  const attempts = enterpriseSearchAttempts({
+    SirenSiret: "",
+    NomCommercial: "EHPAD La Reynerie Bouin 85230",
+    Adresse: "8bis Rue du Pays de Retz 85230 Bouin",
+  }, {
+    adresse: "8bis Rue du Pays de Retz 85230 Bouin",
+    codePostal: "85230",
+    commune: "Bouin",
+  });
+  assert.deepEqual(attempts[0], { query: "EHPAD La Reynerie Bouin pays retz", codePostal: "85230" });
+});
+
+test("enterprise lookup remains bounded and deduplicated", () => {
   const attempts = enterpriseSearchAttempts({
     SirenSiret: "",
     NomCommercial: "CRECHE POM'DE RAINETTE",
     Adresse: "Sallertaine",
   });
-  assert.ok(attempts.length <= 3);
+  assert.ok(attempts.length <= 6);
   assert.equal(new Set(attempts.map(item => `${item.query}|${item.codePostal}`)).size, attempts.length);
 });
 
