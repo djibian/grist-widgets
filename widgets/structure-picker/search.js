@@ -253,15 +253,36 @@ function queryTokenCoverage(query, text) {
   return bestPerQuery.reduce((sum, value) => sum + value, 0) / bestPerQuery.length;
 }
 
+function externalIdentityScore(candidate, query) {
+  const names = [candidate?.nomCommercial, candidate?.raisonSociale].filter(Boolean);
+  let best = 0;
+  for (const name of names) {
+    // The Annuaire query may deliberately contain a street hint. Compare in
+    // both directions so a published establishment name contained in that
+    // richer query remains a strong identity signal.
+    best = Math.max(
+      best,
+      fuzzyTextScore(query, name),
+      fuzzyTextScore(name, query),
+      queryTokenCoverage(name, query) * 0.95,
+    );
+  }
+  return best;
+}
+
 export function scoreExternalCandidate(candidate, query, codePostal = "") {
-  const text = [candidate?.nomCommercial, candidate?.raisonSociale, candidate?.adresse, candidate?.commune, candidate?.codePostal]
+  const contextText = [candidate?.nomCommercial, candidate?.raisonSociale, candidate?.adresse, candidate?.commune, candidate?.codePostal]
     .filter(Boolean)
     .join(" ");
-  const coverage = queryTokenCoverage(query, text);
-  const commercialScore = fuzzyTextScore(query, candidate?.nomCommercial);
-  const legalScore = fuzzyTextScore(query, candidate?.raisonSociale);
+  const identityScore = externalIdentityScore(candidate, query);
+  const contextCoverage = queryTokenCoverage(query, contextText);
   const postalScore = codePostal && String(candidate?.codePostal ?? "") === String(codePostal) ? 1 : 0;
-  return coverage * 0.72 + commercialScore * 0.13 + legalScore * 0.05 + postalScore * 0.10;
+
+  // Identity is deliberately dominant. Address/context may disambiguate two
+  // branches, but must not turn an unrelated association at the right street
+  // into a better identity match than the establishment whose published name
+  // actually matches the selected Grist row.
+  return identityScore * 0.72 + contextCoverage * 0.18 + postalScore * 0.10;
 }
 
 export function rankExternalCandidates(candidates, query, codePostal = "") {
