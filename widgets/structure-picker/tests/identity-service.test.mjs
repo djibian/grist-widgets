@@ -23,6 +23,7 @@ function candidate(overrides = {}) {
 
 test("Super U is verified from an operator-published local SIRET then current Annuaire revalidation", async () => {
   let fallbackCalled = false;
+  let verificationOptions = null;
   const sidonam = candidate({
     nomCommercial: "SIDONAM",
     raisonSociale: "SIDONAM",
@@ -56,7 +57,7 @@ test("Super U is verified from an operator-published local SIRET then current An
     }),
     fetchOfficial: async (request, options) => {
       assert.equal(request.kind, "siret");
-      assert.equal(options.cacheTtlMs, 0, "published SIRET proof must bypass session cache");
+      verificationOptions = options;
       return { items: [sidonam], coverage: { complete: true, hasNextPage: false, unitSirens: ["410918080"] } };
     },
     resolveFallback: async () => {
@@ -66,6 +67,7 @@ test("Super U is verified from an operator-published local SIRET then current An
   });
 
   assert.equal(fallbackCalled, false);
+  assert.equal(verificationOptions?.cacheTtlMs, 0, "published SIRET proof must bypass session cache");
   assert.equal(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
   assert.equal(result.decision.candidate.siret, "41091808000020");
   assert.match(result.decision.reason, /chaîne de preuves/i);
