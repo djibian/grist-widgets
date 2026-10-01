@@ -7,6 +7,8 @@ import {
 export const LOCAL_LIMIT = 8;
 export const EXTERNAL_LIMIT = 10;
 
+let externalRankingContext = { query: "", codePostal: "" };
+
 export function normalize(value) {
   return String(value ?? "")
     .normalize("NFD")
@@ -235,6 +237,40 @@ export function candidateIsAlreadyLocal(candidate, localIdentifiers) {
   return false;
 }
 
+function queryTokenCoverage(query, text) {
+  const queryTokens = tokens(query);
+  const textTokens = tokens(text);
+  if (!queryTokens.length || !textTokens.length) return 0;
+
+  const bestPerQuery = queryTokens.map(queryToken => {
+    let best = 0;
+    for (const textToken of textTokens) {
+      best = Math.max(best, tokenSimilarity(queryToken, textToken));
+      if (best === 1) break;
+    }
+    return best;
+  });
+  return bestPerQuery.reduce((sum, value) => sum + value, 0) / bestPerQuery.length;
+}
+
+export function scoreExternalCandidate(candidate, query, codePostal = "") {
+  const text = [candidate?.nomCommercial, candidate?.raisonSociale, candidate?.adresse, candidate?.commune, candidate?.codePostal]
+    .filter(Boolean)
+    .join(" ");
+  const coverage = queryTokenCoverage(query, text);
+  const commercialScore = fuzzyTextScore(query, candidate?.nomCommercial);
+  const legalScore = fuzzyTextScore(query, candidate?.raisonSociale);
+  const postalScore = codePostal && String(candidate?.codePostal ?? "") === String(codePostal) ? 1 : 0;
+  return coverage * 0.72 + commercialScore * 0.13 + legalScore * 0.05 + postalScore * 0.10;
+}
+
+export function rankExternalCandidates(candidates, query, codePostal = "") {
+  return (Array.isArray(candidates) ? candidates : [])
+    .map((candidate, index) => ({ candidate, index, score: scoreExternalCandidate(candidate, query, codePostal) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(item => item.candidate);
+}
+
 export function flattenExternalResults(payload, localIdentifiers = new Set(), limit = EXTERNAL_LIMIT, departments = getActiveDepartments()) {
   const candidates = [];
   const seenSirets = new Set();
@@ -250,23 +286,33 @@ export function flattenExternalResults(payload, localIdentifiers = new Set(), li
       if (!siret || seenSirets.has(siret) || candidateIsAlreadyLocal(candidate, localIdentifiers)) continue;
       seenSirets.add(siret);
       candidates.push(candidate);
-      if (candidates.length >= limit) return candidates;
     }
   }
-  return candidates;
+
+  const ranked = externalRankingContext.query
+    ? rankExternalCandidates(candidates, externalRankingContext.query, externalRankingContext.codePostal)
+    : candidates;
+  return ranked.slice(0, limit);
 }
 
 export function buildExternalSearchUrl(query, { perPage = 10, matchingLimit = 10, codePostal = "", departments = getActiveDepartments() } = {}) {
+  const normalizedPostalCode = /^\d{5}$/.test(String(codePostal).trim()) ? String(codePostal).trim() : "";
+  externalRankingContext = { query: String(query ?? "").trim(), codePostal: normalizedPostalCode };
+  const requestedPerPage = Number.isFinite(Number(perPage)) ? Number(perPage) : 10;
+  const effectivePerPage = normalizedPostalCode
+    ? Math.min(25, Math.max(20, requestedPerPage))
+    : Math.min(25, Math.max(1, requestedPerPage));
+
   const params = new URLSearchParams({
-    q: String(query ?? "").trim(),
+    q: externalRankingContext.query,
     departement: departments.join(","),
     etat_administratif: "A",
     minimal: "true",
     include: "matching_etablissements,siege",
     limite_matching_etablissements: String(matchingLimit),
     page: "1",
-    per_page: String(perPage),
+    per_page: String(effectivePerPage),
   });
-  if (/^\d{5}$/.test(String(codePostal).trim())) params.set("code_postal", String(codePostal).trim());
+  if (normalizedPostalCode) params.set("code_postal", normalizedPostalCode);
   return `https://recherche-entreprises.api.gouv.fr/search?${params.toString()}`;
 }
