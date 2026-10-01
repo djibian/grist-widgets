@@ -25,6 +25,7 @@ L’Assistant Structures permet de rechercher, ajouter et compléter les structu
 - recherche dans toute la table Grist ;
 - recherche d’établissements via l’Annuaire des Entreprises ;
 - enrichissement SIREN/SIRET et raison sociale ;
+- désambiguïsation des établissements par nom usuel, code postal et indices de rue avant classement local des résultats ;
 - géocodage IGN de l’adresse ;
 - alimentation de Latitude/Longitude pour le widget carte ;
 - recherche expérimentale de Téléphone, Courriel et Site web via cinq sources publiques : OpenStreetMap, Service-Public.fr (DILA), Wikidata, All The Places et Overture Places.
