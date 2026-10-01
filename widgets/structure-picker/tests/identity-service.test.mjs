@@ -54,8 +54,9 @@ test("Super U is verified from an operator-published local SIRET then current An
         longitude: null,
       }],
     }),
-    fetchOfficial: async request => {
+    fetchOfficial: async (request, options) => {
       assert.equal(request.kind, "siret");
+      assert.equal(options.cacheTtlMs, 0, "published SIRET proof must bypass session cache");
       return { items: [sidonam], coverage: { complete: true, hasNextPage: false, unitSirens: ["410918080"] } };
     },
     resolveFallback: async () => {
