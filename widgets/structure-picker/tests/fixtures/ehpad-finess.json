@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "prefix": "85",
+  "departments": [
+    "44",
+    "85"
+  ],
+  "source": {
+    "id": "finess-ans",
+    "label": "FINESS — Agence du Numérique en Santé",
+    "url": "https://static.data.gouv.fr/resources/finess-structures-1/20261002-021915/finess-structures-journalier-20261002.json.gz",
+    "datasetUrl": "https://www.data.gouv.fr/datasets/finess-structures-1",
+    "schemaVersion": "v1.0.0",
+    "generatedAt": "2026-10-02T02:07:13.718325845Z",
+    "license": "Licence Ouverte 2.0"
+  },
+  "records": [
+    {
+      "informationsGeneralesEGE": {
+        "egeId": "147262",
+        "complementDenominationEg": null,
+        "dateFermeture": null,
+        "dateOuverture": "1901-01-01",
+        "datePremiereAutorisation": "2017-01-04",
+        "nomEgeCourt": "EHPAD LA REYNERIE",
+        "nomEgeLong": "EHPAD LA REYNERIE",
+        "numeroEducationNationale": null,
+        "numeroReferenceExterne": null,
+        "numFinessEge": "850002163",
+        "espic": null,
+        "siret": "26850025300011"
+      },
+      "categorieentiteGeographiqueExercice": "500",
+      "modefixationtarifaire": "45",
+      "typeBudget": [
+        "02"
+      ],
+      "adresse": [
+        {
+          "usageAdresse": "03",
+          "numeroVoie": null,
+          "typeVoie": "R",
+          "libelleVoie": "DU PAYS DE RETZ",
+          "complementVoie": null,
+          "complementPointGeographique": null,
+          "lieuDit": null,
+          "cogCommune": "85029",
+          "ligneAcheminement": "BOUIN",
+          "ligneUne": null,
+          "ligneDeux": null,
+          "ligneTrois": null,
+          "ligneQuatre": "RUE DU PAYS DE RETZ",
+          "ligneCinq": null,
+          "ligneSix": null,
+          "codePostal": "85230",
+          "coordonneesGeographique": {
+            "coordonneeX": "-1.993633",
+            "coordonneeY": "46.974887",
+            "directionLatitude": "6664741.45",
+            "directionLongitude": "320627.93",
+            "cleInInteropBAN": "85029_0475",
+            "scoreBAN": "0.9563990909090908"
+          }
+        }
+      ],
+      "contact": [
+        {
+          "typeContact": {
+            "roleContact": "01"
+          },
+          "telecom": {
+            "telephone": "0251687408",
+            "telecopie": "0251490322",
+            "courriel": null
+          }
+        }
+      ],
+      "engagement": [
+        {
+          "engagementId": "24685",
+          "typeEngagement": "CONV",
+          "sousTypeEngagement": "CPM",
+          "dateEffetEngagement": "2018-09-17",
+          "dateSignatureEngagement": "2018-09-17",
+          "dateCaduciteEngagement": null,
+          "dateFinEngagement": null,
+          "dateNotificationEngagement": null,
+          "nomEngagement": null,
+          "identifiantEngagement": null,
+          "motifArrete": null,
+          "autoriteRegulationEngagement": []
+        },
+        {
+          "engagementId": "54959",
+          "typeEngagement": "ARRT",
+          "sousTypeEngagement": "ARR",
+          "dateEffetEngagement": "2009-10-26",
+          "dateSignatureEngagement": "2009-10-26",
+          "dateCaduciteEngagement": null,
+          "dateFinEngagement": null,
+          "dateNotificationEngagement": null,
+          "nomEngagement": null,
+          "identifiantEngagement": null,
+          "motifArrete": null,
+          "autoriteRegulationEngagement": []
+        },
+        {
+          "engagementId": "60550",
+          "typeEngagement": "ARRT",
+          "sousTypeEngagement": "ARR",
+          "dateEffetEngagement": "2013-06-18",
+          "dateSignatureEngagement": "2013-06-18",
+          "dateCaduciteEngagement": null,
+          "dateFinEngagement": null,
+          "dateNotificationEngagement": null,
+          "nomEngagement": null,
+          "identifiantEngagement": null,
+          "motifArrete": null,
+          "autoriteRegulationEngagement": []
+        }
+      ],
+      "evenement": [
+        {
+          "evenementId": "482871",
+          "dateEnregistrement": "2023-03-15 11:21:01",
+          "dateEvenement": "1901-01-01",
+          "etatObjet1": "003",
+          "identifiantObjet1": "147262",
+          "identifiantObjet2": null,
+          "systemeMaitre": "01",
+          "typeObjet1": "EG",
+          "typeObjet2": null,
+          "codeEvenement": "003"
+        },
+        {
+          "evenementId": "496669",
+          "dateEnregistrement": "2023-03-15 11:21:01",
+          "dateEvenement": "2017-01-04",
+          "etatObjet1": "007",
+          "identifiantObjet1": "147262",
+          "identifiantObjet2": null,
+          "systemeMaitre": "01",
+          "typeObjet1": "EG",
+          "typeObjet2": null,
+          "codeEvenement": "007"
+        }
+      ],
+      "roleEge": [],
+      "etatObjet": "A",
+      "dateDerniereMaj": "2017-07-18 00:00:00"
+    },
+    {
+      "informationsGeneralesEGE": {
+        "egeId": "147479",
+        "complementDenominationEg": null,
+        "dateFermeture": "2011-01-01",
+        "dateOuverture": "1996-03-19",
+        "datePremiereAutorisation": "1996-03-19",
+        "nomEgeCourt": "USLD HOPITAL LOCAL  BOUIN",
+        "nomEgeLong": "UNITE DE SOINS DE LONGUE DUREE - HOPITAL LOCAL DE BOUIN",
+        "numeroEducationNationale": null,
+        "numeroReferenceExterne": null,
+        "numFinessEge": "850006206",
+        "espic": [
+          "1"
+        ],
+        "siret": "26850025300037"
+      },
+      "categorieentiteGeographiqueExercice": "362",
+      "modefixationtarifaire": "17",
+      "typeBudget": [
+        "02"
+      ],
+      "adresse": [
+        {
+          "usageAdresse": "03",
+          "numeroVoie": null,
+          "typeVoie": "R",
+          "libelleVoie": "DU PAYS DE RETZ",
+          "complementVoie": null,
+          "complementPointGeographique": null,
+          "lieuDit": null,
+          "cogCommune": "85029",
+          "ligneAcheminement": "BOUIN",
+          "ligneUne": null,
+          "ligneDeux": null,
+          "ligneTrois": null,
+          "ligneQuatre": "RUE DU PAYS DE RETZ",
+          "ligneCinq": null,
+          "ligneSix": null,
+          "codePostal": "85230",
+          "coordonneesGeographique": {
+            "coordonneeX": "-1.993633",
+            "coordonneeY": "46.974887",
+            "directionLatitude": "6664741.45",
+            "directionLongitude": "320627.93",
+            "cleInInteropBAN": "85029_0475",
+            "scoreBAN": "0.9563990909090908"
+          }
+        }
+      ],
+      "contact": [
+        {
+          "typeContact": {
+            "roleContact": "01"
+          },
+          "telecom": {
+            "telephone": "0251687408",
+            "telecopie": "0251490322",
+            "courriel": null
+          }
+        }
+      ],
+      "engagement": [],
+      "evenement": [
+        {
+          "evenementId": "483088",
+          "dateEnregistrement": "2023-03-15 11:21:01",
+          "dateEvenement": "1996-03-19",
+          "etatObjet1": "003",
+          "identifiantObjet1": "147479",
+          "identifiantObjet2": null,
+          "systemeMaitre": "01",
+          "typeObjet1": "EG",
+          "typeObjet2": null,
+          "codeEvenement": "003"
+        },
+        {
+          "evenementId": "487650",
+          "dateEnregistrement": "2023-03-15 11:21:01",
+          "dateEvenement": "2011-01-01",
+          "etatObjet1": "100",
+          "identifiantObjet1": "147479",
+          "identifiantObjet2": null,
+          "systemeMaitre": "01",
+          "typeObjet1": "EG",
+          "typeObjet2": null,
+          "codeEvenement": "005"
+        },
+        {
+          "evenementId": "496882",
+          "dateEnregistrement": "2023-03-15 11:21:01",
+          "dateEvenement": "1996-03-19",
+          "etatObjet1": "007",
+          "identifiantObjet1": "147479",
+          "identifiantObjet2": null,
+          "systemeMaitre": "01",
+          "typeObjet1": "EG",
+          "typeObjet2": null,
+          "codeEvenement": "007"
+        }
+      ],
+      "roleEge": [],
+      "etatObjet": "I",
+      "dateDerniereMaj": "2011-03-16 00:00:00"
+    }
+  ],
+  "recordCount": 2
+}

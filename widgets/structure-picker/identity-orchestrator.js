@@ -200,7 +200,6 @@ export async function resolveStructureIdentity({
   try {
     const location = extractLocationFromAddress(row.Adresse);
     const initialQuery = identitySearchName(row);
-    const geocodePromise = performGeocode();
     let initialOfficialPromise;
     let sirenValidationPromise = null;
 
@@ -227,14 +226,11 @@ export async function resolveStructureIdentity({
       }
     }
 
-    const [initialOfficial, geocoded, sirenValidation] = await Promise.all([
+    const [initialOfficial, sirenValidation] = await Promise.all([
       initialOfficialPromise,
-      geocodePromise,
       sirenValidationPromise ?? Promise.resolve([]),
     ]);
 
-    geocodeCandidates = Array.isArray(geocoded) ? geocoded : [];
-    selectedGeocode = geocodeCandidates[0] ?? null;
     candidates = mergeCandidates(candidates, initialOfficial);
 
     if (identifiers.siren && !identifiers.siret) {
@@ -247,9 +243,20 @@ export async function resolveStructureIdentity({
       candidates = candidates.filter(item => normalizeIdentifier(item?.siren) === identifiers.siren);
     }
 
-    const anchor = locationAnchor(row, selectedGeocode);
+    let anchor = locationAnchor(row, null);
     let decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
 
+    if (isDecisive(decision)) {
+      return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
+    }
+
+    // A known site address already supports the identity decision. Waiting for
+    // an optional street geocode would consume the budget for stronger registry proof.
+    const geocoded = await performGeocode();
+    geocodeCandidates = Array.isArray(geocoded) ? geocoded : [];
+    selectedGeocode = geocodeCandidates[0] ?? null;
+    anchor = locationAnchor(row, selectedGeocode);
+    decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
     if (isDecisive(decision)) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }

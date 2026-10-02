@@ -25,11 +25,11 @@ function candidate(overrides = {}) {
   };
 }
 
-test("first wave runs text identity and geocoding and stops on verified O PRE D'VOUS", async () => {
+test("a conclusive text identity does not start an unnecessary geocode for verified O PRE D'VOUS", async () => {
   const calls = [];
   const result = await resolveStructureIdentity({
     row: { NomCommercial: "ô Pré d’Vous", Adresse: "24 rue des fosses 44270 La Marne", SirenSiret: "", Latitude: "", Longitude: "" },
-    geocode: async () => [{ adresse: "24 Rue des Fosses 44270 La Marne", codePostal: "44270", commune: "La Marne", latitude: 46.997657, longitude: -1.736921, score: 0.95 }],
+    geocode: async () => { assert.fail("identity must not wait for street discovery"); },
     fetchOfficial: async request => {
       calls.push(request);
       assert.equal(request.kind, "text");

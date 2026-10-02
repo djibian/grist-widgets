@@ -6,7 +6,7 @@ import {
 
 const MIN_REQUEST_INTERVAL_MS = 1800;
 const DEFAULT_CACHE_TTL_MS = 20 * 60 * 1000;
-const CACHE_PREFIX = "structure-assistant:annuaire:v2:";
+const CACHE_PREFIX = "structure-assistant:annuaire:v3:";
 
 let lastRequestAt = 0;
 let backoffUntil = 0;

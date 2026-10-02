@@ -27,6 +27,25 @@ Les index publiés couvrent actuellement les départements **44 et 85** pour All
 - revalidation du SIRET, de la raison sociale et de l’adresse ;
 - coordonnées conservées comme référence administrative : leur présence ne démontre pas la précision du site.
 
+### FINESS géographique — Agence du Numérique en Santé
+
+Après un verdict probable, le résolveur conserve les `liste_finess` propres à chaque établissement Annuaire et consulte l’extrait du [registre officiel FINESS Structures](https://www.data.gouv.fr/datasets/finess-structures-1) publié avec le widget. Il recherche un identifiant FINESS exact, puis contrôle le SIRET du même enregistrement géographique ; aucun voisin n’est sélectionné.
+
+Une preuve forte exige une entité géographique d’exercice (`EGE`) active, un SIRET complet, un nom public exact après retrait du code postal et de la commune, ainsi qu’une voie, un code postal et une commune concordants avec la fiche et l’Annuaire, sans contradiction de numéro. Le type dans le nom public est conservé et les catégories officielles FINESS sont contrôlées lorsqu’un EHPAD (`500`) ou un SSIAD (`354`) est explicitement demandé : un SSIAD ne confirme pas un EHPAD, même si le nom long reprend celui de l’opérateur. Le SIRET et le rattachement FINESS doivent être revalidés dans une réponse Annuaire fraîche : la réponse initiale est réutilisée si elle ne vient pas du cache, sinon une requête SIRET exacte est nécessaire. Plusieurs preuves suffisantes restent ambiguës.
+
+La phase entière est bornée à huit secondes et au délai d’identité restant, avec deux candidats et deux FINESS par candidat au maximum. Une indisponibilité, un extrait tronqué, un rattachement non unique ou une preuve incompatible conserve l’abstention. Une identité déjà confirmée ne consulte pas FINESS. IGN ne bloque pas un candidat déjà trouvé par nom et adresse.
+
+Le candidat unique conserve la ligne géographique du registre, sa catégorie, les identifiants EGE/FINESS/SIRET, l’adresse, le lien vers la fiche officielle, l’URL et la date du flux source, et la réponse de rattachement Annuaire. Les coordonnées de géocodage d’adresse FINESS/BAN restent dans cette preuve ; elles ne deviennent jamais automatiquement une position démontrée du site.
+
+Les deux extraits publiés contiennent les 2 906 établissements géographiques actifs avec SIRET des départements 44 et 85 dans le flux officiel du 2 octobre 2026. Ils sont générés depuis le flux complet, sans liste de noms ou de SIRET de référence. Pour actualiser les données :
+
+```sh
+python3 scripts/generate-finess-identity-index.py
+npm test
+```
+
+`--input` accepte un flux officiel téléchargé (`.json` ou `.json.gz`), `--source-url` conserve sa provenance et `--departments` permet d’étendre la couverture. Les secteurs hors couverture restent sans confirmation FINESS. L’Annuaire continue de revalider les établissements actuels à chaque preuve ; un FINESS supprimé ou une contradiction nouvelle invalide le rattachement.
+
 ### Géocodage IGN / Géoplateforme
 
 `https://data.geopf.fr/geocodage/search`

@@ -129,7 +129,11 @@ function candidateCard(candidate) {
   details.appendChild(identity);
   const sources = [
     { label: "Annuaire des Entreprises", recordId: candidate.siret, url: `https://annuaire-entreprises.data.gouv.fr/etablissement/${candidate.siret}` },
-    ...(candidate.identityLinks ?? []).map(link => ({ label: link.sourceLabel, recordId: link.sourceRecordId, url: link.sourceUrl, publishedAt: link.sourcePublishedAt, historical: link.historical })),
+    ...(candidate.identityLinks ?? []).flatMap(link => [
+      { label: link.sourceLabel, recordId: link.sourceRecordId, url: link.sourceUrl, publishedAt: link.sourcePublishedAt, historical: link.historical },
+      ...(link.registryEvidence?.snapshotUrl ? [{ label: "Extraction officielle FINESS", recordId: link.sourceRecordId,
+        url: link.registryEvidence.snapshotUrl, publishedAt: link.sourcePublishedAt }] : []),
+    ]),
     ...(point?.proof ?? []).map(item => item.source),
     ...((point?.evidence ?? []).filter(item => item.accepted).map(item => item.observation.source)),
   ];

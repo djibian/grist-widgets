@@ -1,0 +1,13 @@
+# Réponses réelles EHPAD / FINESS
+
+Capturées le 2 octobre 2026. Les fichiers JSON conservent les réponses publiques, sans ajouter d’alias ni de coordonnées servant à la résolution.
+
+- `ehpad-annuaire.json` : [Recherche d’entreprises](https://recherche-entreprises.api.gouv.fr/search?q=ehpad+la+reynerie&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=85230). Inclut l’EHPAD `26850025300011` et son FINESS géographique `850002163`, le SSIAD `26850025300045`, l’USLD fermé `26850025300037` et l’association `89405714000010` à l’adresse `8 B RUE DU PAYS DE RETZ`.
+- `ehpad-finess-source.json` : l’entité juridique et ses EGE extraites sans modification du [flux FINESS Structures de l’ANS du 2 octobre 2026](https://static.data.gouv.fr/resources/finess-structures-1/20261002-021915/finess-structures-journalier-20261002.json.gz), `schemaVersion=v1.0.0`, `generatedAt=2026-10-02T02:07:13.718325845Z`. Source officielle [Agence du Numérique en Santé](https://www.data.gouv.fr/datasets/finess-structures-1), Licence Ouverte 2.0.
+- `ehpad-finess.json` : les mêmes EGE sous l’enveloppe de consultation du widget. EGE `147262`, FINESS `850002163`, SIRET `26850025300011`, état `A`, catégorie `500`, nom `EHPAD LA REYNERIE`, rue du Pays de Retz, 85230 Bouin. L’USLD fermé `850006206` / `26850025300037` partage l’adresse mais reste exclu. Les coordonnées sont un géocodage FINESS/BAN associé à la clé de voie `85029_0475` : aucune preuve de position précise du site.
+
+La [fiche publique officielle CNSA](https://www.pour-les-personnes-agees.gouv.fr/annuaire-ehpad-et-maisons-de-retraite/ehpad/vendee-85/bouin-85230/ehpad-la-reynerie/850002163), mise à jour le 17 août 2026, confirme le nom public et l’adresse sous ce FINESS. Cette consultation corrobore le corpus ; le navigateur utilise l’extrait du flux ANS publié avec le widget puis le rattachement Annuaire actuel.
+
+Les extraits de production sont générés depuis l’intégralité du flux et contiennent tous les EGE actifs avec SIRET dans les départements 44 et 85. Les tests du générateur vérifient que la ligne publiée de l’EHPAD est identique à celle produite depuis la source réelle, sans hériter des identifiants de l’entité juridique et sans inclure l’USLD fermé.
+
+La [nomenclature FINESS publiée au Journal officiel](https://www.legifrance.gouv.fr/jorf/article_jo/JORFARTI000045697069) distingue les catégories EHPAD (`500`) et SSIAD (`354`). Le résolveur contrôle cette distinction si le type est explicite dans le nom demandé, indépendamment du nom de l’opérateur.

@@ -1,5 +1,5 @@
 import { resolveIdentityForEnrichment } from "./identity-service.js";
-import { IDENTITY_STATES, normalizeIdentity } from "./identity-resolution.js";
+import { IDENTITY_STATES, normalizeIdentity, targetNameVariants } from "./identity-resolution.js";
 import { resolveSitePosition, POSITION_STATES } from "./establishment-position.js";
 import { findIndexedSitePositions, findOsmSiretPositions } from "./site-position-sources.js";
 import { IDENTITY_BUDGET } from "./identity-orchestrator.js";
@@ -37,8 +37,9 @@ async function boundedOperation(source, options, timeoutMs, optional = false) {
 
 function publicName(candidate, row, links) {
   const linked = (links ?? []).find(link => link.verifiedOfficial && link.siret === candidate.siret);
+  const targets = new Set(targetNameVariants(row, { includeCategoryFallback: false }));
   return (candidate.aliases ?? []).find(name => normalizeIdentity(name) === normalizeIdentity(row.NomCommercial))
-    || linked?.publicNames?.find(name => normalizeIdentity(name) === normalizeIdentity(row.NomCommercial))
+    || linked?.publicNames?.find(name => targets.has(normalizeIdentity(name)))
     || (candidate.nomUsuelDistinct ? candidate.nomCommercial : row.NomCommercial)
     || candidate.raisonSociale;
 }

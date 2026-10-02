@@ -30,6 +30,7 @@ class Element extends EventTarget {
     const matches = node => {
       if (selector.startsWith("#")) return node.id === selector.slice(1);
       if (selector.startsWith(".")) return node.className.split(" ").includes(selector.slice(1));
+      if (selector === "a") return node.tagName === "a";
       if (selector === 'input[type="radio"]') return node.tagName === "input" && node.type === "radio";
       return node.tagName === "input" && node.dataset.identityProposalField
         && (!selector.includes(":checked") || node.checked)
@@ -45,6 +46,8 @@ class Element extends EventTarget {
 const published = JSON.parse(await readFile(new URL("../identity-links/published.json", import.meta.url), "utf8"));
 const overtureShard = JSON.parse(await readFile(new URL("./fixtures/overture-44270.json", import.meta.url), "utf8"));
 const atpShard = JSON.parse(await readFile(new URL("./fixtures/all-the-places-44270.json", import.meta.url), "utf8"));
+const ehpadOfficial = JSON.parse(await readFile(new URL("./fixtures/ehpad-annuaire.json", import.meta.url), "utf8"));
+const ehpadFiness = JSON.parse(await readFile(new URL("./fixtures/ehpad-finess.json", import.meta.url), "utf8"));
 const manifest = {
   schemaVersion: 1, generatedAt: "2026-09-14T15:54:51Z", sources: Object.fromEntries([
     ["all-the-places", "All The Places"], ["overture", "Overture Places"],
@@ -61,7 +64,7 @@ const scenarios = [
     name: "EHPAD La Reynerie Bouin 85230", address: "8bis Rue du Pays de Retz 85230 Bouin",
     siret: "26850025300011", legalName: "EHPAD LA REYNERIE BOUIN", alias: "EHPAD",
     officialAddress: "LA REYNERIE RUE DU PAYS DE RETZ 85230 BOUIN", postcode: "85230", city: "BOUIN",
-    latitude: 46.974, longitude: -1.998, label: "Identité probable",
+    latitude: 46.973772, longitude: -1.995070, label: "Identité confirmée",
   },
   {
     name: "ô Pré d’Vous", address: "24 rue des fosses 44270 La Marne",
@@ -78,6 +81,7 @@ const scenarios = [
 ];
 
 function officialPayload(scenario) {
+  if (scenario.siret === "26850025300011") return ehpadOfficial;
   const establishments = [{
     siret: scenario.siret, adresse: scenario.officialAddress, code_postal: scenario.postcode,
     libelle_commune: scenario.city, liste_enseignes: scenario.alias ? [scenario.alias] : null,
@@ -85,12 +89,6 @@ function officialPayload(scenario) {
     longitude: scenario.siret === "41091808000020" ? -1.8156674543287 : scenario.longitude,
     etat_administratif: "A",
   }];
-  if (scenario.siret === "26850025300011") {
-    establishments.push({
-      siret: "26850025300045", adresse: "14 RUE DU PAYS DE RETZ 85230 BOUIN", code_postal: "85230",
-      libelle_commune: "BOUIN", liste_enseignes: ["SOINS INFIRMIERS DOMICILE SSIDPA"], etat_administratif: "A",
-    });
-  }
   return {
     total_results: 1, total_pages: 1, page: 1, per_page: 25,
     results: [{ siren: scenario.siret.slice(0, 9), nom_complet: scenario.legalName, matching_etablissements: establishments }],
@@ -119,6 +117,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
   let current = scenarios[0];
   let mode = "normal";
   let releaseOldPosition;
+  let releaseOldFiness;
   const requests = [];
   const writes = [];
   const originalDocument = globalThis.document;
@@ -153,6 +152,12 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     const url = new URL(rawUrl);
     requests.push({ url, signal: options.signal, body: options.body, at: Date.now() });
     if (url.pathname.endsWith("/identity-links/published.json")) return Response.json(published);
+    if (url.pathname.endsWith("/identity-links/finess/85.json")) {
+      if (mode === "pending-finess") return new Promise(() => {});
+      if (mode === "late-finess") return new Promise(resolve => { releaseOldFiness = () => resolve(Response.json(ehpadFiness)); });
+      if (mode === "unavailable-finess") return new Response("", { status: 503 });
+      return Response.json(ehpadFiness);
+    }
     if (url.pathname.endsWith("/contact-indexes/indexed-departments.json")) return Response.json(manifest);
     if (url.pathname.endsWith("/all-the-places/44/44270.json")) {
       if (mode === "pending-atp") return new Promise(() => {}); // optional fetch ignores abort
@@ -228,11 +233,15 @@ test("Grist shows a single coherent site candidate and preserves the four identi
       await select(index);
       click();
       await settle();
+      t.mock.timers.tick(1800); // fresh sector revalidation gets the next Annuaire queue slot
+      await settle();
       t.mock.timers.tick(1500);
       await settle();
       assert.equal(nodes["enrich-button"].disabled, false);
       assert.match(nodes["establishment-candidate"].textContent, new RegExp(current.siret));
       assert.ok(nodes["establishment-candidate"].textContent.includes(current.label));
+      assert.equal(nodes["establishment-candidate"].querySelectorAll(".establishment-card").length, 1);
+      assert.equal(nodes["establishment-candidate"].querySelectorAll('input[type="radio"]').length, 0);
       for (const request of requests.filter(item => item.url.hostname.startsWith("overpass"))) {
         assert.equal(new URLSearchParams(request.body).get("data").includes(`"${current.siret}"`), true);
       }
@@ -245,10 +254,73 @@ test("Grist shows a single coherent site candidate and preserves the four identi
       if (index === 1) {
         const siret = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]:checked:not(:disabled)")
           .find(item => item.dataset.identityProposalField === "SirenSiret");
-        assert.equal(siret, undefined, "EHPAD remains probable, without an automatic legal-field selection");
+        assert.ok(siret, "the sector proof confirms the sole EHPAD SIRET");
+        assert.match(nodes["establishment-candidate"].textContent, /FINESS géographique 850002163/);
+        assert.equal(nodes["establishment-candidate"].querySelector(".choice-name").textContent, "EHPAD LA REYNERIE");
+        assert.match(nodes["establishment-candidate"].textContent, /Agence du Numérique en Santé/);
+        assert.match(nodes["establishment-candidate"].textContent, /2026-10-02/);
+        assert.ok(nodes["establishment-candidate"].querySelectorAll("a").some(link =>
+          link.href === ehpadFiness.source.url && link.textContent.includes("Extraction officielle FINESS")));
+        assert.doesNotMatch(nodes["establishment-candidate"].textContent, /26850025300045|89405714000010|46\.974887/);
+        assert.equal(requests.filter(item => item.url.pathname.endsWith("/identity-links/finess/85.json")).length, 1);
+        assert.equal(requests.filter(item => item.url.hostname === "recherche-entreprises.api.gouv.fr").length, 1, "a fresh text response already revalidates this exact site and FINESS");
+        assert.equal(requests.some(item => item.url.hostname === "data.geopf.fr"), false, "street geocoding cannot delay stronger identity proof");
+        assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").some(input => input.dataset.identityProposalField === "Coordinates"), false);
       }
     });
   }
+
+  await t.test("an unavailable FINESS proof keeps the EHPAD probable with no automatic legal selection", async () => {
+    await select(1);
+    mode = "unavailable-finess";
+    click();
+    await settle();
+    t.mock.timers.tick(1500);
+    await settle();
+    assert.match(nodes["establishment-candidate"].textContent, /Identité probable/);
+    assert.match(nodes["establishment-candidate"].textContent, /26850025300011/);
+    assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]:checked:not(:disabled)")
+      .some(input => input.dataset.identityProposalField === "SirenSiret"), false);
+    mode = "normal";
+  });
+
+  await t.test("a FINESS fetch ignoring abort finishes as probable without consuming the identity deadline", async () => {
+    await select(1);
+    mode = "pending-finess";
+    click();
+    await settle();
+    const finessSignal = requests.find(item => item.url.pathname.endsWith("/identity-links/finess/85.json")).signal;
+    t.mock.timers.tick(8000);
+    await settle();
+    t.mock.timers.tick(1500);
+    await settle();
+    assert.equal(finessSignal.aborted, true);
+    assert.equal(nodes["enrich-button"].disabled, false);
+    assert.match(nodes["establishment-candidate"].textContent, /Identité probable.*26850025300011/);
+    assert.doesNotMatch(nodes["enrich-status"].textContent, /délai maximal/);
+    mode = "normal";
+  });
+
+  await t.test("a late FINESS proof after changing Grist selection cannot confirm the old candidate", async () => {
+    await select(1);
+    mode = "late-finess";
+    click();
+    await settle();
+    const finessSignal = requests.find(item => item.url.pathname.endsWith("/identity-links/finess/85.json")).signal;
+    await select(2);
+    mode = "normal";
+    assert.equal(finessSignal.aborted, true);
+    click();
+    await settle();
+    const text = nodes["establishment-candidate"].textContent;
+    assert.match(text, /89306104400028/);
+    releaseOldFiness();
+    await settle();
+    t.mock.timers.tick(4000);
+    await settle();
+    assert.equal(nodes["establishment-candidate"].textContent, text);
+    assert.doesNotMatch(text, /26850025300011|850002163/);
+  });
 
   await t.test("a hanging optional ATP shard cannot discard the fast Overture position or trigger Overpass", async () => {
     await select(0);
