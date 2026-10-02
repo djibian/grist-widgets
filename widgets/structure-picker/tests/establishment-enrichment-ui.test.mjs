@@ -48,6 +48,7 @@ const overtureShard = JSON.parse(await readFile(new URL("./fixtures/overture-442
 const atpShard = JSON.parse(await readFile(new URL("./fixtures/all-the-places-44270.json", import.meta.url), "utf8"));
 const ehpadOfficial = JSON.parse(await readFile(new URL("./fixtures/ehpad-annuaire.json", import.meta.url), "utf8"));
 const ehpadFiness = JSON.parse(await readFile(new URL("./fixtures/ehpad-finess.json", import.meta.url), "utf8"));
+const ehpadPositions = JSON.parse(await readFile(new URL("../site-position-indexes/osm-finess/850002.json", import.meta.url), "utf8"));
 const manifest = {
   schemaVersion: 1, generatedAt: "2026-09-14T15:54:51Z", sources: Object.fromEntries([
     ["all-the-places", "All The Places"], ["overture", "Overture Places"],
@@ -118,6 +119,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
   let mode = "normal";
   let releaseOldPosition;
   let releaseOldFiness;
+  let releaseOldFinessPosition;
   const requests = [];
   const writes = [];
   const originalDocument = globalThis.document;
@@ -157,6 +159,13 @@ test("Grist shows a single coherent site candidate and preserves the four identi
       if (mode === "late-finess") return new Promise(resolve => { releaseOldFiness = () => resolve(Response.json(ehpadFiness)); });
       if (mode === "unavailable-finess") return new Response("", { status: 503 });
       return Response.json(ehpadFiness);
+    }
+    if (url.pathname.endsWith("/site-position-indexes/osm-finess/850002.json")) {
+      if (mode === "pending-finess-position") return new Promise(() => {});
+      if (mode === "late-finess-position") return new Promise(resolve => { releaseOldFinessPosition = () => resolve(Response.json(ehpadPositions)); });
+      if (mode === "conflicting-finess-position") return Response.json({ ...ehpadPositions, records: ehpadPositions.records.map(record =>
+        record.tags["ref:FR:FINESS"] === "850002163" ? { ...record, tags: { ...record.tags, "ref:FR:SIRET": "26850025300045" } } : record) });
+      return Response.json(ehpadPositions);
     }
     if (url.pathname.endsWith("/contact-indexes/indexed-departments.json")) return Response.json(manifest);
     if (url.pathname.endsWith("/all-the-places/44/44270.json")) {
@@ -248,6 +257,12 @@ test("Grist shows a single coherent site candidate and preserves the four identi
       if (index === 2) {
         assert.match(nodes["establishment-candidate"].textContent, /46\.99756389, -1\.7365524/);
         assert.doesNotMatch(nodes["establishment-candidate"].textContent, /VIVAL/);
+      } else if (index === 1) {
+        assert.match(nodes["establishment-candidate"].textContent, /46\.9742242, -1\.9937342/);
+        assert.match(nodes["establishment-candidate"].textContent, /Position confirmée : OpenStreetMap/);
+        assert.match(nodes["establishment-candidate"].textContent, /SIRET 26850025300011 — FINESS 850002163/);
+        assert.match(nodes["establishment-candidate"].textContent, /node:9056350135 — version 4 — 2025-11-01/);
+        assert.equal(requests.some(item => item.url.hostname.startsWith("overpass")), false);
       } else {
         assert.match(nodes["establishment-candidate"].textContent, /Position précise du site non démontrée/);
       }
@@ -265,7 +280,9 @@ test("Grist shows a single coherent site candidate and preserves the four identi
         assert.equal(requests.filter(item => item.url.pathname.endsWith("/identity-links/finess/850002.json")).length, 1);
         assert.equal(requests.filter(item => item.url.hostname === "recherche-entreprises.api.gouv.fr").length, 1, "a fresh text response already revalidates this exact site and FINESS");
         assert.equal(requests.some(item => item.url.hostname === "data.geopf.fr"), false, "street geocoding cannot delay stronger identity proof");
-        assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").some(input => input.dataset.identityProposalField === "Coordinates"), false);
+        const coordinates = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").find(input => input.dataset.identityProposalField === "Coordinates");
+        assert.equal(coordinates.checked, true);
+        assert.equal(coordinates.disabled, false);
       }
     });
   }
@@ -281,6 +298,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.match(nodes["establishment-candidate"].textContent, /26850025300011/);
     assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]:checked:not(:disabled)")
       .some(input => input.dataset.identityProposalField === "SirenSiret"), false);
+    assert.equal(requests.some(item => item.url.pathname.includes("/site-position-indexes/osm-finess/")), false);
     mode = "normal";
   });
 
@@ -320,6 +338,57 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.equal(nodes["establishment-candidate"].textContent, text);
     assert.doesNotMatch(text, /26850025300011|850002163/);
+  });
+
+  await t.test("a linked position with the SSIAD SIRET keeps EHPAD identity verified but abstains on coordinates", async () => {
+    await select(1);
+    mode = "conflicting-finess-position";
+    click();
+    await settle();
+    assert.equal(nodes["enrich-button"].disabled, false);
+    assert.match(nodes["establishment-candidate"].textContent, /Identité confirmée/);
+    assert.match(nodes["establishment-candidate"].textContent, /Une preuve liée au site contredit son identité/);
+    assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").some(input => input.dataset.identityProposalField === "Coordinates"), false);
+    assert.equal(requests.some(item => item.url.hostname.startsWith("overpass")), false);
+    mode = "normal";
+  });
+
+  await t.test("a hanging FINESS position source cannot delay identity forever or later overwrite it with coordinates", async () => {
+    await select(1);
+    mode = "pending-finess-position";
+    click();
+    await settle();
+    const signal = requests.find(item => item.url.pathname.includes("/site-position-indexes/osm-finess/")).signal;
+    t.mock.timers.tick(10000);
+    await settle();
+    t.mock.timers.tick(1500);
+    await settle();
+    assert.equal(signal.aborted, true);
+    assert.equal(nodes["enrich-button"].disabled, false);
+    assert.match(nodes["establishment-candidate"].textContent, /Identité confirmée/);
+    assert.match(nodes["establishment-candidate"].textContent, /Position précise du site non démontrée/);
+    mode = "normal";
+  });
+
+  await t.test("late FINESS position evidence cannot cross-wire the next Grist candidate", async () => {
+    await select(1);
+    mode = "late-finess-position";
+    click();
+    await settle();
+    const signal = requests.find(item => item.url.pathname.includes("/site-position-indexes/osm-finess/")).signal;
+    await select(2);
+    mode = "normal";
+    click();
+    await settle();
+    const text = nodes["establishment-candidate"].textContent;
+    assert.equal(signal.aborted, true);
+    assert.match(text, /89306104400028/);
+    releaseOldFinessPosition();
+    await settle();
+    t.mock.timers.tick(10000);
+    await settle();
+    assert.equal(nodes["establishment-candidate"].textContent, text);
+    assert.doesNotMatch(text, /26850025300011|850002163|46\.9742242/);
   });
 
   await t.test("a hanging optional ATP shard cannot discard the fast Overture position or trigger Overpass", async () => {
@@ -447,5 +516,27 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.equal(fields.Longitude, -1.815576);
     assert.match(fields.PositionSource, /Overture Places/);
     assert.equal(JSON.parse(fields.PositionProof).siret, "41091808000020");
+  });
+
+  await t.test("the EHPAD candidate writes its exact SIRET, point, OSM version and FINESS proof atomically", async () => {
+    await select(1);
+    click();
+    await settle();
+    nodes["proposal-panel"].querySelector("#identity-apply-proposals").dispatchEvent(new Event("click"));
+    await settle();
+    assert.equal(writes.length, 2);
+    const fields = writes[1][0][3];
+    assert.equal(fields.Numero_d_immatriculation, "26850025300011");
+    assert.equal(fields.Latitude, 46.9742242);
+    assert.equal(fields.Longitude, -1.9937342);
+    assert.match(fields.PositionSource, /OpenStreetMap \(node:9056350135\)/);
+    const proof = JSON.parse(fields.PositionProof);
+    assert.equal(proof.siret, "26850025300011");
+    assert.equal(proof.status, "SITE_CONFIRMED");
+    assert.equal(proof.source.version, 4);
+    assert.equal(proof.source.updatedAt, "2025-11-01T15:45:18Z");
+    assert.equal(proof.proof.find(item => item.kind === "EXPLICIT_GEOGRAPHIC_FINESS").finess, "850002163");
+    assert.equal(table.Numero_d_immatriculation[1], "26850025300011");
+    assert.equal(table.Latitude[1], 46.9742242);
   });
 });

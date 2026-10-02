@@ -104,7 +104,8 @@ function candidateCard(candidate) {
   name.textContent = candidate.nomCommercial || candidate.raisonSociale || "Établissement";
   const legal = document.createElement("div");
   legal.className = "choice-detail";
-  legal.textContent = `${candidate.raisonSociale || ""} — SIRET ${candidate.siret}`;
+  const finessIds = [...new Set((candidate.identityLinks ?? []).filter(link => link.source === "finess" && link.verifiedOfficial).map(link => link.sourceRecordId))];
+  legal.textContent = `${candidate.raisonSociale || ""} — SIRET ${candidate.siret}${finessIds.length ? ` — FINESS ${finessIds.join(", ")}` : ""}`;
   const address = document.createElement("div");
   address.className = "choice-detail";
   address.textContent = candidate.adresse;
@@ -115,7 +116,7 @@ function candidateCard(candidate) {
   const point = candidate.position;
   const located = [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(point?.status);
   position.textContent = located
-    ? `${point.latitude}, ${point.longitude} — Position : ${point.source.label}, ${point.status === POSITION_STATES.SITE_CONFIRMED ? "SIRET explicite" : "nom public attesté + adresse de site concordante"}`
+    ? `${point.latitude}, ${point.longitude} — Position ${point.status === POSITION_STATES.SITE_CONFIRMED ? "confirmée" : "corroborée"} : ${point.source.label}, ${point.status === POSITION_STATES.SITE_CONFIRMED ? "identifiants d’établissement explicites" : "nom public attesté + adresse de site concordante"}`
     : `Position : ${point?.reason || "position précise non démontrée"}`;
   content.appendChild(position);
 
@@ -145,7 +146,8 @@ function candidateCard(candidate) {
     const line = document.createElement("div");
     line.className = "choice-detail";
     const link = document.createElement(/^https?:\/\//.test(source.url || "") ? "a" : "span");
-    link.textContent = [source.label, source.recordId, source.upstream?.release || source.upstream?.runId, source.publishedAt || source.generatedAt, source.historical ? "référence historique revalidée" : ""].filter(Boolean).join(" — ");
+    link.textContent = [source.label, source.recordId, source.version ? `version ${source.version}` : "", source.updatedAt,
+      source.upstream?.release || source.upstream?.runId, source.publishedAt || source.generatedAt, source.historical ? "référence historique revalidée" : ""].filter(Boolean).join(" — ");
     if (/^https?:\/\//.test(source.url || "")) { link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer"; }
     line.appendChild(link);
     details.appendChild(line);

@@ -64,11 +64,12 @@ export async function resolveEstablishmentForEnrichment({
     return { decision: { ...decision, alternatives }, candidate: null, alternatives, diagnostics: identity.diagnostics ?? [] };
   }
 
-  const indexed = await boundedOperation(findIndexedPositions, { candidate: official, signal }, ESTABLISHMENT_BUDGET.indexedDeadlineMs, true);
-  const options = { ...indexed, links: identity.links ?? [], discovery: identity.geocodeCandidates ?? [] };
+  const sourceOptions = { candidate: official, links: identity.links ?? [], identityStatus: decision.status, signal };
+  const indexed = await boundedOperation(findIndexedPositions, sourceOptions, ESTABLISHMENT_BUDGET.indexedDeadlineMs, true);
+  const options = { ...indexed, links: identity.links ?? [], requestedAddress: row.Adresse, discovery: identity.geocodeCandidates ?? [] };
   let position = resolveSitePosition(official, options);
   if (position.status === POSITION_STATES.UNRESOLVED) {
-    const osm = await boundedOperation(findOsmPositions, { candidate: official, signal }, ESTABLISHMENT_BUDGET.osmDeadlineMs, true);
+    const osm = await boundedOperation(findOsmPositions, sourceOptions, ESTABLISHMENT_BUDGET.osmDeadlineMs, true);
     position = resolveSitePosition(official, {
       ...options, observations: [...(indexed.observations ?? []), ...(osm.observations ?? [])],
       coverage: [...(indexed.coverage ?? []), ...(osm.coverage ?? [])],

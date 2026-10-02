@@ -164,7 +164,10 @@ for (const scenario of cases) {
         if (url.protocol === "file:") return Response.json(JSON.parse(await readFile(url, "utf8")));
         return recordingFetch(url, fetchOptions, network);
       } }),
-      findIndexedPositions: options => findIndexedSitePositions({ ...options, manifestUrl, fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network) }),
+      findIndexedPositions: options => findIndexedSitePositions({ ...options, manifestUrl, fetchImpl: async (url, fetchOptions) => {
+        if (url.protocol === "file:") return Response.json(JSON.parse(await readFile(url, "utf8")));
+        return recordingFetch(url, fetchOptions, network);
+      } }),
       findOsmPositions: options => findOsmSiretPositions({ ...options, fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network) }),
     });
   } catch (caught) {
