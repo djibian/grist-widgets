@@ -2,7 +2,8 @@ import { addressEvidence, normalizeIdentity, targetNameVariants } from "./identi
 import { normalizeFiness, normalizeIdentifier } from "./search.js";
 
 export const FINESS_INDEX_BASE = new URL("./identity-links/finess/", import.meta.url);
-export const FINESS_BUDGET = Object.freeze({ maxCandidates: 2, maxIdsPerCandidate: 2, deadlineMs: 8000 });
+export const FINESS_SHARD_PREFIX_LENGTH = 6;
+export const FINESS_BUDGET = Object.freeze({ maxCandidates: 2, maxIdsPerCandidate: 2, deadlineMs: 8000, maxShardBytes: 96 * 1024 });
 const clean = value => String(value ?? "").trim();
 const streetTypes = { R: "RUE", AV: "AVENUE", BD: "BOULEVARD", ALL: "ALLEE", CHE: "CHEMIN", IMP: "IMPASSE", PL: "PLACE", RTE: "ROUTE" };
 // Official FINESS categories, not an inference from the operator's name:
@@ -12,7 +13,7 @@ const categoryCodes = Object.freeze({ ehpad: "500", ssiad: "354" });
 export function buildFinessLookupUrl(finess, siret, baseUrl = FINESS_INDEX_BASE) {
   const id = normalizeFiness(finess);
   if (!id || normalizeIdentifier(siret).length !== 14) return null;
-  return new URL(`${id.slice(0, 2)}.json`, baseUrl);
+  return new URL(`${id.slice(0, FINESS_SHARD_PREFIX_LENGTH)}.json`, baseUrl);
 }
 
 function registryAddress(address) {
@@ -72,19 +73,21 @@ export async function findFinessIdentityLinks({ row, candidates = [], signal, fe
   }
   const requests = [];
   const lookups = candidates.flatMap(candidate => (candidate.finessIds ?? []).map(id => ({ candidate, id })));
-  const prefixes = [...new Set(lookups.map(item => normalizeFiness(item.id).slice(0, 2)).filter(Boolean))];
+  const prefixes = [...new Set(lookups.map(item => normalizeFiness(item.id).slice(0, FINESS_SHARD_PREFIX_LENGTH)).filter(Boolean))];
   const results = await Promise.all(prefixes.map(async prefix => {
     const url = new URL(`${prefix}.json`, baseUrl);
     requests.push({ source: `finess:${prefix}`, kind: "finess-index", url: String(url) });
     const response = await fetchImpl(url, { headers: { Accept: "application/json" }, signal });
     if (!response.ok) throw new Error(`Extrait FINESS indisponible (HTTP ${response.status}).`);
-    const payload = await response.json();
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > FINESS_BUDGET.maxShardBytes) throw new Error("Extrait FINESS trop volumineux.");
+    const payload = JSON.parse(text);
     if (payload?.schemaVersion !== 1 || payload.prefix !== prefix || !Array.isArray(payload.records)
       || payload.recordCount !== payload.records.length || payload.source?.id !== "finess-ans"
       || payload.source.schemaVersion !== "v1.0.0" || !payload.source.generatedAt || !payload.source.url) {
       throw new Error("Extrait FINESS invalide ou incomplet.");
     }
-    return lookups.filter(item => item.id.slice(0, 2) === prefix).flatMap(({ id, candidate }) => {
+    return lookups.filter(item => item.id.slice(0, FINESS_SHARD_PREFIX_LENGTH) === prefix).flatMap(({ id, candidate }) => {
       const records = payload.records.filter(record => normalizeFiness(record?.informationsGeneralesEGE?.numFinessEge) === id);
       if (records.length !== 1) return []; // a geographic identifier must be unique
       const link = finessIdentityLink(records[0], candidate, row, payload.source, url);

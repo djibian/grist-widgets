@@ -10,6 +10,8 @@ import urllib.request
 SOURCE_URL = "https://www.data.gouv.fr/api/1/datasets/r/cd493959-fb03-41e5-9347-0edd14dfbc22"
 DATASET_URL = "https://www.data.gouv.fr/datasets/finess-structures-1"
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "widgets/structure-picker/identity-links/finess"
+SHARD_PREFIX_LENGTH = 6
+MAX_SHARD_BYTES = 96 * 1024
 
 
 def build_shards(document, departments, source_url):
@@ -46,7 +48,7 @@ def build_shards(document, departments, source_url):
                 "categorieentiteGeographiqueExercice": site.get("categorieentiteGeographiqueExercice"),
                 "etatObjet": site["etatObjet"], "dateDerniereMaj": site.get("dateDerniereMaj"),
             }
-            shards.setdefault(finess[:2], []).append(compact)
+            shards.setdefault(finess[:SHARD_PREFIX_LENGTH], []).append(compact)
     if not shards:
         raise ValueError("No active geographic FINESS with SIRET in requested departments")
     source = {"id": "finess-ans", "label": "FINESS — Agence du Numérique en Santé",
@@ -77,12 +79,16 @@ def main():
         with open_input(path, "rt", encoding="utf-8") as input_file:
             document = json.load(input_file)
         shards = build_shards(document, set(args.departments.split(",")), source_url)
+        encoded = {prefix: json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
+                   for prefix, payload in shards.items()}
+        if any(len(text.encode("utf-8")) > MAX_SHARD_BYTES for text in encoded.values()):
+            raise ValueError("FINESS shard exceeds the browser payload budget")
         args.output.mkdir(parents=True, exist_ok=True)
         for old in args.output.glob("*.json"):
             if old.stem not in shards:
                 old.unlink()
-        for prefix, payload in shards.items():
-            (args.output / f"{prefix}.json").write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+        for prefix, text in encoded.items():
+            (args.output / f"{prefix}.json").write_text(text, encoding="utf-8")
         print(f"FINESS: {sum(len(shard['records']) for shard in shards.values())} geographic identities in {len(shards)} shards; {document['generatedAt']}")
 
 

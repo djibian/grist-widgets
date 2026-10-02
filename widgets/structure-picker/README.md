@@ -37,7 +37,7 @@ La phase entière est bornée à huit secondes et au délai d’identité restan
 
 Le candidat unique conserve la ligne géographique du registre, sa catégorie, les identifiants EGE/FINESS/SIRET, l’adresse, le lien vers la fiche officielle, l’URL et la date du flux source, et la réponse de rattachement Annuaire. Les coordonnées de géocodage d’adresse FINESS/BAN restent dans cette preuve ; elles ne deviennent jamais automatiquement une position démontrée du site.
 
-Les deux extraits publiés contiennent les 2 906 établissements géographiques actifs avec SIRET des départements 44 et 85 dans le flux officiel du 2 octobre 2026. Ils sont générés depuis le flux complet, sans liste de noms ou de SIRET de référence. Pour actualiser les données :
+Les extraits publiés contiennent les 2 906 établissements géographiques actifs avec SIRET des départements 44 et 85 dans le flux officiel du 2 octobre 2026. Ils sont générés depuis le flux complet, sans liste de noms ou de SIRET de référence. Les fichiers sont découpés selon les six premiers caractères du FINESS, avec un plafond de 96 Kio contrôlé à la génération et à la lecture : le navigateur télécharge le petit extrait de l’identifiant recherché plutôt qu’un département complet. Pour actualiser les données :
 
 ```sh
 python3 scripts/generate-finess-identity-index.py

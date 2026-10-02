@@ -6,10 +6,12 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
+import { FINESS_BUDGET } from "../finess-identity.js";
 
 const generator = fileURLToPath(new URL("../../../scripts/generate-finess-identity-index.py", import.meta.url));
 const fixture = JSON.parse(await readFile(new URL("./fixtures/ehpad-finess-source.json", import.meta.url), "utf8"));
-const published = JSON.parse(await readFile(new URL("../identity-links/finess/85.json", import.meta.url), "utf8"));
+const indexDirectory = new URL("../identity-links/finess/", import.meta.url);
+const published = JSON.parse(await readFile(new URL("850002.json", indexDirectory), "utf8"));
 
 async function run(t, document, compressed = false) {
   const directory = await mkdtemp(path.join(tmpdir(), "finess-test-"));
@@ -26,8 +28,8 @@ async function run(t, document, compressed = false) {
 test("the real FINESS Structures source generates the published geographic EHPAD record, excluding the legal entity and closed USLD", async t => {
   const result = await run(t, fixture);
   assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(await readdir(result.output), ["85.json"]);
-  const shard = JSON.parse(await readFile(path.join(result.output, "85.json"), "utf8"));
+  assert.deepEqual(await readdir(result.output), ["850002.json"]);
+  const shard = JSON.parse(await readFile(path.join(result.output, "850002.json"), "utf8"));
   assert.equal(shard.recordCount, 1);
   assert.deepEqual(shard.records[0], published.records.find(site => site.informationsGeneralesEGE.numFinessEge === "850002163"));
   assert.equal(shard.source.generatedAt, fixture.generatedAt);
@@ -36,7 +38,7 @@ test("the real FINESS Structures source generates the published geographic EHPAD
   assert.doesNotMatch(JSON.stringify(shard.records), /850000373|850006206|26850025300037/);
   const gzipped = await run(t, fixture, true);
   assert.equal(gzipped.status, 0, gzipped.stderr);
-  assert.equal(await readFile(path.join(gzipped.output, "85.json"), "utf8"), await readFile(path.join(result.output, "85.json"), "utf8"));
+  assert.equal(await readFile(path.join(gzipped.output, "850002.json"), "utf8"), await readFile(path.join(result.output, "850002.json"), "utf8"));
 });
 
 test("the generator never inherits a legal entity's identifiers when geographic SIRET is missing", async t => {
@@ -48,7 +50,7 @@ test("the generator never inherits a legal entity's identifiers when geographic 
   assert.match(result.stderr, /No active geographic FINESS/);
 });
 
-test("duplicate geographic identifiers and unsupported upstream schemas fail publication", async t => {
+test("duplicate geographic identifiers, unsupported schemas and oversized shards fail publication", async t => {
   const duplicate = structuredClone(fixture);
   duplicate.pmej[0].ege.push(duplicate.pmej[0].ege[0]);
   const result = await run(t, duplicate);
@@ -57,12 +59,21 @@ test("duplicate geographic identifiers and unsupported upstream schemas fail pub
   const unsupported = await run(t, { ...fixture, schemaVersion: "v2.0.0" });
   assert.notEqual(unsupported.status, 0);
   assert.match(unsupported.stderr, /Unsupported FINESS/);
+  const oversized = structuredClone(fixture);
+  oversized.pmej[0].ege[0].informationsGeneralesEGE.nomEgeLong = "x".repeat(FINESS_BUDGET.maxShardBytes);
+  const tooLarge = await run(t, oversized);
+  assert.notEqual(tooLarge.status, 0);
+  assert.match(tooLarge.stderr, /payload budget/);
 });
 
 test("published FINESS shards contain the complete configured cohort, unique active geographic IDs and upstream provenance", async () => {
   const ids = new Set();
-  for (const prefix of ["44", "85"]) {
-    const shard = JSON.parse(await readFile(new URL(`../identity-links/finess/${prefix}.json`, import.meta.url), "utf8"));
+  for (const file of await readdir(indexDirectory)) {
+    const text = await readFile(new URL(file, indexDirectory), "utf8");
+    assert.ok(Buffer.byteLength(text) <= FINESS_BUDGET.maxShardBytes, `${file} must stay within the cold browser download budget`);
+    const shard = JSON.parse(text);
+    assert.equal(file, `${shard.prefix}.json`);
+    assert.equal(shard.prefix.length, 6);
     assert.equal(shard.recordCount, shard.records.length);
     assert.equal(shard.source.id, "finess-ans");
     assert.match(shard.source.url, /static\.data\.gouv\.fr\/resources\/finess-structures-1/);
@@ -72,6 +83,7 @@ test("published FINESS shards contain the complete configured cohort, unique act
       assert.ok(!info.dateFermeture);
       assert.match(info.siret, /^\d{14}$/);
       assert.match(info.numFinessEge, /^[A-Z0-9]{9}$/);
+      assert.ok(info.numFinessEge.startsWith(shard.prefix));
       assert.equal(ids.has(info.numFinessEge), false);
       ids.add(info.numFinessEge);
     }

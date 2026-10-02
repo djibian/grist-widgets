@@ -152,7 +152,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     const url = new URL(rawUrl);
     requests.push({ url, signal: options.signal, body: options.body, at: Date.now() });
     if (url.pathname.endsWith("/identity-links/published.json")) return Response.json(published);
-    if (url.pathname.endsWith("/identity-links/finess/85.json")) {
+    if (url.pathname.endsWith("/identity-links/finess/850002.json")) {
       if (mode === "pending-finess") return new Promise(() => {});
       if (mode === "late-finess") return new Promise(resolve => { releaseOldFiness = () => resolve(Response.json(ehpadFiness)); });
       if (mode === "unavailable-finess") return new Response("", { status: 503 });
@@ -262,7 +262,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
         assert.ok(nodes["establishment-candidate"].querySelectorAll("a").some(link =>
           link.href === ehpadFiness.source.url && link.textContent.includes("Extraction officielle FINESS")));
         assert.doesNotMatch(nodes["establishment-candidate"].textContent, /26850025300045|89405714000010|46\.974887/);
-        assert.equal(requests.filter(item => item.url.pathname.endsWith("/identity-links/finess/85.json")).length, 1);
+        assert.equal(requests.filter(item => item.url.pathname.endsWith("/identity-links/finess/850002.json")).length, 1);
         assert.equal(requests.filter(item => item.url.hostname === "recherche-entreprises.api.gouv.fr").length, 1, "a fresh text response already revalidates this exact site and FINESS");
         assert.equal(requests.some(item => item.url.hostname === "data.geopf.fr"), false, "street geocoding cannot delay stronger identity proof");
         assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").some(input => input.dataset.identityProposalField === "Coordinates"), false);
@@ -289,7 +289,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     mode = "pending-finess";
     click();
     await settle();
-    const finessSignal = requests.find(item => item.url.pathname.endsWith("/identity-links/finess/85.json")).signal;
+    const finessSignal = requests.find(item => item.url.pathname.endsWith("/identity-links/finess/850002.json")).signal;
     t.mock.timers.tick(8000);
     await settle();
     t.mock.timers.tick(1500);
@@ -306,7 +306,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     mode = "late-finess";
     click();
     await settle();
-    const finessSignal = requests.find(item => item.url.pathname.endsWith("/identity-links/finess/85.json")).signal;
+    const finessSignal = requests.find(item => item.url.pathname.endsWith("/identity-links/finess/850002.json")).signal;
     await select(2);
     mode = "normal";
     assert.equal(finessSignal.aborted, true);

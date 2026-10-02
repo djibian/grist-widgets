@@ -120,7 +120,7 @@ for (const [label, change] of [
 
 test("lookup uses only the candidate's FINESS shard; duplicate or truncated geographic records do not confirm identity", async () => {
   const result = await findFinessIdentityLinks({ row, candidates: [ehpad], fetchImpl: async (url, fetchOptions) => {
-    assert.match(url.pathname, /identity-links\/finess\/85\.json$/);
+    assert.match(url.pathname, /identity-links\/finess\/850002\.json$/);
     assert.equal(url.search, "");
     assert.equal(fetchOptions.headers.Accept, "application/json");
     return Response.json({ ...sectorPayload, records: [record, record], recordCount: 2 });
@@ -129,6 +129,13 @@ test("lookup uses only the candidate's FINESS shard; duplicate or truncated geog
   await assert.rejects(findFinessIdentityLinks({ row, candidates: [ehpad], fetchImpl: async () =>
     Response.json({ ...sectorPayload, recordCount: 3 }) }), /incomplet/);
   assert.equal(buildFinessLookupUrl("invalid", ehpad.siret), null);
+});
+
+test("a department-sized payload cannot bypass the bounded FINESS shard contract", async () => {
+  const oversized = { ...sectorPayload, records: [{ ...record,
+    informationsGeneralesEGE: { ...info, nomEgeLong: "x".repeat(FINESS_BUDGET.maxShardBytes) },
+  }], recordCount: 1 };
+  await assert.rejects(findFinessIdentityLinks({ row, candidates: [ehpad], fetchImpl: async () => Response.json(oversized) }), /trop volumineux/);
 });
 
 test("a registry link is not sufficient when fresh Annuaire omits or changes its per-site FINESS", async () => {
