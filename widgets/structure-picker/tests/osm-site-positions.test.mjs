@@ -147,6 +147,16 @@ test("a neighbour's 7bis address contradicts the requested 8bis even when Annuai
   assert.equal(position.latitude, null);
 });
 
+test("even without POI identifiers an exact attested name/address cannot override a contradictory SSIAD type", () => {
+  const poi = { ...changedPoi({ name: "EHPAD LA REYNERIE", "ref:FR:SIRET": undefined,
+    "ref:FR:FINESS": undefined, "type:FR:FINESS": "354", social_facility: "outreach" }), adresse: candidate.adresse };
+  for (const observations of [[poi], [observation, poi]]) {
+    const position = resolveSitePosition(candidate, { observations, links });
+    assert.equal(position.status, "CONFLICT");
+    assert.equal(position.latitude, null);
+  }
+});
+
 test("a shorter public name cannot be accepted from SIRET or name alone without matching FINESS category", () => {
   for (const poi of [changedPoi({ "ref:FR:FINESS": undefined }), changedPoi({ "type:FR:FINESS": undefined })]) {
     const result = resolveSitePosition(candidate, { observations: [poi], links });

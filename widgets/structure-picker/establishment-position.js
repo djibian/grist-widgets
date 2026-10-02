@@ -78,10 +78,12 @@ export function assessSitePosition(candidate, poi, { links = [], requestedAddres
   }
   if (poi.adresse && addressEvidence(candidate.adresse, poi.adresse).conflict) return refuse("L’adresse du POI contredit celle de l’établissement.", explicitlyLinked);
   if (poi.adresse && requestedAddress && addressEvidence(requestedAddress, poi.adresse).conflict) return refuse("L’adresse du POI contredit l’adresse du site demandé.", explicitlyLinked);
+  const namedFiness = finess.find(link => link.publicNames.some(name => normalizeIdentity(name) === normalizeIdentity(poi.name)));
+  const nameAddressLinked = Boolean(namedFiness && exactSiteAddress(candidate.adresse, poi.adresse));
   const expectedCategory = geographic?.registryEvidence.categoryCode
-    || (siret === candidate.siret && finess.length === 1 ? finess[0].registryEvidence.categoryCode : "");
+    || (siret === candidate.siret && finess.length === 1 ? finess[0].registryEvidence.categoryCode : namedFiness?.registryEvidence.categoryCode);
   if (expectedCategory && poi.finessCategory && poi.finessCategory !== expectedCategory) {
-    return refuse("La catégorie FINESS du POI contredit celle de l’établissement.", true);
+    return refuse("La catégorie FINESS du POI contredit celle de l’établissement.", explicitlyLinked || nameAddressLinked);
   }
   // FINESS 500 is a residential nursing home, not a neighbouring home-care
   // service. An abbreviated name is usable only with the exact geographic
@@ -92,7 +94,7 @@ export function assessSitePosition(candidate, poi, { links = [], requestedAddres
     && (!type.healthcare || type.healthcare === "nursing_home")
     && (!type.amenity || ["social_facility", "nursing_home"].includes(type.amenity));
   if (expectedCategory === "500" && !nursingHome) {
-    return refuse("Le type du POI ne désigne pas un établissement d’hébergement EHPAD.", true);
+    return refuse("Le type du POI ne désigne pas un établissement d’hébergement EHPAD.", explicitlyLinked || nameAddressLinked);
   }
 
   // Only the place's own name participates. A shared operator/brand on a
