@@ -24,14 +24,15 @@ Les index publiés couvrent actuellement les départements **44 et 85** pour All
 `https://recherche-entreprises.api.gouv.fr/search`
 
 - recherche des établissements actifs dans les départements configurés ;
-- récupération du SIRET, de la raison sociale, de l’adresse et, lorsqu’elles existent, des coordonnées.
+- revalidation du SIRET, de la raison sociale et de l’adresse ;
+- coordonnées conservées comme référence administrative : leur présence ne démontre pas la précision du site.
 
 ### Géocodage IGN / Géoplateforme
 
 `https://data.geopf.fr/geocodage/search`
 
-- normalisation de l’adresse ;
-- latitude et longitude ;
+- découverte à partir d’une adresse, d’un code postal et d’une commune ;
+- point de géocodage conservé comme indice, jamais promu automatiquement en position du site ;
 - le code postal et la commune sont dérivés en mémoire de l’adresse afin d’améliorer la recherche Annuaire.
 
 ### Contacts publics — expérimental
@@ -67,11 +68,13 @@ Ces champs doivent pointer vers des colonnes de données modifiables.
 - `RaisonSociale` → **Raison sociale** ;
 - `Latitude` → **Latitude** ;
 - `Longitude` → **Longitude** ;
+- `PositionSource` → **Source de la position** ;
+- `PositionProof` → **Preuves de la position** (JSON avec SIRET, niveau, source et chaîne de preuves) ;
 - `Telephone` → **Téléphone** ;
 - `Courriel` → **Courriel** ;
 - `SiteWeb` → **Site web**.
 
-Latitude et Longitude sont fortement recommandées : l’assistant les remplit lors du géocodage et elles alimentent directement le widget carte des structures de stage.
+Latitude et Longitude alimentent la carte. Elles sont proposées ensemble uniquement lorsqu’un point de lieu est démontré pour le SIRET retenu. Mapper aussi Source de la position et Preuves de la position permet de conserver la provenance dans Grist ; elle reste consultable dans le bloc candidat pendant l’analyse.
 
 Téléphone, Courriel et Site web sont utilisés uniquement par la fonction expérimentale **Contacts publics** ; ils ne font pas partie de l’enrichissement stable effectué par **Analyser / compléter**.
 
@@ -93,14 +96,19 @@ Le bouton de création manuelle prépare une nouvelle ligne dans Grist ; la sais
 
 L’onglet **Compléter la sélection** montre l’état du nom usuel, du SIREN/SIRET, de la raison sociale, de l’adresse et des coordonnées carte.
 
-Le bouton **Analyser / compléter** :
+Le bouton **Analyser / compléter** résout d’abord l’identité, puis recherche une position de site pour cet établissement. Un seul bloc rassemble nom public, raison sociale, SIRET, adresse, coordonnées éventuelles et sources/preuves. Les verdicts d’identité restent `MATCH_VERIFIED`, `MATCH_PROBABLE`, `AMBIGUOUS`, `NO_MATCH` ou `INCOMPLETE` ; une absence de preuve de position ne dégrade pas une identité confirmée.
 
-1. géocode l’adresse existante si elle existe ;
-2. utilise le SIREN/SIRET lorsqu’il est connu, sinon le nom usuel enrichi du code postal/commune dérivés de l’adresse ;
-3. propose les établissements et les adresses possibles ;
-4. construit un aperçu des modifications ;
-5. coche par défaut uniquement les champs actuellement vides ;
-6. exige une validation explicite pour remplacer une valeur déjà présente.
+`establishment-service.js` compose le résolveur d’identité existant avec `establishment-position.js`. Le contrôleur `establishment-enrichment-ui.js` est l’unique propriétaire du bouton d’analyse et des propositions. `app.js` conserve la recherche, l’ajout et le diagnostic de la fiche.
+
+Les sources de position sont les shards publics ATP/Overture du code postal (sans utiliser le classement des contacts), puis, si aucune position n’est démontrée, une seule requête OSM sur `ref:FR:SIRET` exact. La recherche nationale par identifiant évite de joindre un voisin par proximité. Les index actuellement publiés contiennent un sous-ensemble des lieux avec contacts ; un code postal absent ou un lieu non indexé conduit à l’abstention.
+
+Une position est admissible par **SIRET explicite revalidé** (`SITE_CONFIRMED`), sans contradiction de nom public/adresse, ou par **nom propre du lieu exactement égal à un nom public attesté pour ce SIRET et adresse de site concordante** (`SITE_CORROBORATED`). L’attestation provient des enseignes Annuaire ou d’un lien publié revalidé. Commune, code postal, tokens de voie, numéro et répétition doivent concorder ; une voie sans numéro est admise uniquement si les deux sources n’en indiquent aucun. Une marque ou un opérateur partagé par un autre équipement ne remplace pas le nom propre du lieu. Aucun rapprochement par distance, score flou ou score de confiance d’existence Overture ne constitue une preuve de liaison.
+
+Les coordonnées Annuaire et IGN sont conservées comme preuves de référence/découverte, sans devenir la position finale. Deux points de lieux admissibles distants de plus de **75 m** déclenchent `CONFLICT` et l’abstention : ce seuil borne le désaccord entre observations déjà rattachées, il ne sert jamais à associer un POI à un SIRET. Parmi les observations cohérentes, le SIRET explicite prime, puis ATP, OSM, Overture ; les coordonnées ne sont jamais moyennées. Le niveau concerne la liaison au site, sans annoncer une exactitude topographique garantie.
+
+L’identité dispose de **12 s** ; les index de position de **10 s**, puis OSM de **1,5 s** au maximum. Le manifest est préchargé pendant l’examen de la fiche et réutilisé au plus cinq minutes. Un index lent ne fait pas perdre les observations déjà chargées. OSM n’est pas lancé après une position indexée admissible. Le contrôleur borne l’ensemble à **24 s**, annule les requêtes sur changement de sélection et ignore les anciennes réponses.
+
+Les champs juridiques probables restent décochés. Une position s’applique en une paire latitude/longitude et exige le SIRET correspondant dans la fiche ou dans la même action Grist. Les sources/preuves sont écrites dans les mappings facultatifs avec cette paire. L’application relit la fiche et refuse une sélection devenue obsolète. Un résultat Annuaire ajouté depuis la recherche n’insère plus ses coordonnées administratives ; l’analyse de la fiche établit ensuite la position réelle.
 
 Les colonnes formule ne sont jamais écrites. Une proposition vers un champ non mappé ou non modifiable est affichée mais désactivée.
 

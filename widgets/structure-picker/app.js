@@ -9,7 +9,6 @@ import {
 } from "./search.js";
 import {
   addCandidateSafely,
-  applyEnrichmentChanges,
   configurationMessage,
   configurationWarning,
   fetchFullSnapshot,
@@ -20,14 +19,7 @@ import {
   watchSelection,
   watchTable,
 } from "./grist.js";
-import { geocodeAddress } from "./geocode.js";
-import {
-  buildEnrichmentProposals,
-  diagnoseRow,
-  selectedChanges,
-} from "./enrichment.js";
-import { resolveIdentityForEnrichment } from "./identity-service.js";
-import { IDENTITY_STATES } from "./identity-resolution.js";
+import { diagnoseRow } from "./enrichment.js";
 import {
   formatDepartmentCodes,
   formatDepartmentScope,
@@ -55,12 +47,7 @@ const ui = {
   externalScopeHelp: document.getElementById("external-scope-help"),
   localCount: document.getElementById("local-count"),
   externalCount: document.getElementById("external-count"),
-  enrichButton: document.getElementById("enrich-button"),
   selectedSummary: document.getElementById("selected-summary"),
-  enrichStatus: document.getElementById("enrich-status"),
-  enterpriseChoices: document.getElementById("enterprise-choices"),
-  geocodeChoices: document.getElementById("geocode-choices"),
-  proposalPanel: document.getElementById("proposal-panel"),
 };
 
 const state = {
@@ -74,13 +61,6 @@ const state = {
   lastExternalRequestAt: 0,
   backoffUntil: 0,
   selectedRowId: null,
-  enrichmentGeneration: 0,
-  enrichmentController: null,
-  enterpriseCandidates: [],
-  geocodeCandidates: [],
-  selectedEnterprise: null,
-  selectedGeocode: null,
-  proposals: [],
 };
 
 function clearNode(node) {
@@ -96,7 +76,7 @@ function emptyMessage(message) {
 
 function setStatus(node, message = "", type = "") {
   node.textContent = message;
-  node.className = node === ui.externalStatus || node === ui.enrichStatus ? "substatus" : "status";
+  node.className = node === ui.externalStatus ? "substatus" : "status";
   if (type) node.classList.add(type);
 }
 
@@ -411,25 +391,9 @@ function healthItem(label, value, ok) {
   return item;
 }
 
-function clearEnrichment() {
-  state.enrichmentGeneration += 1;
-  state.enrichmentController?.abort();
-  state.enrichmentController = null;
-  state.enterpriseCandidates = [];
-  state.geocodeCandidates = [];
-  state.selectedEnterprise = null;
-  state.selectedGeocode = null;
-  state.proposals = [];
-  clearNode(ui.enterpriseChoices);
-  clearNode(ui.geocodeChoices);
-  clearNode(ui.proposalPanel);
-  setStatus(ui.enrichStatus, "");
-}
-
 function renderSelectedSummary() {
   clearNode(ui.selectedSummary);
   const row = selectedRow();
-  ui.enrichButton.disabled = !(state.configured && row && (row.NomCommercial || row.SirenSiret || row.Adresse));
 
   if (state.selectedRowId === "new") {
     ui.selectedSummary.append(emptyMessage("Nouvelle ligne sélectionnée : saisis d'abord les informations de base dans Grist."));
@@ -464,229 +428,6 @@ function renderSelectedSummary() {
   ui.selectedSummary.appendChild(grid);
 }
 
-function makeChoiceBlock(titleText, items, selectedItem, type) {
-  const fragment = document.createDocumentFragment();
-  const title = document.createElement("h3");
-  title.textContent = titleText;
-  fragment.appendChild(title);
-  const list = document.createElement("div");
-  list.className = "choice-list";
-
-  items.forEach((item, index) => {
-    const label = document.createElement("label");
-    label.className = "choice-card";
-    const radio = document.createElement("input");
-    radio.type = "radio";
-    radio.name = `${type}-choice`;
-    radio.value = String(index);
-    radio.checked = item === selectedItem;
-    radio.addEventListener("change", () => {
-      if (type === "enterprise") state.selectedEnterprise = item;
-      else state.selectedGeocode = item;
-      renderProposalPanel();
-    });
-
-    const content = document.createElement("div");
-    const name = document.createElement("div");
-    name.className = "choice-name";
-    if (type === "enterprise") {
-      name.textContent = item.nomCommercial || item.raisonSociale || "Établissement";
-      const detail = document.createElement("div");
-      detail.className = "choice-detail";
-      detail.textContent = [item.raisonSociale, item.adresse, item.siret ? `SIRET ${item.siret}` : ""].filter(Boolean).join(" — ");
-      content.append(name, detail);
-    } else {
-      name.textContent = item.adresse;
-      const detail = document.createElement("div");
-      detail.className = "choice-detail";
-      const score = Number.isFinite(item.score) ? `score ${item.score.toFixed(2)}` : "";
-      detail.textContent = [`${item.latitude}, ${item.longitude}`, score].filter(Boolean).join(" — ");
-      content.append(name, detail);
-    }
-    label.append(radio, content);
-    list.appendChild(label);
-  });
-  fragment.appendChild(list);
-  return fragment;
-}
-
-function renderEnrichmentChoices() {
-  clearNode(ui.enterpriseChoices);
-  clearNode(ui.geocodeChoices);
-  if (state.enterpriseCandidates.length) {
-    ui.enterpriseChoices.appendChild(makeChoiceBlock("Identité officielle — Annuaire des Entreprises", state.enterpriseCandidates, state.selectedEnterprise, "enterprise"));
-  }
-  if (state.geocodeCandidates.length) {
-    ui.geocodeChoices.appendChild(makeChoiceBlock("Localisation — Géocodage IGN", state.geocodeCandidates, state.selectedGeocode, "geocode"));
-  }
-}
-
-function updateApplyButton() {
-  const button = ui.proposalPanel.querySelector("#apply-proposals");
-  if (!button) return;
-  button.disabled = !ui.proposalPanel.querySelector("input[data-proposal-field]:checked:not(:disabled)");
-}
-
-function renderProposalPanel() {
-  clearNode(ui.proposalPanel);
-  const row = selectedRow();
-  if (!row) return;
-  state.proposals = buildEnrichmentProposals(row, state.selectedEnterprise, state.selectedGeocode);
-  if (!state.proposals.length) {
-    ui.proposalPanel.append(emptyMessage("Aucune modification supplémentaire à proposer avec les choix actuels."));
-    return;
-  }
-
-  const title = document.createElement("h3");
-  title.textContent = "Modifications proposées";
-  ui.proposalPanel.appendChild(title);
-  const help = document.createElement("div");
-  help.className = "help";
-  help.textContent = "Les champs vides sont cochés par défaut. Remplacer une valeur existante exige une validation explicite.";
-  ui.proposalPanel.appendChild(help);
-
-  const list = document.createElement("div");
-  list.className = "proposal-list";
-  for (const item of state.proposals) {
-    const mapped = state.snapshot?.resolvedMappings?.[item.field];
-    const writable = state.snapshot?.writableMappings?.[item.field];
-    const rowNode = document.createElement("label");
-    rowNode.className = "proposal-row";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.dataset.proposalField = item.field;
-    checkbox.checked = Boolean(item.selectedByDefault && writable);
-    checkbox.disabled = !writable;
-    checkbox.addEventListener("change", updateApplyButton);
-
-    const label = document.createElement("div");
-    label.className = "proposal-label";
-    label.textContent = item.label;
-    if (!mapped) label.textContent += " — non mappé";
-    else if (!writable) label.textContent += " — non modifiable";
-
-    const values = document.createElement("div");
-    values.className = "proposal-values";
-    const current = document.createElement("div");
-    current.className = "proposal-current";
-    current.textContent = `Actuel : ${item.current === undefined || item.current === null || item.current === "" ? "—" : item.current}`;
-    const proposed = document.createElement("div");
-    proposed.className = "proposal-new";
-    proposed.textContent = `Proposé : ${item.proposed}`;
-    const source = document.createElement("div");
-    source.className = "proposal-source";
-    source.textContent = item.source;
-    values.append(current, proposed, source);
-    rowNode.append(checkbox, label, values);
-    list.appendChild(rowNode);
-  }
-  ui.proposalPanel.appendChild(list);
-
-  const actions = document.createElement("div");
-  actions.className = "proposal-actions";
-  const apply = document.createElement("button");
-  apply.id = "apply-proposals";
-  apply.type = "button";
-  apply.className = "button button-primary";
-  apply.textContent = "Appliquer les modifications cochées";
-  apply.addEventListener("click", applySelectedProposals);
-  actions.appendChild(apply);
-  ui.proposalPanel.appendChild(actions);
-  updateApplyButton();
-}
-
-function enrichmentStatusMessage(result, row) {
-  const decision = result?.decision;
-  if (!decision) return "Analyse terminée sans verdict d’identité.";
-  const locationMessage = state.geocodeCandidates.length
-    ? " Vérifie séparément la proposition de localisation avant de remplacer l’adresse."
-    : row.Adresse ? " Aucune proposition de géocodage n’a été trouvée." : "";
-  const diagnostic = result?.diagnostics?.length ? ` ${result.diagnostics[0]}` : "";
-
-  switch (decision.status) {
-    case IDENTITY_STATES.MATCH_VERIFIED:
-      return `Identité confirmée par les preuves. ${decision.reason || ""}${locationMessage}`.trim();
-    case IDENTITY_STATES.MATCH_PROBABLE:
-      return `Un établissement probable a été trouvé mais son SIRET n’est pas présélectionné. ${decision.reason || ""}${locationMessage}`.trim();
-    case IDENTITY_STATES.AMBIGUOUS:
-      return `Plusieurs établissements restent plausibles ; aucune identité n’est présélectionnée. ${decision.reason || ""}${locationMessage}`.trim();
-    case IDENTITY_STATES.INCOMPLETE:
-      return `Analyse incomplète : ${decision.reason || "une preuve nécessaire manque."}${diagnostic}${locationMessage}`.trim();
-    case IDENTITY_STATES.NO_MATCH:
-    default:
-      return `${decision.reason || "Aucune identité juridique suffisamment étayée n’a été trouvée."}${locationMessage}`.trim();
-  }
-}
-
-async function runEnrichment() {
-  const row = selectedRow();
-  if (!state.configured || !row) return;
-  clearEnrichment();
-  const generation = ++state.enrichmentGeneration;
-  state.enrichmentController = new AbortController();
-  const signal = state.enrichmentController.signal;
-  ui.enrichButton.disabled = true;
-  setStatus(ui.enrichStatus, "Analyse de l’identité et du site sélectionné…");
-
-  try {
-    const result = await resolveIdentityForEnrichment({
-      row,
-      signal,
-      geocode: geocodeAddress,
-    });
-    if (generation !== state.enrichmentGeneration) return;
-
-    state.geocodeCandidates = Array.isArray(result?.geocodeCandidates) ? result.geocodeCandidates : [];
-    state.selectedGeocode = result?.selectedGeocode ?? state.geocodeCandidates[0] ?? null;
-    state.enterpriseCandidates = Array.isArray(result?.displayCandidates) ? result.displayCandidates : [];
-    state.selectedEnterprise = result?.decision?.status === IDENTITY_STATES.MATCH_VERIFIED
-      ? result.decision.candidate
-      : null;
-
-    renderEnrichmentChoices();
-    renderProposalPanel();
-    setStatus(
-      ui.enrichStatus,
-      enrichmentStatusMessage(result, row),
-      result?.decision?.status === IDENTITY_STATES.MATCH_VERIFIED ? "success" : result?.decision?.status === IDENTITY_STATES.INCOMPLETE ? "error" : "",
-    );
-  } catch (error) {
-    if (error?.name === "AbortError") return;
-    console.error(error);
-    setStatus(ui.enrichStatus, error.message || "Impossible d'analyser cette structure.", "error");
-  } finally {
-    if (generation === state.enrichmentGeneration) ui.enrichButton.disabled = !selectedRow();
-  }
-}
-
-async function applySelectedProposals() {
-  const row = selectedRow();
-  if (!row) return;
-  const selectedFields = new Set(
-    [...ui.proposalPanel.querySelectorAll("input[data-proposal-field]:checked:not(:disabled)")].map(input => input.dataset.proposalField),
-  );
-  const changes = selectedChanges(state.proposals, selectedFields);
-  if (!Object.keys(changes).length) return;
-
-  const button = ui.proposalPanel.querySelector("#apply-proposals");
-  if (button) button.disabled = true;
-  setStatus(ui.enrichStatus, "Mise à jour de la structure dans Grist…");
-  try {
-    const result = await applyEnrichmentChanges(row.id, changes, state.mappings);
-    state.snapshot = result.snapshot;
-    const skippedMessage = result.skipped.length ? ` Champs ignorés : ${result.skipped.join(", ")}.` : "";
-    setStatus(ui.enrichStatus, `Structure mise à jour.${skippedMessage}`, "success");
-    renderSelectedSummary();
-    scheduleSearch();
-    state.proposals = [];
-    clearNode(ui.proposalPanel);
-  } catch (error) {
-    console.error(error);
-    setStatus(ui.enrichStatus, error.message || "Impossible de mettre à jour la structure.", "error");
-    updateApplyButton();
-  }
-}
-
 async function refreshFullTable(mappings) {
   state.mappings = mappings ?? state.mappings ?? {};
   const generation = ++state.refreshGeneration;
@@ -716,9 +457,7 @@ async function refreshFullTable(mappings) {
 
 function selectionChanged(rowId, mappings) {
   if (mappings && Object.keys(mappings).length) state.mappings = mappings;
-  const changed = String(rowId) !== String(state.selectedRowId);
   state.selectedRowId = rowId;
-  if (changed) clearEnrichment();
   renderSelectedSummary();
 }
 
@@ -728,7 +467,6 @@ function updateDepartmentScope() {
 }
 
 ui.search.addEventListener("input", scheduleSearch);
-ui.enrichButton.addEventListener("click", runEnrichment);
 ui.manualCreate.addEventListener("click", async () => {
   try {
     await prepareManualRow();

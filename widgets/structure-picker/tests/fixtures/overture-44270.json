@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "source": "overture",
+  "department": "44",
+  "postcode": "44270",
+  "generatedAt": "2026-09-14T15:54:51Z",
+  "upstream": {
+    "project": "Overture Maps",
+    "release": "2026-08-19.0",
+    "schemaVersion": null
+  },
+  "recordCount": 2,
+  "records": [
+    {
+      "recordId": "a22f6566-ef76-4fcd-a8c3-4c9b401357c5",
+      "name": "O Pre d'Vous",
+      "siret": "",
+      "address": "24 Rue des Fosses, 44270 La Marne",
+      "postcode": "44270",
+      "city": "La Marne",
+      "latitude": 46.99756389,
+      "longitude": -1.7365524,
+      "telephone": "+33240325431",
+      "courriel": "opredvous@gmail.com",
+      "siteWeb": "",
+      "telephones": [
+        "+33240325431"
+      ],
+      "courriels": [
+        "opredvous@gmail.com"
+      ],
+      "sitesWeb": [],
+      "confidence": 0.47939378023147583,
+      "datasets": [
+        "meta",
+        "Overture"
+      ],
+      "hasAllThePlacesLineage": false
+    },
+    {
+      "recordId": "dd01bb16-803f-4a74-bb8f-738051c4c415",
+      "name": "Super U Machecoul",
+      "siret": "",
+      "address": "Boulevard des Prises, Espace commercial, 44270 Machecoul-Saint-Même",
+      "postcode": "44270",
+      "city": "Machecoul-Saint-Même",
+      "latitude": 46.99808,
+      "longitude": -1.815576,
+      "telephone": "+33240023775",
+      "courriel": "superu.machecoul@systeme-u.fr",
+      "siteWeb": "https://www.instagram.com/superumachecoulsaintmeme/",
+      "telephones": [
+        "+33240023775"
+      ],
+      "courriels": [
+        "superu.machecoul@systeme-u.fr"
+      ],
+      "sitesWeb": [
+        "https://www.instagram.com/superumachecoulsaintmeme/"
+      ],
+      "confidence": 0.9959889322519302,
+      "datasets": [
+        "meta",
+        "Overture"
+      ],
+      "hasAllThePlacesLineage": false
+    }
+  ]
+}

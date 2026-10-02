@@ -1,5 +1,6 @@
 import { extractLocationFromAddress, identifierParts, normalize } from "./search.js";
 import { IDENTITY_STATES, usableCoordinates } from "./identity-resolution.js";
+import { POSITION_STATES } from "./establishment-position.js";
 
 const FIELD_LABELS = {
   NomCommercial: "Nom usuel",
@@ -8,6 +9,7 @@ const FIELD_LABELS = {
   RaisonSociale: "Raison sociale",
   Latitude: "Latitude",
   Longitude: "Longitude",
+  Coordinates: "Position du site (latitude / longitude)",
   Telephone: "Téléphone",
   Courriel: "Courriel",
   SiteWeb: "Site web",
@@ -75,7 +77,7 @@ function proposal(field, current, proposed, source, { selectedByDefault = !hasVa
   };
 }
 
-export function buildEnrichmentProposals(row, enterpriseCandidate = null, geocodeCandidate = null, { identityStatus = "" } = {}) {
+export function buildEnrichmentProposals(row, enterpriseCandidate = null, { identityStatus = enterpriseCandidate?.identityStatus ?? "" } = {}) {
   const proposals = [];
   const add = item => { if (item) proposals.push(item); };
   const identityVerified = !identityStatus || identityStatus === IDENTITY_STATES.MATCH_VERIFIED;
@@ -94,23 +96,33 @@ export function buildEnrichmentProposals(row, enterpriseCandidate = null, geocod
     }));
   }
 
-  const addressSource = geocodeCandidate || enterpriseCandidate;
+  const addressSource = enterpriseCandidate;
   if (addressSource) {
-    add(proposal("Adresse", row.Adresse, addressSource.adresse, geocodeCandidate ? "Géocodage IGN" : "Annuaire des Entreprises", {
+    add(proposal("Adresse", row.Adresse, addressSource.adresse, "Annuaire des Entreprises", {
       selectedByDefault: !hasValue(row.Adresse),
     }));
   }
 
-  const coordinateSource = geocodeCandidate || enterpriseCandidate;
-  if (coordinateSource) {
-    const source = geocodeCandidate ? "Géocodage IGN" : "Annuaire des Entreprises";
+  const position = enterpriseCandidate?.position;
+  if (position?.siret === enterpriseCandidate?.siret
+    && [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(position?.status)
+    && usableCoordinates(position.latitude, position.longitude)
+    && (!numericEqual(row.Latitude, position.latitude) || !numericEqual(row.Longitude, position.longitude))) {
     const currentCoordinates = usableCoordinates(row.Latitude, row.Longitude);
-    add(proposal("Latitude", row.Latitude, coordinateSource.latitude, source, {
-      selectedByDefault: !currentCoordinates,
-    }));
-    add(proposal("Longitude", row.Longitude, coordinateSource.longitude, source, {
-      selectedByDefault: !currentCoordinates,
-    }));
+    const source = `${position.source.label} — ${position.reason}`;
+    add({
+      field: "Coordinates", fields: ["Latitude", "Longitude"], label: FIELD_LABELS.Coordinates,
+      current: currentCoordinates ? `${row.Latitude}, ${row.Longitude}` : "—",
+      proposed: `${position.latitude}, ${position.longitude}`, source,
+      changes: {
+        Latitude: position.latitude, Longitude: position.longitude,
+        PositionSource: `${position.source.label} (${position.source.recordId}) ${position.source.url}`,
+        PositionProof: JSON.stringify({ siret: position.siret, status: position.status, source: position.source, proof: position.proof }),
+      },
+      requiresSiret: position.siret, currentSiret: identifierParts(row.SirenSiret).siret,
+      selectedByDefault: identityVerified && !currentCoordinates,
+      replacesExisting: Boolean(currentCoordinates),
+    });
   }
 
   return proposals;
@@ -120,7 +132,13 @@ export function selectedChanges(proposals, selectedFields) {
   const selected = selectedFields instanceof Set ? selectedFields : new Set(selectedFields ?? []);
   const changes = {};
   for (const item of proposals ?? []) {
-    if (selected.has(item.field)) changes[item.field] = item.proposed;
+    if (selected.has(item.field) && !item.requiresSiret) changes[item.field] = item.proposed;
+  }
+  for (const item of proposals ?? []) {
+    if (selected.has(item.field) && item.requiresSiret
+      && identifierParts(changes.SirenSiret ?? item.currentSiret).siret === item.requiresSiret) {
+      Object.assign(changes, item.changes);
+    }
   }
   return changes;
 }

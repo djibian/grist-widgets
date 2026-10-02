@@ -12,7 +12,7 @@ const search = await readFile(new URL("../search.js", import.meta.url), "utf8");
 
 test("charge la configuration des départements avant l'application", () => {
   const settings = html.indexOf("departments-config.js?v=1.0.0");
-  const appScript = html.indexOf("app.js?v=1.3.1");
+  const appScript = html.indexOf('src="app.js?v=');
   assert.ok(settings >= 0 && settings < appScript);
 });
 

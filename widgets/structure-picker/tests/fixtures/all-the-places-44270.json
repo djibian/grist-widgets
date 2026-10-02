@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "source": "all-the-places",
+  "department": "44",
+  "postcode": "44270",
+  "generatedAt": "2026-09-14T15:54:51Z",
+  "upstream": {
+    "project": "All The Places",
+    "runId": "2026-09-05-13-32-25"
+  },
+  "recordCount": 1,
+  "records": [
+    {
+      "recordId": "LP0qFcWcqUu7rCwK-946_TrZLfc=",
+      "name": "VIVAL LA MARNE #79807 LA MARNE ,",
+      "siret": "",
+      "address": "24 RUE DES FOSSES, 44270 LA MARNE",
+      "postcode": "44270",
+      "city": "LA MARNE",
+      "latitude": 46.99754345,
+      "longitude": -1.73667682,
+      "spider": "little_free_library",
+      "ref": "79807",
+      "sourceUri": "https://appapi.littlefreelibrary.org/library/map.json?page_size=500&page=18",
+      "telephone": "",
+      "courriel": "",
+      "siteWeb": "https://map.littlefreelibrary.org/79807"
+    }
+  ]
+}

@@ -2,29 +2,30 @@ import { applyEnrichmentChanges, fetchFullSnapshot, findRowById, watchSelection,
 import { geocodeAddress } from "./geocode.js";
 import { buildEnrichmentProposals, selectedChanges } from "./enrichment.js";
 import { fetchOfficialRequest } from "./enterprise-client.js";
-import { IDENTITY_BUDGET, resolveStructureIdentity } from "./identity-orchestrator.js";
-import { resolveIdentityForEnrichment } from "./identity-service.js";
+import { resolveStructureIdentity } from "./identity-orchestrator.js";
+import { ESTABLISHMENT_BUDGET, resolveEstablishmentForEnrichment } from "./establishment-service.js";
 import { IDENTITY_STATES, decisionEvidence } from "./identity-resolution.js";
 import { findOsmIdentityPois } from "./osm-identity.js";
+import { POSITION_STATES } from "./establishment-position.js";
+import { warmSitePositionManifest } from "./site-position-sources.js";
 
 const ui = {
   enrichButton: document.getElementById("enrich-button"),
   enrichStatus: document.getElementById("enrich-status"),
-  enterpriseChoices: document.getElementById("enterprise-choices"),
-  geocodeChoices: document.getElementById("geocode-choices"),
+  candidate: document.getElementById("establishment-candidate"),
   proposalPanel: document.getElementById("proposal-panel"),
 };
 
 const state = {
   mappings: {},
   snapshot: null,
+  snapshotGeneration: 0,
   selectedRowId: null,
   generation: 0,
   controller: null,
   decision: null,
-  enterpriseCandidate: null,
-  geocodeCandidates: [],
-  selectedGeocode: null,
+  candidate: null,
+  analyzedRow: null,
   proposals: [],
 };
 
@@ -51,25 +52,36 @@ function selectedRow() {
   return findRowById(state.snapshot, state.selectedRowId);
 }
 
+function canAnalyze() {
+  const row = selectedRow();
+  return row && !(state.snapshot?.missing?.length || state.snapshot?.nonWritableRequired?.length)
+    && (row.NomCommercial || row.SirenSiret || row.Adresse);
+}
+
 function resetAnalysis() {
   state.generation += 1;
   state.controller?.abort();
   state.controller = null;
   state.decision = null;
-  state.enterpriseCandidate = null;
-  state.geocodeCandidates = [];
-  state.selectedGeocode = null;
+  state.candidate = null;
+  state.analyzedRow = null;
   state.proposals = [];
-  clearNode(ui.enterpriseChoices);
-  clearNode(ui.geocodeChoices);
+  if (ui.enrichButton) ui.enrichButton.disabled = true;
+  clearNode(ui.candidate);
   clearNode(ui.proposalPanel);
   setStatus("");
 }
 
 async function refreshSnapshot(mappings = state.mappings) {
   state.mappings = mappings ?? state.mappings ?? {};
+  const generation = ++state.snapshotGeneration;
   try {
-    state.snapshot = await fetchFullSnapshot(state.mappings);
+    const snapshot = await fetchFullSnapshot(state.mappings);
+    if (generation === state.snapshotGeneration) {
+      state.snapshot = snapshot;
+      if (ui.enrichButton) ui.enrichButton.disabled = Boolean(state.controller) || !canAnalyze();
+      if (canAnalyze()) warmSitePositionManifest().catch(() => {});
+    }
   } catch (error) {
     console.warn("Identity resolver snapshot unavailable", error);
   }
@@ -83,112 +95,106 @@ function decisionLabel(status) {
   return "Aucune identité démontrée";
 }
 
-function candidateCard(candidate, { selected = false, selectable = false } = {}) {
-  const card = document.createElement(selectable ? "label" : "div");
-  card.className = "choice-card";
-  if (selectable) {
-    const radio = document.createElement("input");
-    radio.type = "radio";
-    radio.name = "identity-resolution-candidate";
-    radio.checked = selected;
-    radio.addEventListener("change", () => {
-      state.enterpriseCandidate = candidate;
-      renderProposalPanel();
-    });
-    card.appendChild(radio);
-  }
-
+function candidateCard(candidate) {
+  const card = document.createElement("div");
+  card.className = "choice-card establishment-card";
   const content = document.createElement("div");
   const name = document.createElement("div");
   name.className = "choice-name";
-  name.textContent = candidate?.nomCommercial || candidate?.raisonSociale || "Établissement";
-  content.appendChild(name);
+  name.textContent = candidate.nomCommercial || candidate.raisonSociale || "Établissement";
+  const legal = document.createElement("div");
+  legal.className = "choice-detail";
+  legal.textContent = `${candidate.raisonSociale || ""} — SIRET ${candidate.siret}`;
+  const address = document.createElement("div");
+  address.className = "choice-detail";
+  address.textContent = candidate.adresse;
+  content.append(name, legal, address);
 
-  const detail = document.createElement("div");
-  detail.className = "choice-detail";
-  detail.textContent = [
-    candidate?.raisonSociale,
-    candidate?.adresse,
-    candidate?.siret ? `SIRET ${candidate.siret}` : "",
-  ].filter(Boolean).join(" — ");
-  content.appendChild(detail);
+  const position = document.createElement("div");
+  position.className = "choice-detail";
+  const point = candidate.position;
+  const located = [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(point?.status);
+  position.textContent = located
+    ? `${point.latitude}, ${point.longitude} — Position : ${point.source.label}, ${point.status === POSITION_STATES.SITE_CONFIRMED ? "SIRET explicite" : "nom public attesté + adresse de site concordante"}`
+    : `Position : ${point?.reason || "position précise non démontrée"}`;
+  content.appendChild(position);
 
-  const evidence = decisionEvidence(state.decision, candidate).slice(0, 3);
-  if (evidence.length) {
-    const proof = document.createElement("div");
-    proof.className = "choice-detail";
-    proof.textContent = `Preuves : ${evidence.join(" · ")}`;
-    content.appendChild(proof);
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "Sources et preuves";
+  details.appendChild(summary);
+  const identity = document.createElement("div");
+  identity.className = "choice-detail";
+  identity.textContent = `Identité : ${decisionEvidence(state.decision, candidate).join(" · ")}`;
+  details.appendChild(identity);
+  const sources = [
+    { label: "Annuaire des Entreprises", recordId: candidate.siret, url: `https://annuaire-entreprises.data.gouv.fr/etablissement/${candidate.siret}` },
+    ...(candidate.identityLinks ?? []).map(link => ({ label: link.sourceLabel, recordId: link.sourceRecordId, url: link.sourceUrl, publishedAt: link.sourcePublishedAt, historical: link.historical })),
+    ...(point?.proof ?? []).map(item => item.source),
+    ...((point?.evidence ?? []).filter(item => item.accepted).map(item => item.observation.source)),
+  ];
+  const seen = new Set();
+  for (const source of sources) {
+    const key = `${source.url || ""}:${source.recordId || ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const line = document.createElement("div");
+    line.className = "choice-detail";
+    const link = document.createElement(/^https?:\/\//.test(source.url || "") ? "a" : "span");
+    link.textContent = [source.label, source.recordId, source.upstream?.release || source.upstream?.runId, source.publishedAt || source.generatedAt, source.historical ? "référence historique revalidée" : ""].filter(Boolean).join(" — ");
+    if (/^https?:\/\//.test(source.url || "")) { link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer"; }
+    line.appendChild(link);
+    details.appendChild(line);
   }
+  for (const proof of point?.proof ?? []) {
+    const line = document.createElement("div");
+    line.className = "choice-detail";
+    line.textContent = proof.description;
+    details.appendChild(line);
+  }
+  if (point?.evidence?.some(item => item.kind === "discovery")) {
+    const line = document.createElement("div");
+    line.className = "choice-detail";
+    line.textContent = "Le géocodage IGN a servi à la découverte et ne constitue pas une preuve de position du site.";
+    details.appendChild(line);
+  }
+  if (point?.coverage?.some(item => ["error", "timeout", "not-indexed"].includes(item.status))) {
+    const line = document.createElement("div");
+    line.className = "choice-detail";
+    line.textContent = "Certaines sources de position sont indisponibles ou ne couvrent pas ce code postal.";
+    details.appendChild(line);
+  }
+  content.appendChild(details);
   card.appendChild(content);
   return card;
 }
 
-function renderIdentityDecision() {
-  clearNode(ui.enterpriseChoices);
+function renderEstablishment() {
+  clearNode(ui.candidate);
   const decision = state.decision;
   if (!decision) return;
-
   const title = document.createElement("h3");
-  title.textContent = "Identité officielle — Annuaire des Entreprises";
-  ui.enterpriseChoices.appendChild(title);
-
+  title.textContent = "Établissement proposé";
   const summary = document.createElement("div");
   summary.className = "help";
   summary.textContent = `${decisionLabel(decision.status)} — ${decision.reason}`;
-  ui.enterpriseChoices.appendChild(summary);
-
-  if (decision.status === IDENTITY_STATES.MATCH_VERIFIED || decision.status === IDENTITY_STATES.MATCH_PROBABLE) {
-    if (decision.candidate) ui.enterpriseChoices.appendChild(candidateCard(decision.candidate, { selected: true, selectable: true }));
-    return;
-  }
-
-  const alternatives = decision.candidate ? [decision.candidate] : (decision.alternatives ?? []);
-  for (const candidate of alternatives.slice(0, 2)) {
-    ui.enterpriseChoices.appendChild(candidateCard(candidate));
-  }
-}
-
-function renderGeocodeChoices() {
-  clearNode(ui.geocodeChoices);
-  if (!state.geocodeCandidates.length) return;
-  const title = document.createElement("h3");
-  title.textContent = "Localisation — Géocodage IGN";
-  ui.geocodeChoices.appendChild(title);
-  const list = document.createElement("div");
-  list.className = "choice-list";
-
-  state.geocodeCandidates.forEach((item, index) => {
-    const label = document.createElement("label");
-    label.className = "choice-card";
-    const radio = document.createElement("input");
-    radio.type = "radio";
-    radio.name = "identity-geocode-choice";
-    radio.value = String(index);
-    radio.checked = item === state.selectedGeocode;
-    radio.addEventListener("change", () => {
-      state.selectedGeocode = item;
-      renderProposalPanel();
-    });
-    const content = document.createElement("div");
-    const name = document.createElement("div");
-    name.className = "choice-name";
-    name.textContent = item.adresse;
-    const detail = document.createElement("div");
-    detail.className = "choice-detail";
-    const score = Number.isFinite(item.score) ? `score ${item.score.toFixed(2)}` : "";
-    detail.textContent = [`${item.latitude}, ${item.longitude}`, score].filter(Boolean).join(" — ");
-    content.append(name, detail);
-    label.append(radio, content);
-    list.appendChild(label);
-  });
-  ui.geocodeChoices.appendChild(list);
+  ui.candidate.append(title, summary);
+  if (state.candidate) ui.candidate.appendChild(candidateCard(state.candidate));
+  else for (const candidate of (decision.alternatives ?? []).slice(0, 2)) ui.candidate.appendChild(candidateCard(candidate));
 }
 
 function updateApplyButton() {
   const button = ui.proposalPanel?.querySelector("#identity-apply-proposals");
   if (!button) return;
-  button.disabled = !ui.proposalPanel.querySelector("input[data-identity-proposal-field]:checked:not(:disabled)");
+  const inputs = [...ui.proposalPanel.querySelectorAll("input[data-identity-proposal-field]")];
+  const siretSelected = inputs.some(input => input.dataset.identityProposalField === "SirenSiret" && input.checked && !input.disabled);
+  const coordinateInput = inputs.find(input => input.dataset.identityProposalField === "Coordinates");
+  const coordinateProposal = state.proposals.find(item => item.field === "Coordinates");
+  if (coordinateInput) coordinateInput.disabled = coordinateInput.dataset.writable !== "true"
+    || !(siretSelected || coordinateProposal.currentSiret === coordinateProposal.requiresSiret);
+  button.disabled = !Object.keys(selectedChanges(state.proposals,
+    inputs.filter(input => input.checked && !input.disabled).map(input => input.dataset.identityProposalField),
+  )).length;
 }
 
 function renderProposalPanel() {
@@ -197,8 +203,7 @@ function renderProposalPanel() {
   if (!row) return;
   state.proposals = buildEnrichmentProposals(
     row,
-    state.enterpriseCandidate,
-    state.selectedGeocode,
+    state.candidate,
     { identityStatus: state.decision?.status ?? "" },
   );
   if (!state.proposals.length) {
@@ -219,13 +224,16 @@ function renderProposalPanel() {
   const list = document.createElement("div");
   list.className = "proposal-list";
   for (const item of state.proposals) {
-    const mapped = state.snapshot?.resolvedMappings?.[item.field];
-    const writable = state.snapshot?.writableMappings?.[item.field];
+    const fields = item.fields ?? [item.field];
+    const mapped = fields.every(field => state.snapshot?.resolvedMappings?.[field]);
+    const writable = fields.every(field => state.snapshot?.writableMappings?.[field])
+      && (!item.requiresSiret || item.currentSiret === item.requiresSiret || state.snapshot?.writableMappings?.SirenSiret);
     const rowNode = document.createElement("label");
     rowNode.className = "proposal-row";
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.dataset.identityProposalField = item.field;
+    checkbox.dataset.writable = String(Boolean(writable));
     checkbox.checked = Boolean(item.selectedByDefault && writable);
     checkbox.disabled = !writable;
     checkbox.addEventListener("change", updateApplyButton);
@@ -280,7 +288,9 @@ async function applySelectedProposals() {
   if (button) button.disabled = true;
   setStatus("Mise à jour de la structure dans Grist…");
   try {
-    const result = await applyEnrichmentChanges(row.id, changes, state.mappings);
+    const result = await applyEnrichmentChanges(row.id, changes, state.mappings, {
+      positionSiret: state.candidate?.siret, expectedRow: state.analyzedRow,
+    });
     state.snapshot = result.snapshot;
     const skippedMessage = result.skipped.length ? ` Champs ignorés : ${result.skipped.join(", ")}.` : "";
     setStatus(`Structure mise à jour.${skippedMessage}`, "success");
@@ -294,19 +304,19 @@ async function applySelectedProposals() {
 
 async function runIdentityAnalysis() {
   const row = selectedRow();
-  if (!row) return;
+  if (!row || !canAnalyze() || state.controller) return;
   resetAnalysis();
   const generation = ++state.generation;
   const controller = new AbortController();
   state.controller = controller;
   const timeout = setTimeout(() => {
     controller.abort(new DOMException("Le délai maximal de l’analyse a été atteint.", "TimeoutError"));
-  }, IDENTITY_BUDGET.deadlineMs);
+  }, ESTABLISHMENT_BUDGET.deadlineMs);
   ui.enrichButton.disabled = true;
-  setStatus("Analyse de l’identité de l’établissement…");
+  setStatus("Analyse de l’identité puis de la position du site…");
 
   try {
-    const result = await resolveIdentityForEnrichment({
+    const result = await resolveEstablishmentForEnrichment({
       row,
       signal: controller.signal,
       geocode: geocodeAddress,
@@ -316,14 +326,10 @@ async function runIdentityAnalysis() {
     if (generation !== state.generation) return;
 
     state.decision = result.decision;
-    state.geocodeCandidates = result.geocodeCandidates ?? [];
-    state.selectedGeocode = result.selectedGeocode ?? null;
-    state.enterpriseCandidate = [IDENTITY_STATES.MATCH_VERIFIED, IDENTITY_STATES.MATCH_PROBABLE].includes(result.decision?.status)
-      ? result.decision.candidate
-      : null;
+    state.candidate = result.candidate;
+    state.analyzedRow = Object.fromEntries(["NomCommercial", "RaisonSociale", "Adresse", "SirenSiret", "Latitude", "Longitude"].map(field => [field, row[field]]));
 
-    renderIdentityDecision();
-    renderGeocodeChoices();
+    renderEstablishment();
     renderProposalPanel();
 
     const diagnostics = (result.diagnostics ?? []).slice(0, 2);
@@ -331,8 +337,8 @@ async function runIdentityAnalysis() {
     setStatus(message || "Analyse terminée.", result.decision?.status === IDENTITY_STATES.INCOMPLETE ? "error" : "");
   } catch (error) {
     if (generation !== state.generation) return;
-    if (controller.signal.reason?.name === "TimeoutError") {
-      setStatus(controller.signal.reason.message, "error");
+    if (controller.signal.reason?.name === "TimeoutError" || error?.name === "TimeoutError") {
+      setStatus(controller.signal.reason?.message || error.message, "error");
       return;
     }
     if (error?.name === "AbortError") return;
@@ -340,15 +346,17 @@ async function runIdentityAnalysis() {
     setStatus(error.message || "Impossible d’analyser cette structure.", "error");
   } finally {
     clearTimeout(timeout);
-    if (generation === state.generation) ui.enrichButton.disabled = !selectedRow();
+    if (generation === state.generation) {
+      state.controller = null;
+      ui.enrichButton.disabled = !canAnalyze();
+    }
   }
 }
 
 ui.enrichButton?.addEventListener("click", event => {
   event.preventDefault();
-  event.stopImmediatePropagation();
   runIdentityAnalysis();
-}, { capture: true });
+});
 
 watchTable(mappings => refreshSnapshot(mappings));
 watchSelection((rowId, mappings) => {
