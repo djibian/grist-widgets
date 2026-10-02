@@ -1,9 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { buildGeocodeUrl, geocodeResultsFromPayload } from "../widgets/structure-picker/geocode.js";
 import { fetchOfficialRequest } from "../widgets/structure-picker/enterprise-client.js";
-import { resolveIdentityForEnrichment } from "../widgets/structure-picker/identity-service.js";
+import { resolveEstablishmentForEnrichment } from "../widgets/structure-picker/establishment-service.js";
+import { findIndexedSitePositions, findOsmSiretPositions, warmSitePositionManifest } from "../widgets/structure-picker/site-position-sources.js";
 import { matchPublishedIdentityLinks } from "../widgets/structure-picker/published-identity-links.js";
 import { buildOfficialIdentifierSearchRequest } from "../widgets/structure-picker/search.js";
+
+const manifestUrl = process.env.CONTACT_INDEX_MANIFEST_URL || "https://djibian.github.io/grist-widgets/widgets/structure-picker/contact-indexes/indexed-departments.json";
 
 const publishedPayload = JSON.parse(await readFile(
   new URL("../widgets/structure-picker/identity-links/published.json", import.meta.url),
@@ -129,13 +132,22 @@ function publishedLinksFor(row) {
   };
 }
 
+// Like the browser controller, warm the shared manifest before analysis.
+const manifestNetwork = [];
+try {
+  await warmSitePositionManifest({ manifestUrl, fetchImpl: (url, options) => recordingFetch(url, options, manifestNetwork) });
+} catch (error) {
+  capture.manifestError = error.message;
+}
+capture.manifestNetwork = manifestNetwork;
+
 for (const scenario of cases) {
   const network = [];
   let result = null;
   let error = null;
   const controller = new AbortController();
   try {
-    result = await resolveIdentityForEnrichment({
+    result = await resolveEstablishmentForEnrichment({
       row: scenario.row,
       signal: controller.signal,
       geocode: (address, options) => liveGeocode(address, options, network),
@@ -145,6 +157,8 @@ for (const scenario of cases) {
         fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network),
       }),
       findPublishedLinks: async ({ row }) => publishedLinksFor(row),
+      findIndexedPositions: options => findIndexedSitePositions({ ...options, manifestUrl, fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network) }),
+      findOsmPositions: options => findOsmSiretPositions({ ...options, fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network) }),
     });
   } catch (caught) {
     error = { name: caught?.name || "Error", message: caught?.message || String(caught) };
@@ -168,9 +182,9 @@ for (const scenario of cases) {
         explanations: item.explanations,
       })),
     } : null,
-    requests: result?.requests || [],
+    requests: network.map(request => ({ url: request.url, method: request.method, status: request.status })),
     diagnostics: result?.diagnostics || [],
-    links: (result?.links || []).map(link => ({
+    links: (result?.candidate?.identityLinks || []).map(link => ({
       source: link.source,
       sourceLabel: link.sourceLabel,
       sourceRecordId: link.sourceRecordId,
@@ -180,7 +194,8 @@ for (const scenario of cases) {
       adresse: link.adresse,
       verifiedOfficial: link.verifiedOfficial,
     })),
-    geocodeCandidates: result?.geocodeCandidates || [],
+    candidate: result?.candidate || null,
+    position: result?.candidate?.position || null,
     exactProbe,
     error,
     network,
@@ -195,6 +210,7 @@ for (const scenario of capture.cases) {
   if (scenario.links.length) {
     console.log(`  links: ${scenario.links.map(link => `${link.sourceLabel}:${link.siret}:${link.verifiedOfficial ? "verified" : "unverified"}`).join(" | ")}`);
   }
+  if (scenario.position) console.log(`  position: ${scenario.position.status} ${scenario.position.latitude ?? "—"}, ${scenario.position.longitude ?? "—"} (${scenario.position.source?.label || "abstention"})`);
   if (scenario.error) console.log(`  error: ${scenario.error.message}`);
   if (scenario.diagnostics?.length) console.log(`  diagnostics: ${scenario.diagnostics.join(" | ")}`);
   if (scenario.exactProbe) console.log(`  exact-probe: ${scenario.exactProbe.error || scenario.exactProbe.sirets?.join(",") || "no candidate"}`);

@@ -12,7 +12,7 @@ const requiredIds = [
   "search", "manual-create", "config-status", "table-counter", "table-count",
   "global-status", "local-results", "external-results", "external-status",
   "local-count", "external-count", "enrich-button", "selected-summary",
-  "enrich-status", "enterprise-choices", "geocode-choices", "proposal-panel",
+  "enrich-status", "establishment-candidate", "proposal-panel",
   "tab-search", "tab-enrich", "enrich-badge", "panel-search", "panel-enrich",
   "contact-experiment", "contact-search", "contact-current", "contact-status",
   "contact-results", "contact-apply",
@@ -120,4 +120,13 @@ test("applique la composition Grist Studio sans supprimer les composants métier
   assert.match(css, /\.enrich-work-grid/);
   assert.match(css, /\.result-card:hover/);
   assert.match(css, /\.proposal-row/);
+});
+
+
+test("one candidate controller owns identity and position, with no independent geocode choice", async () => {
+  const controller = await readFile(new URL("../establishment-enrichment-ui.js", import.meta.url), "utf8");
+  assert.match(html, /establishment-enrichment-ui\.js/);
+  assert.doesNotMatch(html, /geocode-choices|enterprise-choices|identity-enrichment-ui\.js/);
+  assert.doesNotMatch(app, /runEnrichment|selectedGeocode|makeChoiceBlock|enrichButton\.addEventListener/);
+  assert.doesNotMatch(controller, /renderGeocodeChoices|selectedGeocode|stopImmediatePropagation|capture: true/);
 });

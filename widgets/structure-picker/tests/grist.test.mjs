@@ -30,8 +30,14 @@ test("formula detection blocks only actual formulas", () => {
   assert.equal(isFormulaColumn({ isFormula: true, formula: "" }), false);
 });
 
-test("candidate writing includes map coordinates when mapped", () => {
+test("candidate writing includes only a demonstrated site position when both coordinates are mapped", () => {
   const snapshot = { writableMappings: { NomCommercial: "Nom", Adresse: "Adresse", SirenSiret: "Id", Latitude: "Lat", Longitude: "Lon" } };
-  const fields = fieldsForCandidate({ nomCommercial: "Garage", adresse: "A", siret: "12345678900011", latitude: 47, longitude: -1.8 }, snapshot);
+  const fields = fieldsForCandidate({ nomCommercial: "Garage", adresse: "A", siret: "12345678900011", position: { status: "SITE_CONFIRMED", siret: "12345678900011", latitude: 47, longitude: -1.8, source: { label: "OSM", recordId: "node:1" }, proof: [] } }, snapshot);
   assert.deepEqual(fields, { Nom: "Garage", Adresse: "A", Id: "12345678900011", Lat: 47, Lon: -1.8 });
+});
+
+
+test("adding a raw Annuaire result cannot write its administrative coordinates as the final site position", () => {
+  const snapshot = { writableMappings: { SirenSiret: "Id", Latitude: "Lat", Longitude: "Lon" } };
+  assert.deepEqual(fieldsForCandidate({ siret: "12345678900011", latitude: 47, longitude: -1.8 }, snapshot), { Id: "12345678900011" });
 });

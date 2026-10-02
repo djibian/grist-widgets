@@ -1,6 +1,8 @@
 import { recordsFromTable } from "../../shared/grist/records.js";
 import { isFormulaColumn } from "../../shared/grist/metadata.js";
 import { candidateMatchesIdentifier, extractLocationFromAddress, identifierParts } from "./search.js";
+import { POSITION_STATES } from "./establishment-position.js";
+import { usableCoordinates } from "./identity-resolution.js";
 
 export { isFormulaColumn };
 
@@ -11,6 +13,8 @@ export const COLUMN_DEFS = [
   { name: "RaisonSociale", title: "Raison sociale", type: "Text", optional: true },
   { name: "Latitude", title: "Latitude", type: "Numeric", optional: true },
   { name: "Longitude", title: "Longitude", type: "Numeric", optional: true },
+  { name: "PositionSource", title: "Source de la position", type: "Text", optional: true },
+  { name: "PositionProof", title: "Preuves de la position", type: "Text", optional: true },
   { name: "Telephone", title: "Téléphone", type: "Text", optional: true },
   { name: "Courriel", title: "Courriel", type: "Text", optional: true },
   { name: "SiteWeb", title: "Site web", type: "Text", optional: true },
@@ -158,8 +162,15 @@ export function fieldsForCandidate(candidate, snapshot) {
   put("Adresse", candidate.adresse);
   put("SirenSiret", candidate.siret || candidate.siren);
   put("RaisonSociale", candidate.raisonSociale);
-  put("Latitude", candidate.latitude);
-  put("Longitude", candidate.longitude);
+  if (candidate.position?.siret === candidate.siret
+    && [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(candidate.position?.status)
+    && usableCoordinates(candidate.position.latitude, candidate.position.longitude)
+    && writableMappings.Latitude && writableMappings.Longitude) {
+    put("Latitude", candidate.position.latitude);
+    put("Longitude", candidate.position.longitude);
+    put("PositionSource", `${candidate.position.source.label} (${candidate.position.source.recordId}) ${candidate.position.source.url}`);
+    put("PositionProof", JSON.stringify({ siret: candidate.siret, status: candidate.position.status, source: candidate.position.source, proof: candidate.position.proof }));
+  }
   put("Telephone", candidate.telephone);
   put("Courriel", candidate.courriel);
   put("SiteWeb", candidate.siteWeb);
@@ -240,11 +251,22 @@ function identifierConflict(rows, rowId, value) {
   }) ?? null;
 }
 
-export async function applyEnrichmentChanges(rowId, changes, mappings) {
+export async function applyEnrichmentChanges(rowId, changes, mappings, { positionSiret = "", expectedRow = null } = {}) {
   if (!rowId || rowId === "new") throw new Error("Sélectionne d'abord une structure existante.");
   const before = await fetchFullSnapshot(mappings);
   if (before.missing.length || before.nonWritableRequired.length) throw new Error(configurationMessage(before));
-  if (!findRowById(before, rowId)) throw new Error("La structure sélectionnée n'existe plus.");
+  const currentRow = findRowById(before, rowId);
+  if (!currentRow) throw new Error("La structure sélectionnée n'existe plus.");
+  if (expectedRow && Object.entries(expectedRow).some(([field, value]) => String(currentRow[field] ?? "") !== String(value ?? ""))) {
+    throw new Error("La fiche a changé depuis l’analyse. Relance l’analyse avant d’appliquer ce candidat.");
+  }
+  if ("Latitude" in (changes ?? {}) || "Longitude" in (changes ?? {})) {
+    if (!("Latitude" in changes && "Longitude" in changes) || !usableCoordinates(changes.Latitude, changes.Longitude) || !before.writableMappings.Latitude || !before.writableMappings.Longitude) {
+      throw new Error("La latitude et la longitude du site doivent être appliquées ensemble dans deux colonnes modifiables.");
+    }
+    const finalSiret = identifierParts(before.writableMappings.SirenSiret && changes.SirenSiret !== undefined ? changes.SirenSiret : currentRow.SirenSiret).siret;
+    if (!positionSiret || finalSiret !== positionSiret) throw new Error("La position doit rester rattachée au SIRET du candidat retenu.");
+  }
 
   if (Object.prototype.hasOwnProperty.call(changes ?? {}, "SirenSiret")) {
     const conflict = identifierConflict(before.rows, rowId, changes.SirenSiret);

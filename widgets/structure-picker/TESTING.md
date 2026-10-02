@@ -30,14 +30,14 @@ Mapper **Nom usuel**, **Adresse** et **SIREN / SIRET**. Mapper aussi **Latitude*
 16. Cliquer sur **Analyser / compléter**.
 17. Avec un SIRET existant, vérifier que l’Annuaire retrouve l’établissement correspondant.
 18. Sans SIRET, vérifier que le nom usuel et le code postal/commune dérivés de l’adresse servent à la recherche.
-19. S’il existe plusieurs établissements possibles, l’utilisateur doit choisir le bon.
+19. En cas d’ambiguïté, vérifier qu’aucun établissement ni point n’est présélectionné.
 
-## Géocodage et carte
+## Candidat établissement et carte
 
-20. Avec une adresse non normalisée, vérifier les propositions IGN.
+20. Vérifier qu’un seul bloc candidat rassemble identité, SIRET, adresse, position et preuves, sans choix de points IGN séparé.
 21. L’adresse proposée ne doit pas écraser automatiquement l’adresse existante : la case reste décochée par défaut.
-22. Latitude et Longitude sont proposées et cochées par défaut lorsqu’elles sont vides.
-23. Appliquer l’adresse et les coordonnées puis vérifier leur utilisation par le widget carte.
+22. Une position démontrée est proposée en une paire latitude/longitude ; elle reste désactivée si le SIRET correspondant n’est pas conservé ou sélectionné.
+23. Pour Super U Machecoul, vérifier SIDONAM / 41091808000020 et le point Overture 46.99808, -1.815576 (moins de 30 m du point de référence), jamais le point de voie IGN 46.996561, -1.815374. Consulter Sources et preuves, puis vérifier l’application sur la carte.
 
 ## Sécurité
 
@@ -53,3 +53,10 @@ Mapper **Nom usuel**, **Adresse** et **SIREN / SIRET**. Mapper aussi **Latitude*
 30. Vérifier qu’aucun contact existant n’est remplacé sans case cochée.
 31. Vérifier qu’une absence de résultat ou une indisponibilité d’Overpass n’empêche pas la recherche Annuaire ni le géocodage IGN.
 32. Sur un échantillon de structures réelles du 44/85, relever la couverture et les éventuels faux positifs afin de décider du maintien, de la promotion ou du retrait de l’expérience.
+
+
+## Régressions automatiques identité / position
+
+`npm test` exécute toute la CI du dépôt. Les tests `establishment-position`, `site-position-sources`, `establishment-enrichment-ui` et `enrichment` couvrent la précision Super U à partir du vrai enregistrement Overture publié, un voisin portant un autre SIRET, les conflits d’adresse/de position, l’absence de liaison par proximité ou marque, les quatre identités de référence, un shard qui ignore l’annulation, les réponses tardives après changement de fiche, et l’écriture atomique SIRET/paire/provenance. Les fixtures conservent les identifiants et versions du snapshot public du 14 septembre 2026 ; aucune coordonnée de référence n’est injectée dans le code de production.
+
+`node scripts/capture-structure-identity-live.mjs` exerce le même pipeline avec les API publiques et les index publiés, et enregistre les réponses dans `artifacts/structure-picker-identity-live.json`. `CONTACT_INDEX_MANIFEST_URL` permet de cibler le manifest d’une preview publiée. Les services réseau restent distincts de la CI déterministe.
