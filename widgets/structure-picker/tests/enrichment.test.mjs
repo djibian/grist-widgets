@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildEnrichmentProposals, diagnoseRow, enterpriseSearchContext, selectedChanges } from "../enrichment.js";
+import { IDENTITY_STATES } from "../identity-resolution.js";
 
 test("empty coordinates are missing, not zero", () => {
   const diagnosis = diagnoseRow({ NomCommercial: "Garage Martin", Adresse: "12 rue X 44270 Machecoul", SirenSiret: "", Latitude: "", Longitude: "" });
@@ -8,9 +9,20 @@ test("empty coordinates are missing, not zero", () => {
   assert.equal(diagnosis.codePostal, "44270");
 });
 
-test("enterprise lookup uses identifier first and address context otherwise", () => {
+test("Null Island coordinates are treated as missing", () => {
+  const diagnosis = diagnoseRow({ NomCommercial: "Crèche", Adresse: "10 rue X 85300 Sallertaine", SirenSiret: "", Latitude: 0, Longitude: 0 });
+  assert.equal(diagnosis.hasCoordinates, false);
+  assert.equal(diagnosis.needsGeocode, true);
+});
+
+test("a single zero coordinate can still be valid", () => {
+  const diagnosis = diagnoseRow({ NomCommercial: "Test", Adresse: "Adresse", SirenSiret: "", Latitude: 48, Longitude: 0 });
+  assert.equal(diagnosis.hasCoordinates, true);
+});
+
+test("enterprise lookup uses identifier first and keeps name separate from location", () => {
   assert.deepEqual(enterpriseSearchContext({ SirenSiret: "12345678900011", NomCommercial: "X", Adresse: "44000 Nantes" }), { query: "12345678900011", codePostal: "" });
-  assert.deepEqual(enterpriseSearchContext({ SirenSiret: "", NomCommercial: "Garage Martin", Adresse: "12 rue X 44270 Machecoul" }), { query: "Garage Martin Machecoul", codePostal: "44270" });
+  assert.deepEqual(enterpriseSearchContext({ SirenSiret: "", NomCommercial: "Garage Martin", Adresse: "12 rue X 44270 Machecoul" }), { query: "Garage Martin", codePostal: "44270" });
 });
 
 test("missing data is selected by default but address replacement is explicit", () => {
@@ -23,6 +35,22 @@ test("missing data is selected by default but address replacement is explicit", 
   assert.equal(byField.Longitude.selectedByDefault, true);
   assert.equal(byField.Adresse.selectedByDefault, false);
   assert.equal(Object.prototype.hasOwnProperty.call(byField, "APE"), false);
+});
+
+test("probable identity is shown but legal identity fields are not preselected", () => {
+  const row = { NomCommercial: "EHPAD La Reynerie", Adresse: "8bis rue du Pays de Retz 85230 Bouin", SirenSiret: "", RaisonSociale: "" };
+  const enterprise = { nomCommercial: "EHPAD", nomUsuelDistinct: true, raisonSociale: "EHPAD LA REYNERIE BOUIN", siret: "26850025300011" };
+  const byField = Object.fromEntries(buildEnrichmentProposals(row, enterprise, null, { identityStatus: IDENTITY_STATES.MATCH_PROBABLE }).map(item => [item.field, item]));
+  assert.equal(byField.SirenSiret.selectedByDefault, false);
+  assert.equal(byField.RaisonSociale.selectedByDefault, false);
+});
+
+test("verified identity may preselect missing legal fields", () => {
+  const row = { NomCommercial: "ô Pré d’Vous", Adresse: "24 rue des Fosses 44270 La Marne", SirenSiret: "", RaisonSociale: "" };
+  const enterprise = { nomCommercial: "O PRE D'VOUS", nomUsuelDistinct: true, raisonSociale: "PH DISTRIBUTION", siret: "89306104400028" };
+  const byField = Object.fromEntries(buildEnrichmentProposals(row, enterprise, null, { identityStatus: IDENTITY_STATES.MATCH_VERIFIED }).map(item => [item.field, item]));
+  assert.equal(byField.SirenSiret.selectedByDefault, true);
+  assert.equal(byField.RaisonSociale.selectedByDefault, true);
 });
 
 test("legal-name fallback never replaces an existing usual name", () => {

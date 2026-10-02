@@ -2,7 +2,6 @@ import {
   EXTERNAL_LIMIT,
   buildExternalSearchUrl,
   candidateIsAlreadyLocal,
-  candidateMatchesIdentifier,
   flattenExternalResults,
   localIdentifierSet,
   normalize,
@@ -25,9 +24,10 @@ import { geocodeAddress } from "./geocode.js";
 import {
   buildEnrichmentProposals,
   diagnoseRow,
-  enterpriseSearchContext,
   selectedChanges,
 } from "./enrichment.js";
+import { resolveIdentityForEnrichment } from "./identity-service.js";
+import { IDENTITY_STATES } from "./identity-resolution.js";
 import {
   formatDepartmentCodes,
   formatDepartmentScope,
@@ -595,6 +595,29 @@ function renderProposalPanel() {
   updateApplyButton();
 }
 
+function enrichmentStatusMessage(result, row) {
+  const decision = result?.decision;
+  if (!decision) return "Analyse terminée sans verdict d’identité.";
+  const locationMessage = state.geocodeCandidates.length
+    ? " Vérifie séparément la proposition de localisation avant de remplacer l’adresse."
+    : row.Adresse ? " Aucune proposition de géocodage n’a été trouvée." : "";
+  const diagnostic = result?.diagnostics?.length ? ` ${result.diagnostics[0]}` : "";
+
+  switch (decision.status) {
+    case IDENTITY_STATES.MATCH_VERIFIED:
+      return `Identité confirmée par les preuves. ${decision.reason || ""}${locationMessage}`.trim();
+    case IDENTITY_STATES.MATCH_PROBABLE:
+      return `Un établissement probable a été trouvé mais son SIRET n’est pas présélectionné. ${decision.reason || ""}${locationMessage}`.trim();
+    case IDENTITY_STATES.AMBIGUOUS:
+      return `Plusieurs établissements restent plausibles ; aucune identité n’est présélectionnée. ${decision.reason || ""}${locationMessage}`.trim();
+    case IDENTITY_STATES.INCOMPLETE:
+      return `Analyse incomplète : ${decision.reason || "une preuve nécessaire manque."}${diagnostic}${locationMessage}`.trim();
+    case IDENTITY_STATES.NO_MATCH:
+    default:
+      return `${decision.reason || "Aucune identité juridique suffisamment étayée n’a été trouvée."}${locationMessage}`.trim();
+  }
+}
+
 async function runEnrichment() {
   const row = selectedRow();
   if (!state.configured || !row) return;
@@ -603,47 +626,30 @@ async function runEnrichment() {
   state.enrichmentController = new AbortController();
   const signal = state.enrichmentController.signal;
   ui.enrichButton.disabled = true;
-  setStatus(ui.enrichStatus, "Analyse de la structure sélectionnée…");
+  setStatus(ui.enrichStatus, "Analyse de l’identité et du site sélectionné…");
 
   try {
-    let geocodeCandidates = [];
-    if (String(row.Adresse ?? "").trim()) {
-      try {
-        geocodeCandidates = await geocodeAddress(row.Adresse, { signal, limit: 3 });
-      } catch (error) {
-        if (error?.name === "AbortError") throw error;
-        console.warn(error);
-      }
-    }
-    if (generation !== state.enrichmentGeneration) return;
-    state.geocodeCandidates = geocodeCandidates;
-    state.selectedGeocode = geocodeCandidates[0] ?? null;
-
-    const context = enterpriseSearchContext(row, state.selectedGeocode);
-    let enterpriseCandidates = [];
-    if (context.query) {
-      const options = { perPage: 6, matchingLimit: 10, codePostal: context.codePostal, limit: 10 };
-      let response = await fetchExternal(context.query, signal, options);
-      enterpriseCandidates = response.items;
-      if (!enterpriseCandidates.length && context.codePostal) {
-        response = await fetchExternal(context.query, signal, { ...options, codePostal: "" });
-        enterpriseCandidates = response.items;
-      }
-    }
+    const result = await resolveIdentityForEnrichment({
+      row,
+      signal,
+      geocode: geocodeAddress,
+    });
     if (generation !== state.enrichmentGeneration) return;
 
-    state.enterpriseCandidates = enterpriseCandidates;
-    state.selectedEnterprise = enterpriseCandidates.find(candidate => candidateMatchesIdentifier(candidate, row.SirenSiret))
-      ?? (enterpriseCandidates.length === 1 ? enterpriseCandidates[0] : null);
+    state.geocodeCandidates = Array.isArray(result?.geocodeCandidates) ? result.geocodeCandidates : [];
+    state.selectedGeocode = result?.selectedGeocode ?? state.geocodeCandidates[0] ?? null;
+    state.enterpriseCandidates = Array.isArray(result?.displayCandidates) ? result.displayCandidates : [];
+    state.selectedEnterprise = result?.decision?.status === IDENTITY_STATES.MATCH_VERIFIED
+      ? result.decision.candidate
+      : null;
+
     renderEnrichmentChoices();
     renderProposalPanel();
-
-    const messages = [];
-    if (!enterpriseCandidates.length) messages.push("Aucune identité officielle certaine trouvée.");
-    else if (!state.selectedEnterprise) messages.push("Choisis l’établissement correspondant dans l’Annuaire.");
-    if (!geocodeCandidates.length && row.Adresse) messages.push("Aucune proposition de géocodage trouvée.");
-    else if (geocodeCandidates.length) messages.push("Vérifie la proposition de localisation avant de remplacer l’adresse.");
-    setStatus(ui.enrichStatus, messages.join(" ") || "Des compléments sont disponibles.");
+    setStatus(
+      ui.enrichStatus,
+      enrichmentStatusMessage(result, row),
+      result?.decision?.status === IDENTITY_STATES.MATCH_VERIFIED ? "success" : result?.decision?.status === IDENTITY_STATES.INCOMPLETE ? "error" : "",
+    );
   } catch (error) {
     if (error?.name === "AbortError") return;
     console.error(error);

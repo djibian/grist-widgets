@@ -1,4 +1,5 @@
 import { extractLocationFromAddress, identifierParts, normalize } from "./search.js";
+import { IDENTITY_STATES, usableCoordinates } from "./identity-resolution.js";
 
 const FIELD_LABELS = {
   NomCommercial: "Nom usuel",
@@ -35,9 +36,7 @@ function valuesEqual(field, current, proposed) {
 export function diagnoseRow(row) {
   if (!row) return null;
   const identifier = identifierParts(row.SirenSiret);
-  const latitude = Number(row.Latitude);
-  const longitude = Number(row.Longitude);
-  const coordinatesComplete = hasValue(row.Latitude) && hasValue(row.Longitude) && Number.isFinite(latitude) && Number.isFinite(longitude);
+  const coordinates = usableCoordinates(row.Latitude, row.Longitude);
   const location = extractLocationFromAddress(row.Adresse);
 
   return {
@@ -46,27 +45,24 @@ export function diagnoseRow(row) {
     hasIdentifier: Boolean(identifier.siren),
     hasSiret: Boolean(identifier.siret),
     hasLegalName: hasValue(row.RaisonSociale),
-    hasCoordinates: coordinatesComplete,
+    hasCoordinates: Boolean(coordinates),
     codePostal: location.codePostal,
     commune: location.commune,
     needsEnterprise: !identifier.siret || !hasValue(row.RaisonSociale),
-    needsGeocode: hasValue(row.Adresse) && !coordinatesComplete,
+    needsGeocode: hasValue(row.Adresse) && !coordinates,
   };
 }
 
-export function enterpriseSearchContext(row, geocodeCandidate = null) {
+// Conservé pour le mode de recherche simple et la compatibilité des appels
+// existants. Le résolveur d'identité utilise désormais son propre plan borné.
+export function enterpriseSearchContext(row) {
   const identifier = identifierParts(row?.SirenSiret);
   if (identifier.identifier) return { query: identifier.identifier, codePostal: "" };
-
-  const fromAddress = extractLocationFromAddress(geocodeCandidate?.adresse || row?.Adresse);
-  const codePostal = geocodeCandidate?.codePostal || fromAddress.codePostal;
-  const commune = geocodeCandidate?.commune || fromAddress.commune;
-  const name = String(row?.NomCommercial ?? "").trim();
-  const query = [name, commune].filter(Boolean).join(" ").trim();
-  return { query, codePostal };
+  const fromAddress = extractLocationFromAddress(row?.Adresse);
+  return { query: String(row?.NomCommercial ?? "").trim(), codePostal: fromAddress.codePostal };
 }
 
-function proposal(field, current, proposed, source) {
+function proposal(field, current, proposed, source, { selectedByDefault = !hasValue(current) } = {}) {
   if (!hasValue(proposed) || valuesEqual(field, current, proposed)) return null;
   return {
     field,
@@ -74,33 +70,47 @@ function proposal(field, current, proposed, source) {
     current,
     proposed,
     source,
-    selectedByDefault: !hasValue(current),
+    selectedByDefault,
     replacesExisting: hasValue(current),
   };
 }
 
-export function buildEnrichmentProposals(row, enterpriseCandidate = null, geocodeCandidate = null) {
+export function buildEnrichmentProposals(row, enterpriseCandidate = null, geocodeCandidate = null, { identityStatus = "" } = {}) {
   const proposals = [];
   const add = item => { if (item) proposals.push(item); };
+  const identityVerified = !identityStatus || identityStatus === IDENTITY_STATES.MATCH_VERIFIED;
 
   if (enterpriseCandidate) {
     if (enterpriseCandidate.nomUsuelDistinct || !hasValue(row.NomCommercial)) {
-      add(proposal("NomCommercial", row.NomCommercial, enterpriseCandidate.nomCommercial, "Annuaire des Entreprises"));
+      add(proposal("NomCommercial", row.NomCommercial, enterpriseCandidate.nomCommercial, "Annuaire des Entreprises", {
+        selectedByDefault: identityVerified && !hasValue(row.NomCommercial),
+      }));
     }
-    add(proposal("SirenSiret", row.SirenSiret, enterpriseCandidate.siret || enterpriseCandidate.siren, "Annuaire des Entreprises"));
-    add(proposal("RaisonSociale", row.RaisonSociale, enterpriseCandidate.raisonSociale, "Annuaire des Entreprises"));
+    add(proposal("SirenSiret", row.SirenSiret, enterpriseCandidate.siret || enterpriseCandidate.siren, "Annuaire des Entreprises", {
+      selectedByDefault: identityVerified && !hasValue(row.SirenSiret),
+    }));
+    add(proposal("RaisonSociale", row.RaisonSociale, enterpriseCandidate.raisonSociale, "Annuaire des Entreprises", {
+      selectedByDefault: identityVerified && !hasValue(row.RaisonSociale),
+    }));
   }
 
   const addressSource = geocodeCandidate || enterpriseCandidate;
   if (addressSource) {
-    add(proposal("Adresse", row.Adresse, addressSource.adresse, geocodeCandidate ? "Géocodage IGN" : "Annuaire des Entreprises"));
+    add(proposal("Adresse", row.Adresse, addressSource.adresse, geocodeCandidate ? "Géocodage IGN" : "Annuaire des Entreprises", {
+      selectedByDefault: !hasValue(row.Adresse),
+    }));
   }
 
   const coordinateSource = geocodeCandidate || enterpriseCandidate;
   if (coordinateSource) {
     const source = geocodeCandidate ? "Géocodage IGN" : "Annuaire des Entreprises";
-    add(proposal("Latitude", row.Latitude, coordinateSource.latitude, source));
-    add(proposal("Longitude", row.Longitude, coordinateSource.longitude, source));
+    const currentCoordinates = usableCoordinates(row.Latitude, row.Longitude);
+    add(proposal("Latitude", row.Latitude, coordinateSource.latitude, source, {
+      selectedByDefault: !currentCoordinates,
+    }));
+    add(proposal("Longitude", row.Longitude, coordinateSource.longitude, source, {
+      selectedByDefault: !currentCoordinates,
+    }));
   }
 
   return proposals;

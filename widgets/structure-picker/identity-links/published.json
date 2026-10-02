@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-01T00:00:00Z",
+  "records": [
+    {
+      "recordId": "magasins-u-phyto-2023-12-21:PL00660",
+      "siret": "41091808000020",
+      "publicNames": ["Super U Machecoul", "Super U"],
+      "legalName": "SIDONAM",
+      "address": "BOULEVARD DES PRISES 44270 MACHECOUL ST MEME",
+      "postcode": "44270",
+      "city": "MACHECOUL ST MEME",
+      "sourceLabel": "Magasins U — liste des magasins certifiés pour la vente de phyto",
+      "sourceUrl": "https://www.magasins-u.com/content/dam/ufrfront/edito/assets-u/pdf/reglementation-produits/liste-des-magasins-U-certifies-pour-la-vente-de-phyto.pdf.coredownload.inline.pdf",
+      "sourcePublishedAt": "2023-12-21",
+      "sourceKind": "operator-published-local-siret",
+      "sourceReference": "PL00660",
+      "historical": true
+    }
+  ]
+}

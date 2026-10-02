@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { buildOfficialTextSearchRequest } from "../search.js";
+import { DEFAULT_DEPARTMENTS, setActiveDepartments } from "../departments.js";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const config = await readFile(new URL("../departments-config.js", import.meta.url), "utf8");
@@ -55,8 +57,14 @@ test("la configuration utilise les options natives Grist", () => {
 });
 
 test("l'Annuaire et son cache utilisent la configuration active", () => {
+  try {
+    setActiveDepartments(["49"]);
+    const request = buildOfficialTextSearchRequest("Garage Martin");
+    assert.equal(new URL(request.url).searchParams.get("departement"), "49");
+  } finally {
+    setActiveDepartments(DEFAULT_DEPARTMENTS);
+  }
   assert.match(search, /getActiveDepartments/);
-  assert.match(search, /departement: departments\.join\(","\)/);
   assert.match(app, /getActiveDepartments\(\)\.join\(","\)/);
   assert.match(app, /formatDepartmentCodes/);
   assert.match(app, /formatDepartmentScope/);
