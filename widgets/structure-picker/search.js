@@ -23,6 +23,11 @@ export function normalizeIdentifier(value) {
 
 export const normalizeSiret = normalizeIdentifier;
 
+export function normalizeFiness(value) {
+  const id = String(value ?? "").trim().toUpperCase();
+  return /^[A-Z0-9]{9}$/.test(id) ? id : "";
+}
+
 export function identifierParts(value) {
   const identifier = normalizeIdentifier(value);
   if (identifier.length === 14) {
@@ -218,6 +223,9 @@ export function candidateFrom(unit, establishment, departments = getActiveDepart
     raisonSociale,
     siren: String(unit?.siren ?? ""),
     siret: String(establishment.siret ?? ""),
+    // FINESS belongs to this geographic establishment, never to its legal unit.
+    finessIds: [...new Set((Array.isArray(establishment.liste_finess) ? establishment.liste_finess : [])
+      .map(normalizeFiness).filter(Boolean))],
     adresse: String(establishment.adresse ?? ""),
     codePostal: String(establishment.code_postal ?? ""),
     commune: String(establishment.libelle_commune ?? ""),

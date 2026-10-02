@@ -1,4 +1,4 @@
-import { extractLocationFromAddress, identifierParts, normalize, normalizeIdentifier } from "./search.js";
+import { extractLocationFromAddress, identifierParts, normalize, normalizeFiness, normalizeIdentifier } from "./search.js";
 
 export const IDENTITY_STATES = Object.freeze({
   MATCH_VERIFIED: "MATCH_VERIFIED",
@@ -71,7 +71,7 @@ function withoutLeadingGenericCategory(value) {
   return words.slice(1).join(" ");
 }
 
-export function targetNameVariants(row) {
+export function targetNameVariants(row, { includeCategoryFallback = true } = {}) {
   const name = String(row?.NomCommercial ?? "").trim();
   if (!name) return [];
   const location = extractLocationFromAddress(row?.Adresse);
@@ -79,7 +79,7 @@ export function targetNameVariants(row) {
   const noCommune = stripCommuneEdgeWords(noPostal, location.commune);
   const variants = [normalizeIdentity(name), noPostal, noCommune];
   const noCategory = withoutLeadingGenericCategory(noCommune || noPostal);
-  if (noCategory) variants.push(noCategory);
+  if (includeCategoryFallback && noCategory) variants.push(noCategory);
   return unique(variants.map(normalizeIdentity));
 }
 
@@ -302,6 +302,24 @@ function linkEvidenceFor(candidate, row, links) {
   const siret = normalizeIdentifier(candidate?.siret);
   for (const link of Array.isArray(links) ? links : []) {
     if (!siret || normalizeIdentifier(link?.siret) !== siret || !link?.verifiedOfficial) continue;
+    if (link.source === "finess") {
+      const registry = link.registryEvidence;
+      const binding = link.officialBinding;
+      const names = new Set(targetNameVariants(row, { includeCategoryFallback: false }));
+      const publicName = (link.publicNames ?? []).some(name => names.has(normalizeIdentity(name)));
+      const address = addressEvidence(row?.Adresse, link.adresse);
+      const officialAddress = addressEvidence(candidate.adresse, link.adresse);
+      const id = normalizeFiness(link.sourceRecordId);
+      if (id && registry?.finess === id && registry?.siret === siret
+        && registry?.type === "EGE" && registry?.status === "A"
+        && binding?.siret === siret && binding?.finessIds?.includes(id)
+        && candidate.finessIds?.includes(id) && publicName && !aliasRelation(row, candidate).publicAliasMismatch
+        && address.compatible && address.postal === "same" && address.commune === "same"
+        && officialAddress.compatible && officialAddress.postal === "same" && officialAddress.commune === "same") {
+        return { verified: true, link, nameCompatible: true, siteCompatible: true, distance: null };
+      }
+      continue;
+    }
     const pseudoCandidate = {
       aliases: link.publicNames ?? [],
       nomCommercial: (link.publicNames ?? [])[0] ?? "",
@@ -329,6 +347,7 @@ function mergeCandidateGroup(group) {
   return {
     ...first,
     aliases,
+    finessIds: unique(sorted.flatMap(item => item.finessIds ?? []).map(normalizeFiness)),
     nomUsuelDistinct: aliases.length > 0,
     nomCommercial: aliases[0] || first.nomCommercial,
     observations: sorted,
@@ -393,7 +412,9 @@ export function candidateCertificate(row, candidate, { location = null, links = 
 
   const explanations = [];
   if (exactSiret) explanations.push("SIRET identique à la fiche et revalidé dans l’Annuaire");
-  if (link.verified) explanations.push(`Référence SIRET explicite ${link.link?.sourceLabel || link.link?.source || "POI"}, revalidée dans l’Annuaire`);
+  if (link.verified) explanations.push(link.link?.source === "finess"
+    ? `FINESS géographique ${link.link.sourceRecordId} : nom public et adresse concordants, SIRET ${candidateSiret} explicite et rattachement FINESS revalidé dans l’Annuaire`
+    : `Référence SIRET explicite ${link.link?.sourceLabel || link.link?.source || "POI"}, revalidée dans l’Annuaire`);
   if (names.exactDistinctiveAlias) explanations.push(`Nom public distinctif concordant${names.bestAlias ? ` : ${names.bestAlias}` : ""}`);
   else if (names.strongDistinctiveAlias) explanations.push(`Termes distinctifs du nom public concordants${names.bestAlias ? ` : ${names.bestAlias}` : ""}`);
   else if (names.categoryMatch && names.legalExact) explanations.push("Type de site compatible et raison sociale concordante");

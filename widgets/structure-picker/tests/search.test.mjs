@@ -50,6 +50,13 @@ test("blank coordinates stay unknown instead of becoming zero", () => {
   assert.equal(candidate.longitude, null);
 });
 
+test("FINESS identifiers belong only to the returned establishment, including alphanumeric IDs", () => {
+  const unit = { siren: "268500253", nom_complet: "EHPAD", complements: { liste_finess: ["850002163"] } };
+  const site = { siret: "26850025300011", code_postal: "85230", liste_finess: ["850002163", "850002163", "2A0000123", "invalid"] };
+  assert.deepEqual(candidateFrom(unit, site).finessIds, ["850002163", "2A0000123"]);
+  assert.deepEqual(candidateFrom(unit, { ...site, liste_finess: null }).finessIds, [], "no legal-unit FINESS inheritance");
+});
+
 test("legal name is only a fallback when no usual name is published", () => {
   const candidate = candidateFrom({ siren: "123456789", nom_raison_sociale: "MARTIN AUTOMOBILES SARL" }, {
     siret: "12345678900011", etat_administratif: "A", code_postal: "44000",
