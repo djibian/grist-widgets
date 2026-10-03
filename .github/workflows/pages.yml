@@ -80,7 +80,12 @@ jobs:
           while IFS= read -r ref; do
             branch="${ref#refs/remotes/origin/}"
 
-            if git -C source diff --quiet main "$ref" --; then
+            if [[ "$branch" == "preview/pr-77-structure-picker" ]]; then
+              echo "Skipping retired alias $branch"
+              continue
+            fi
+
+            if [[ "$branch" != "preview/structure-picker" ]] && git -C source diff --quiet main "$ref" --; then
               echo "Skipping $branch: preview content is identical to main"
               continue
             fi
