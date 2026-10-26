@@ -1,5 +1,6 @@
 import { normalizeFiness, normalizeIdentifier } from "./search.js";
 import { addressEvidence, usableCoordinates } from "./identity-resolution.js";
+import { interiorSitePoint } from "./registry-site-positions.js";
 
 export const OSM_POSITION_INDEX_BASE = new URL("./site-position-indexes/osm-finess/", import.meta.url);
 export const OSM_POSITION_INDEX_BUDGET = Object.freeze({ maxFinessIds: 2, maxShardBytes: 96 * 1024 });
@@ -7,14 +8,17 @@ const clean = value => String(value ?? "").trim();
 
 export function osmSitePositionFromElement(element, snapshot = {}) {
   const tags = element?.tags ?? {};
-  const coordinates = usableCoordinates(element?.lat ?? element?.center?.lat, element?.lon ?? element?.center?.lon);
+  const ring = element?.type === "way" && element.geometry?.map(point => [point.lon, point.lat]);
+  const shape = ring?.length >= 4 && element.nodes?.[0] === element.nodes?.at(-1) && String(ring[0]) === String(ring.at(-1))
+    ? { type: "Polygon", coordinates: [ring] } : null;
+  const coordinates = element?.type === "node" ? usableCoordinates(element.lat, element.lon) : interiorSitePoint(shape);
   if (!coordinates || !["node", "way", "relation"].includes(element?.type)) return null;
   const rawSiret = clean(tags["ref:FR:SIRET"]);
   const siret = normalizeIdentifier(rawSiret);
   const rawFiness = clean(tags["ref:FR:FINESS"]);
   const finessParts = rawFiness ? rawFiness.split(/[;,]/).map(clean) : [];
   const finessIds = [...new Set(finessParts.map(normalizeFiness).filter(Boolean))];
-  const isPlace = !tags.highway && !tags.place && !Object.keys(tags).some(key => /^(disused|abandoned|demolished):/.test(key))
+  const isPlace = !tags.highway && !tags.place && !tags.fixme && !tags["fixme:position"] && !Object.keys(tags).some(key => /^(disused|abandoned|demolished):/.test(key))
     && Boolean(tags.amenity || tags.healthcare || tags.social_facility || tags.shop || tags.building);
   return {
     kind: isPlace ? "site" : "address", name: clean(tags.name || tags["name:fr"]),
@@ -27,7 +31,7 @@ export function osmSitePositionFromElement(element, snapshot = {}) {
     source: {
       id: "osm", label: "OpenStreetMap", recordId: `${element.type}:${element.id}`,
       url: `https://www.openstreetmap.org/${element.type}/${element.id}`,
-      geometry: element.type === "node" ? "point" : "center", version: element.version ?? null,
+      geometry: element.type === "node" ? "point" : "site-interior-point", version: element.version ?? null,
       updatedAt: element.timestamp ?? null, changeset: element.changeset ?? null,
       generatedAt: snapshot.generatedAt ?? null, indexUrl: snapshot.indexUrl ?? null,
       snapshotUrl: snapshot.url ?? null, license: snapshot.license ?? "ODbL 1.0", tags,
@@ -77,9 +81,9 @@ export async function findIndexedFinessPositions({ candidate, links = [], identi
       if (signal?.aborted) return;
       for (const record of payload.records) {
         const poi = osmSitePositionFromElement(record, { ...payload.source, indexUrl: String(url) });
-        // Only point POIs from the published identifier cohort; neither a
-        // street geocode nor a way's bounding-box centre is promoted here.
-        if (record.type === "node" && Number.isSafeInteger(record.id) && record.id > 0
+        // Points and proven interior points of actual site polygons are usable;
+        // a street geocode or bounding-box centre is never promoted.
+        if (["node", "way"].includes(record.type) && Number.isSafeInteger(record.id) && record.id > 0
           && Number.isSafeInteger(record.version) && record.version > 0 && Number.isFinite(Date.parse(record.timestamp))
           && Date.parse(record.timestamp) <= Date.parse(payload.source.generatedAt)
           && poi?.kind === "site" && poi.finessIds.some(id => id.startsWith(prefix))

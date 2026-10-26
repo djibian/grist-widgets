@@ -78,6 +78,7 @@ function proposal(field, current, proposed, source, { selectedByDefault = !hasVa
 }
 
 export function buildEnrichmentProposals(row, enterpriseCandidate = null, { identityStatus = enterpriseCandidate?.identityStatus ?? "" } = {}) {
+  if ([IDENTITY_STATES.INCOMPLETE, IDENTITY_STATES.NO_MATCH, IDENTITY_STATES.AMBIGUOUS].includes(identityStatus)) return [];
   const proposals = [];
   const add = item => { if (item) proposals.push(item); };
   const identityVerified = !identityStatus || identityStatus === IDENTITY_STATES.MATCH_VERIFIED;

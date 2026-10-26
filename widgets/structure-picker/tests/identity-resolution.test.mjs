@@ -64,7 +64,8 @@ test("explicit SIRET is verified but a site contradiction blocks silent enrichme
     candidates: [candidate({ siret: "12345678900011", siren: "123456789", raisonSociale: "MARTIN", adresse: "99 RUE B 44000 NANTES" })],
     coverage: completeCoverage,
   });
-  assert.equal(conflict.status, IDENTITY_STATES.INCOMPLETE);
+  assert.equal(conflict.status, IDENTITY_STATES.NO_MATCH);
+  assert.equal(conflict.identifierConflict.siret, row.SirenSiret);
 });
 
 test("Super U cannot be assigned to SIDONAM from boulevard proximity alone", () => {

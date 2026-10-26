@@ -3,6 +3,8 @@ import { IDENTITY_BUDGET, resolveStructureIdentity } from "./identity-orchestrat
 import { IDENTITY_STATES, decideIdentity, decisionCandidates } from "./identity-resolution.js";
 import { findPublishedIdentityLinks } from "./published-identity-links.js";
 import { findFinessIdentityLinks, FINESS_BUDGET } from "./finess-identity.js";
+import { findOfficialRegistrySites, verifiedRegistryLink } from "./official-site-registry.js";
+import { abortable, boundedSource, emitTrace } from "./bounded-source.js";
 import {
   buildOfficialIdentifierSearchRequest,
   buildOfficialTextSearchRequest,
@@ -148,7 +150,7 @@ async function completeSectorProof({ row, signal, fallback, fetchOfficial, fresh
   }
 }
 
-export async function resolveIdentityForEnrichment({
+async function resolveBaseIdentity({
   row,
   signal,
   geocode,
@@ -156,6 +158,7 @@ export async function resolveIdentityForEnrichment({
   findPublishedLinks = findPublishedIdentityLinks,
   findSectorLinks = findFinessIdentityLinks,
   resolveFallback = resolveStructureIdentity,
+  onProgress,
 } = {}) {
   if (!row) throw new Error("Fiche Grist absente.");
   const startedAt = Date.now();
@@ -232,10 +235,11 @@ export async function resolveIdentityForEnrichment({
     }
     return result;
   } });
+  try { onProgress?.(fallback); } catch { /* Diagnostics cannot change a decision. */ }
   if (fallback?.decision?.status !== IDENTITY_STATES.MATCH_VERIFIED) {
     fallback = await completeSectorProof({
       row, signal, fallback, fetchOfficial, freshOfficial, findSectorLinks,
-      deadlineMs: Math.min(FINESS_BUDGET.deadlineMs, IDENTITY_BUDGET.deadlineMs - (Date.now() - startedAt) - 100),
+      deadlineMs: Math.min(FINESS_BUDGET.deadlineMs, IDENTITY_BUDGET.deadlineMs - (Date.now() - startedAt) - 300),
     });
   }
   const combinedDiagnostics = [...diagnostics, ...(fallback?.diagnostics ?? [])];
@@ -251,4 +255,155 @@ export async function resolveIdentityForEnrichment({
     };
   }
   return { ...fallback, diagnostics: combinedDiagnostics };
+}
+
+// A single coordinator owns the evidence and the deadline. Discovery sources
+// run independently; the Annuaire remains the authority for each geographic
+// SIRET/sector-identifier binding. Completed observations are checkpointed.
+export async function resolveIdentityForEnrichment(options = {}) {
+  const { row, signal, onProgress, onEvent, findRegistrySites = findOfficialRegistrySites } = options;
+  if (!row) throw new Error("Fiche Grist absente.");
+  const started = Date.now();
+  const trace = [];
+  const results = new Map();
+  const fresh = new Map();
+  const diagnostics = [];
+  let registrySettled = typeof findRegistrySites !== "function";
+  const sectorFirst = !row.SirenSiret && /\b(ecole|college|lycee|ehpad|residence|ssiad)\b/.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
+  let releaseRegistry;
+  const registryReady = new Promise(resolve => { releaseRegistry = resolve; });
+  if (registrySettled) releaseRegistry();
+  const event = entry => {
+    if (trace.length < 160) trace.push({ ...entry, atMs: Date.now() - started });
+    emitTrace(onEvent, entry);
+  };
+  const combine = () => {
+    const all = [...results.values()];
+    const candidates = all.flatMap(result => result.candidates ?? []);
+    const links = all.flatMap(result => result.links ?? []);
+    const coverage = all.flatMap(result => result.coverage ?? []);
+    const location = all.find(result => result.selectedGeocode)?.selectedGeocode ?? null;
+    let decision = decideIdentity({ row, candidates, links, coverage, location });
+    if (decision.status === IDENTITY_STATES.NO_MATCH && all.some(result => result.decision?.status === IDENTITY_STATES.INCOMPLETE)) {
+      decision = { ...decision, status: IDENTITY_STATES.INCOMPLETE, reason: "Une recherche nécessaire reste incomplète ; aucune identité n’est inventée." };
+    }
+    const unresolved = all.flatMap(result => result.unresolvedBindings ?? []);
+    if (unresolved.length && !row.SirenSiret && decision.status === IDENTITY_STATES.MATCH_VERIFIED) {
+      decision = { ...decision, status: IDENTITY_STATES.INCOMPLETE, reason: "Un autre rattachement sectoriel reste à revalider ; aucun choix automatique." };
+    }
+    const unverifiedSites = all.flatMap(result => result.unverifiedSites ?? []);
+    if (!decision.candidate && decision.status === IDENTITY_STATES.INCOMPLETE && unverifiedSites.length === 1) {
+      decision = { ...decision, candidate: unverifiedSites[0] };
+    }
+    return {
+      decision, candidates, links, coverage,
+      displayCandidates: decisionCandidates(decision), requests: all.flatMap(result => result.requests ?? []),
+      geocodeCandidates: all.flatMap(result => result.geocodeCandidates ?? []),
+      selectedGeocode: location,
+      diagnostics: [...new Set([...diagnostics, ...all.flatMap(result => result.diagnostics ?? [])])], trace,
+    };
+  };
+  let planSignal;
+  const update = (key, result) => {
+    if (planSignal?.aborted || signal?.aborted || !result) return;
+    results.set(key, result);
+    try { onProgress?.(combine()); } catch { /* Observers do not own resolution. */ }
+  };
+  const originalFetch = options.fetchOfficial ?? fetchOfficialRequest;
+  const fetchValidated = async (request, requestOptions = {}) => {
+    const result = await boundedSource(`annuaire:${request.kind}`, sourceSignal => originalFetch(request, { ...requestOptions, signal: sourceSignal, onEvent: event }),
+      { signal: requestOptions.signal ?? planSignal, timeoutMs: IDENTITY_BUDGET.requestMs, onEvent: event });
+    if (result.cached === false) for (const candidate of result.items ?? []) fresh.set(candidate.siret, { candidate, result, request, checkedAt: new Date().toISOString() });
+    return result;
+  };
+  try {
+    const completed = await boundedSource("identity:plan", async sourceSignal => {
+      planSignal = sourceSignal;
+      const fallback = options.resolveFallback ?? resolveStructureIdentity;
+      const published = options.findPublishedLinks === undefined ? findPublishedIdentityLinks : options.findPublishedLinks;
+      const base = (async () => {
+        // A known sector registry can supply the geographic SIRET directly.
+        // Do not consume the Annuaire's rate-limited slot with a broad public-
+        // name query while that bounded, local source is being revalidated.
+        if (sectorFirst) await abortable(registryReady, sourceSignal);
+        if (sectorFirst && combine().decision.status === IDENTITY_STATES.MATCH_VERIFIED) return null;
+        return resolveBaseIdentity({ ...options, signal: sourceSignal, fetchOfficial: fetchValidated, onProgress: result => update("base", result),
+        findPublishedLinks: typeof published === "function" ? args => boundedSource("published:discovery", child => published({ ...args, signal: child }),
+          { signal: sourceSignal, timeoutMs: 1000, onEvent: event }) : published,
+        resolveFallback: args => fallback({ ...args, onEvent: event, onProgress: result => update("base", result),
+          deadlineMs: Math.max(1, IDENTITY_BUDGET.deadlineMs - (Date.now() - started) - 300) }),
+        });
+      })().then(result => { update("base", result); return "base"; }).catch(error => {
+        if (!sourceSignal.aborted) diagnostics.push(`Résolution Annuaire : ${error.message}`);
+        return "base";
+      });
+      const registry = (async () => {
+        if (typeof findRegistrySites !== "function") return;
+        const requests = []; const candidates = []; const links = []; const coverage = []; const unresolvedBindings = []; const unverifiedSites = [];
+        try {
+          const discovery = await findRegistrySites({ row, signal: sourceSignal, onEvent: event });
+          const records = discovery.records ?? [];
+          const ids = [...new Set(records.map(record => record.siret).filter(id => /^\d{14}$/.test(id)))];
+          if (!discovery.complete || ids.length > 2) {
+            diagnostics.push(discovery.message || "Plusieurs sites sectoriels nécessitent une recherche plus précise.");
+            coverage.push({ source: "registry:discovery", status: "error", required: true, coverage: { complete: false } });
+          } else {
+            for (const siret of ids) {
+              if (sourceSignal.aborted) return;
+              const request = buildOfficialIdentifierSearchRequest(siret);
+              requests.push({ source: "annuaire:registry", kind: request.kind, url: request.url });
+              try {
+                let current = fresh.get(siret);
+                if (!current) {
+                  const result = await fetchValidated(request, { signal: sourceSignal, cacheTtlMs: 0 });
+                  current = { candidate: exactCandidate(result, siret), result, request, checkedAt: new Date().toISOString() };
+                }
+                if (current.candidate) candidates.push(current.candidate);
+                for (const record of records.filter(record => record.siret === siret)) {
+                  const link = current.candidate && verifiedRegistryLink(record, current.candidate, { checkedAt: current.checkedAt, url: current.request.url });
+                  if (link) links.push(link);
+                  else diagnostics.push(`${record.kind} ${record.recordId} : le SIRET, l’adresse ou l’identifiant du site n’est pas revalidé dans l’Annuaire.`);
+                }
+              } catch (error) {
+                if (sourceSignal.aborted) return;
+                unresolvedBindings.push(siret);
+                diagnostics.push(`Revalidation du site ${siret} : ${error.message}`);
+                coverage.push({ source: `annuaire:registry:${siret}`, status: "error", required: true, coverage: { complete: false } });
+                for (const record of records.filter(record => record.siret === siret)) unverifiedSites.push({
+                  siret, raisonSociale: "", nomCommercial: record.name, aliases: record.publicNames, nomUsuelDistinct: true,
+                  adresse: record.adresse, registryOnly: true, registryRecord: record,
+                });
+              }
+              update("registry", { candidates, links, coverage, requests, unresolvedBindings, unverifiedSites });
+            }
+          }
+          if (records.length && !ids.length) diagnostics.push("Le référentiel atteste un site public mais ne fournit pas de SIRET propre revalidable.");
+          update("registry", { candidates, links, coverage, requests, unresolvedBindings, unverifiedSites });
+        } catch (error) {
+          if (!sourceSignal.aborted) {
+            diagnostics.push(`Référentiels de sites : ${error.message}`);
+            update("registry", { coverage: [{ source: "registry:discovery", status: "error", required: /\b(ecole|college|lycee|ehpad|residence|ssiad)\b/i.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "")), coverage: { complete: false } }] });
+          }
+        } finally { registrySettled = true; releaseRegistry(); }
+      })().then(() => "registry");
+      const pending = new Map([["base", base], ["registry", registry]]);
+      while (pending.size) {
+        const name = await Promise.race(pending.values()); pending.delete(name);
+        const result = combine();
+        if (result.decision.status === IDENTITY_STATES.MATCH_VERIFIED && (registrySettled || row.SirenSiret
+          || !/\b(ecole|college|lycee|ehpad|residence|ssiad)\b/.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()))) return result;
+      }
+      return combine();
+    }, { signal, timeoutMs: IDENTITY_BUDGET.deadlineMs - 100, onEvent: event });
+    return { ...completed, trace: [...trace] };
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    const result = combine();
+    if (result.decision.status !== IDENTITY_STATES.MATCH_VERIFIED && !result.decision.identifierConflict) result.decision = {
+      ...result.decision, status: IDENTITY_STATES.INCOMPLETE,
+      reason: "Certaines sources nécessaires n’ont pas répondu ; les résultats et preuves déjà reçus sont conservés.",
+    };
+    result.diagnostics.push(error.message);
+    return { ...result, trace: [...trace] };
+  }
 }

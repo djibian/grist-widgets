@@ -209,25 +209,32 @@ function setSimilarity(left, right) {
   return Math.max(jaccard, containment * 0.95);
 }
 
-export function parseSiteAddress(value) {
+export function parseSiteAddress(value, { communeHint = "" } = {}) {
   const raw = String(value ?? "").trim();
   const location = extractLocationFromAddress(raw);
   const postalMatch = [...raw.matchAll(/\b\d{5}\b/g)].at(-1);
   const beforePostal = postalMatch ? raw.slice(0, postalMatch.index) : raw;
   const house = parseHouseNumber(beforePostal);
+  // Missing postcode does not erase an explicitly written commune. A hint is
+  // accepted only when its complete canonical name is a suffix of the input.
+  const hinted = !location.commune && communeHint && canonicalPlace(raw).endsWith(` ${canonicalPlace(communeHint)}`)
+    ? communeHint : "";
+  const commune = location.commune || hinted;
   return {
     raw,
     codePostal: location.codePostal,
-    commune: canonicalPlace(location.commune),
+    commune: canonicalPlace(commune),
     number: house.number,
     repetition: house.repetition,
-    streetTokens: streetTokens(raw, location.commune),
+    streetTokens: streetTokens(raw, commune),
   };
 }
 
 export function addressEvidence(targetAddress, candidateAddress) {
-  const target = parseSiteAddress(targetAddress);
-  const candidate = parseSiteAddress(candidateAddress);
+  const initialTarget = parseSiteAddress(targetAddress);
+  const initialCandidate = parseSiteAddress(candidateAddress);
+  const target = parseSiteAddress(targetAddress, { communeHint: initialCandidate.commune });
+  const candidate = parseSiteAddress(candidateAddress, { communeHint: initialTarget.commune });
   const postal = target.codePostal && candidate.codePostal
     ? target.codePostal === candidate.codePostal ? "same" : "conflict"
     : "unknown";
@@ -298,10 +305,65 @@ function targetCoordinates(row, location) {
     || usableCoordinates(location?.latitude, location?.longitude);
 }
 
+export function registryPublicNameMatch(target, published, kind, categoryCode = "", siteType = "") {
+  const input = comparisonTokens(target);
+  const official = comparisonTokens(published);
+  const schoolTypes = new Set(["ecole", "college", "lycee"]);
+  if (kind === "education") {
+    const requested = input.find(token => schoolTypes.has(token));
+    const actual = official.find(token => schoolTypes.has(token)) || comparisonTokens(siteType).find(token => schoolTypes.has(token));
+    if (requested && requested !== actual) return false;
+  } else {
+    const categories = { ehpad: "500", ssiad: "354", usld: "362" };
+    if (input.some(token => categories[token] && categories[token] !== categoryCode)) return false;
+  }
+  const descriptors = new Set(kind === "education"
+    ? ["ecole", "college", "lycee", "primaire", "prive", "privee", "public", "publique", "elementaire", "maternelle", "general", "generale", "technologique", "professionnel", "professionnelle", "agricole", ...FUNCTION_WORDS]
+    : ["ehpad", "residence", "ssiad", "usld", ...FUNCTION_WORDS]);
+  const stem = words => {
+    let index = 0;
+    while (index < words.length && descriptors.has(words[index])) index += 1;
+    return words.slice(index).filter(token => !FUNCTION_WORDS.has(token)).join(" ");
+  };
+  const left = stem(input);
+  return left.length >= 4 && left === stem(official);
+}
+
+export function registrySiteMatches(row, record) {
+  const names = targetNameVariants(row, { includeCategoryFallback: false });
+  if (!names.some(name => (record.publicNames ?? [record.name]).some(published => registryPublicNameMatch(name, published, record.kind, record.categoryCode, record.siteType)))) return false;
+  const address = addressEvidence(row.Adresse, record.adresse);
+  return address.compatible && address.commune === "same" && address.postal !== "conflict";
+}
+
+export function registryLinkValid(link, candidate, row) {
+  const record = link.registryRecord;
+  const binding = link.officialBinding;
+  if (!record || !registrySiteMatches(row, record) || record.siret !== candidate.siret
+    || link.siret !== candidate.siret || record.recordId !== link.sourceRecordId
+    || binding?.siret !== candidate.siret || !binding.checkedAt || !binding.url || candidate.etatAdministratif !== "A") return false;
+  const address = addressEvidence(candidate.adresse, record.adresse);
+  if (!address.compatible || address.postal !== "same" || address.commune !== "same") return false;
+  if (record.kind === "education") return record.status === "OUVERT" && record.native?.etat === "OUVERT"
+    && record.name === record.native.nom_etablissement && record.publicNames?.includes(record.native.nom_etablissement)
+    && record.native?.identifiant_de_l_etablissement === record.recordId && record.native?.siren_siret === candidate.siret
+    && /^\d{7}[A-Z]$/.test(record.recordId)
+    && candidate.uaiIds?.includes(record.recordId) && binding.uaiIds?.includes(record.recordId);
+  return record.kind === "finess" && record.status === "A" && record.native?.etatObjet === "A"
+    && record.native?.informationsGeneralesEGE?.numFinessEge === record.recordId
+    && record.native?.informationsGeneralesEGE?.siret === candidate.siret && normalizeFiness(record.recordId)
+    && candidate.finessIds?.includes(record.recordId) && binding.finessIds?.includes(record.recordId)
+    && link.registryEvidence?.type === "EGE" && link.registryEvidence?.siret === candidate.siret;
+}
+
 function linkEvidenceFor(candidate, row, links) {
   const siret = normalizeIdentifier(candidate?.siret);
   for (const link of Array.isArray(links) ? links : []) {
     if (!siret || normalizeIdentifier(link?.siret) !== siret || !link?.verifiedOfficial) continue;
+    if (link.registryRecord && ["education", "finess"].includes(link.source)) {
+      if (registryLinkValid(link, candidate, row)) return { verified: true, link, nameCompatible: true, siteCompatible: true, distance: null };
+      continue;
+    }
     if (link.source === "finess") {
       const registry = link.registryEvidence;
       const binding = link.officialBinding;
@@ -332,7 +394,7 @@ function linkEvidenceFor(candidate, row, links) {
     const linkCoords = usableCoordinates(link?.latitude, link?.longitude);
     const distance = distanceMeters(rowCoords, linkCoords);
     const nameCompatible = names.exactDistinctiveAlias || names.strongDistinctiveAlias;
-    const siteCompatible = address.compatible || (distance !== null && distance <= 300);
+    const siteCompatible = address.compatible && !address.conflict;
     if (nameCompatible && siteCompatible) {
       return { verified: true, link, nameCompatible, siteCompatible, distance };
     }
@@ -348,6 +410,7 @@ function mergeCandidateGroup(group) {
     ...first,
     aliases,
     finessIds: unique(sorted.flatMap(item => item.finessIds ?? []).map(normalizeFiness)),
+    uaiIds: unique(sorted.flatMap(item => item.uaiIds ?? [])),
     nomUsuelDistinct: aliases.length > 0,
     nomCommercial: aliases[0] || first.nomCommercial,
     observations: sorted,
@@ -393,7 +456,8 @@ export function candidateCertificate(row, candidate, { location = null, links = 
   const distance = bestDistance(row, candidate, location);
   const link = linkEvidenceFor(candidate, row, links);
   const inactive = candidate?.etatAdministratif && candidate.etatAdministratif !== "A";
-  const conflict = Boolean(inactive || address.conflict);
+  const conflict = Boolean(inactive || address.conflict
+    || (exactSiret && names.publicAliasMismatch && !["education", "finess"].includes(link.link?.source)));
 
   const publicIdentity = names.exactDistinctiveAlias || names.strongDistinctiveAlias;
   const legalIdentity = !names.publicAliasMismatch && (names.legalExact || names.legalStrong);
@@ -412,7 +476,9 @@ export function candidateCertificate(row, candidate, { location = null, links = 
 
   const explanations = [];
   if (exactSiret) explanations.push("SIRET identique à la fiche et revalidé dans l’Annuaire");
-  if (link.verified) explanations.push(link.link?.source === "finess"
+  if (link.verified) explanations.push(link.link?.source === "education"
+    ? `UAI ${link.link.sourceRecordId} : établissement scolaire ouvert, nom/adresse et SIRET exacts, rattachement UAI revalidé dans l’Annuaire`
+    : link.link?.source === "finess"
     ? `FINESS géographique ${link.link.sourceRecordId} : nom public et adresse concordants, SIRET ${candidateSiret} explicite et rattachement FINESS revalidé dans l’Annuaire`
     : `Référence SIRET explicite ${link.link?.sourceLabel || link.link?.source || "POI"}, revalidée dans l’Annuaire`);
   if (names.exactDistinctiveAlias) explanations.push(`Nom public distinctif concordant${names.bestAlias ? ` : ${names.bestAlias}` : ""}`);
@@ -422,7 +488,7 @@ export function candidateCertificate(row, candidate, { location = null, links = 
   if (address.complete) explanations.push("Adresse de site complète concordante");
   else if (address.compatible) explanations.push("Adresse de site compatible mais incomplète");
   if (distance !== null && distance <= 300) explanations.push(`Localisation compatible (${Math.round(distance)} m)`);
-  if (names.publicAliasMismatch) explanations.push("Nom public de cet établissement incompatible avec la fiche");
+  if (names.publicAliasMismatch && !link.verified) explanations.push("Nom public de cet établissement incompatible avec la fiche");
   if (address.conflict) explanations.push("Contradiction d’adresse explicite");
   if (inactive) explanations.push("Établissement signalé non actif");
 
@@ -479,18 +545,19 @@ export function decideIdentity({ row, candidates = [], links = [], coverage = []
     }
     if (exactCertificate?.conflict) {
       return {
-        status: IDENTITY_STATES.INCOMPLETE,
-        candidate: exactCertificate.candidate,
-        alternatives: [],
+        status: IDENTITY_STATES.NO_MATCH,
+        candidate: null,
+        alternatives: certificates.filter(item => item.level === "verified" && !item.exactSiret && item.admissible).map(item => item.candidate).slice(0, 2),
         certificates,
         coverage: coverageSummary,
-        reason: "Le SIRET existe mais des informations explicites du site se contredisent.",
+        identifierConflict: { siret: identifiers.siret, adresse: exactCertificate.candidate.adresse },
+        reason: `Le SIRET ${identifiers.siret} désigne ${exactCertificate.candidate.adresse} : il ne confirme pas le site saisi. Toute correction doit être validée explicitement.`,
       };
     }
     return {
       status: coverageSummary.complete ? IDENTITY_STATES.NO_MATCH : IDENTITY_STATES.INCOMPLETE,
       candidate: null,
-      alternatives: [],
+      alternatives: certificates.filter(item => item.level === "verified" && item.admissible).map(item => item.candidate).slice(0, 2),
       certificates,
       coverage: coverageSummary,
       reason: coverageSummary.complete

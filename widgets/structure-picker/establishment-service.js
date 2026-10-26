@@ -6,6 +6,15 @@ import { IDENTITY_BUDGET } from "./identity-orchestrator.js";
 
 export const ESTABLISHMENT_BUDGET = Object.freeze({ deadlineMs: 24000, indexedDeadlineMs: 10000, osmDeadlineMs: 1500 });
 
+function incompleteIdentity(partial, message) {
+  const previous = partial.identity;
+  return previous ? { ...previous, decision: previous.decision?.status === IDENTITY_STATES.MATCH_VERIFIED || previous.decision?.identifierConflict
+    ? previous.decision : { ...previous.decision, status: IDENTITY_STATES.INCOMPLETE, reason: "Réponses nécessaires manquantes ; informations reçues conservées." },
+    diagnostics: [...(previous.diagnostics ?? []), message] }
+    : { decision: { status: IDENTITY_STATES.INCOMPLETE, candidate: null, alternatives: [], certificates: [],
+      reason: "Les sources d’identité n’ont pas répondu dans leur budget. Aucune identité n’est inventée." }, candidates: [], links: [], diagnostics: [message], trace: [] };
+}
+
 async function boundedOperation(source, options, timeoutMs, optional = false) {
   if (options.signal?.aborted) throw options.signal.reason ?? new DOMException("Aborted", "AbortError");
   const controller = new AbortController();
@@ -20,18 +29,20 @@ async function boundedOperation(source, options, timeoutMs, optional = false) {
       const error = new DOMException(optional ? "Source de position hors délai" : "Le délai maximal de l’analyse d’identité a été atteint.", "TimeoutError");
       controller.abort(error);
       if (optional) resolve({ observations: [...partial.observations], coverage: [...partial.coverage, { source: source.name, status: "timeout" }] });
-      else reject(error);
+      else resolve(incompleteIdentity(partial, error.message));
     }, timeoutMs);
   });
   try {
     if (options.signal?.aborted) throw options.signal.reason ?? new DOMException("Aborted", "AbortError");
     return await Promise.race([source({ ...options, signal: controller.signal, partial }), stopped]);
   } catch (error) {
-    if (options.signal?.aborted || !optional) throw error;
-    return { observations: [], coverage: [{ source: source.name, status: "error", message: error.message }] };
+    if (options.signal?.aborted) throw error;
+    if (!optional) return incompleteIdentity(partial, error.message);
+    return { observations: [...partial.observations], coverage: [...partial.coverage, { source: source.name, status: "error", message: error.message }] };
   } finally {
     clearTimeout(timer);
     options.signal?.removeEventListener("abort", onAbort);
+    controller.abort();
   }
 }
 
@@ -50,18 +61,29 @@ export async function resolveEstablishmentForEnrichment({
   ...identityOptions
 } = {}) {
   const identity = await boundedOperation(
-    options => resolveIdentity({ ...identityOptions, row, signal: options.signal }),
+    options => resolveIdentity({ ...identityOptions, row, signal: options.signal,
+      onProgress: result => {
+        if (options.signal.aborted) return;
+        options.partial.identity = result;
+        identityOptions.onProgress?.(result);
+      },
+    }),
     { signal }, IDENTITY_BUDGET.deadlineMs,
   );
   const decision = identity.decision;
   const eligible = [IDENTITY_STATES.MATCH_VERIFIED, IDENTITY_STATES.MATCH_PROBABLE].includes(decision?.status);
   const official = eligible ? decision.candidate : null;
   if (!official) {
+    const partial = decision?.status === IDENTITY_STATES.INCOMPLETE && decision.candidate ? {
+      ...decision.candidate, latitude: null, longitude: null, identityStatus: decision.status,
+      position: { siret: decision.candidate.siret, status: POSITION_STATES.UNRESOLVED, latitude: null, longitude: null, source: null, proof: [], evidence: [], coverage: [], reason: "Identité à revalider : aucune position finale rattachée." },
+    } : null;
     const alternatives = (decision?.alternatives ?? []).map(candidate => ({
       ...candidate, latitude: null, longitude: null, identityStatus: decision.status,
       position: { siret: candidate.siret, status: POSITION_STATES.UNRESOLVED, latitude: null, longitude: null, source: null, proof: [], evidence: [], coverage: [], reason: "Identité non résolue : aucune position de site rattachée." },
     }));
-    return { decision: { ...decision, alternatives }, candidate: null, alternatives, diagnostics: identity.diagnostics ?? [] };
+    return { decision: { ...decision, candidate: partial, alternatives }, candidate: partial, alternatives,
+      diagnostics: identity.diagnostics ?? [], trace: identity.trace ?? [], discovery: identity.geocodeCandidates ?? [] };
   }
 
   const sourceOptions = { candidate: official, links: identity.links ?? [], identityStatus: decision.status, signal };
@@ -83,5 +105,5 @@ export async function resolveEstablishmentForEnrichment({
     identityProof: decision.certificates?.find(item => item.siret === official.siret)?.explanations ?? [],
     identityLinks: (identity.links ?? []).filter(link => link.siret === official.siret),
   };
-  return { decision: { ...decision, candidate }, candidate, alternatives: [], diagnostics: identity.diagnostics ?? [] };
+  return { decision: { ...decision, candidate }, candidate, alternatives: [], diagnostics: identity.diagnostics ?? [], trace: identity.trace ?? [] };
 }

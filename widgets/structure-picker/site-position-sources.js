@@ -2,6 +2,7 @@ import { loadContactIndexManifest, loadContactIndexShard, resolveContactIndexSha
 import { extractLocationFromAddress, normalizeIdentifier } from "./search.js";
 import { findIndexedFinessPositions, osmSitePositionFromElement, verifiedGeographicFiness } from "./osm-site-positions.js";
 import { findIndexedAddressBuildings } from "./address-building-positions.js";
+import { findIndexedEducationPositions } from "./registry-site-positions.js";
 
 const manifestCache = new Map();
 const MANIFEST_CACHE_MS = 5 * 60 * 1000;
@@ -32,9 +33,20 @@ export function warmSitePositionManifest({ manifestUrl = CONTACT_INDEX_MANIFEST_
 export async function findIndexedSitePositions({ candidate, links = [], identityStatus, signal, fetchImpl = globalThis.fetch, manifestUrl = CONTACT_INDEX_MANIFEST_URL, partial = { observations: [], coverage: [] } } = {}) {
   const postcode = candidate.codePostal || extractLocationFromAddress(candidate.adresse).codePostal;
   const { observations, coverage } = partial;
+  const educationPositions = findIndexedEducationPositions({ candidate, links, identityStatus, signal, fetchImpl }).then(result => {
+    if (signal?.aborted) return;
+    observations.push(...result.observations);
+    coverage.push(...result.coverage);
+  });
   // Identifier lookup is independent of the postcode manifest. Its completed
   // evidence survives a slow optional manifest/shard and the shared deadline.
   const finessPositions = findIndexedFinessPositions({ candidate, links, identityStatus, signal, fetchImpl }).then(result => {
+    if (signal?.aborted) return;
+    observations.push(...result.observations);
+    coverage.push(...result.coverage);
+  });
+  const finessSiteGeometries = findIndexedFinessPositions({ candidate, links, identityStatus, signal, fetchImpl,
+    baseUrl: new URL("./site-position-indexes/osm-finess-sites/", import.meta.url) }).then(result => {
     if (signal?.aborted) return;
     observations.push(...result.observations);
     coverage.push(...result.coverage);
@@ -79,7 +91,7 @@ export async function findIndexedSitePositions({ candidate, links = [], identity
       }
     }));
   })();
-  await Promise.all([finessPositions, buildingPositions, postcodePositions]);
+  await Promise.all([educationPositions, finessPositions, finessSiteGeometries, buildingPositions, postcodePositions]);
   return { observations, coverage };
 }
 
@@ -90,7 +102,7 @@ export async function findOsmSiretPositions({ candidate, links = [], identitySta
   // repeated calls to other Overpass instances when the optional source stalls.
   const finess = identityStatus === "MATCH_VERIFIED" ? verifiedGeographicFiness(candidate, links).map(link => link.sourceRecordId) : [];
   const filters = [`nwr["ref:FR:SIRET"="${siret}"];`, ...[...new Set(finess)].slice(0, 2).map(id => `nwr["ref:FR:FINESS"="${id}"];`)];
-  const query = `[out:json][timeout:2];(${filters.join("")});out meta center;`;
+  const query = `[out:json][timeout:2];(${filters.join("")});out meta geom;`;
   const response = await fetchImpl("https://overpass-api.de/api/interpreter", {
     method: "POST", body: new URLSearchParams({ data: query }).toString(),
     headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, signal,

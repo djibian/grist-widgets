@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { setImmediate as settle } from "node:timers/promises";
 import { resetOfficialClientForTests } from "../enterprise-client.js";
+import { resetRegistryCacheForTests } from "../official-site-registry.js";
 
 // Exercise the sole enrichment listener loaded by index.html with the actual
 // identity, index-source and position pipeline, fake Grist and controlled network races.
@@ -81,6 +82,22 @@ const scenarios = [
     latitude: 46.86, longitude: -1.895, label: "Identité confirmée",
   },
 ];
+const newCases = [
+  { name: "École de l’Alliance", address: "55 boulevard Jean XXIII, 85300 Challans", siret: "32548690000062", fixture: "alliance", label: "Identité confirmée" },
+  { name: "Résidence Marie et Albert Guillonneau", address: "27 rue de la Gazonnière, 85300 Challans", siret: "26850050100070", fixture: "guillonneau", label: "Identité confirmée" },
+  { name: "École Sainte Marie", address: "9 rue de la Paix, Saint-Lumine-de-Coutais", inputSiret: "78605938600015", siret: "78605938600023", fixture: "marie", label: "Aucune identité démontrée" },
+  { name: "École Sainte Marie", address: "9 rue de la Paix, 44310 Saint-Lumine-de-Coutais", inputSiret: "78605938600015", siret: "78605938600023", fixture: "marie", label: "Aucune identité démontrée" },
+  { name: "Maison de l’enfance", address: "10 ter place du Champ de Foire, 44650 Legé", siret: "", fixture: "enfance", label: "Aucune identité démontrée" },
+];
+scenarios.push(...newCases);
+const registryManifest = JSON.parse(await readFile(new URL("../identity-links/site-registry/manifest.json", import.meta.url), "utf8"));
+const registryAssets = new Map(await Promise.all([
+  "identity-links/site-registry/manifest.json",
+  ...registryManifest.communes.filter(town => ["85047", "44174", "44081"].includes(town.code)).flatMap(town => town.files.map(file => `identity-links/site-registry/${file}`)),
+  "site-position-indexes/osm-education/085125.json", "site-position-indexes/osm-education/044133.json", "site-position-indexes/osm-finess-sites/850025.json",
+].map(async file => [file, await readFile(new URL(`../${file}`, import.meta.url), "utf8")])));
+const newOfficialFixtures = new Map(await Promise.all(["marie-seat-annuaire", "marie-site-annuaire", "alliance-annuaire", "guillonneau-annuaire", "enfance-annuaire", "alliance-text-annuaire", "guillonneau-text-annuaire"]
+  .map(async file => [file, await readFile(new URL(`./fixtures/resolution/${file}.json`, import.meta.url), "utf8")])));
 
 function officialPayload(scenario) {
   if (scenario.siret === "26850025300011") return ehpadOfficial;
@@ -111,9 +128,9 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     .map(id => [id, Object.assign(new Element(id === "enrich-button" ? "button" : "div"), { id })]));
   const mappings = { NomCommercial: "Nom_usuel", Adresse: "Adresse", SirenSiret: "Numero_d_immatriculation", RaisonSociale: "Raison_sociale", Latitude: "Latitude", Longitude: "Longitude" };
   const table = {
-    id: [1, 2, 3, 4], Nom_usuel: scenarios.map(item => item.name), Adresse: scenarios.map(item => item.address),
-    Numero_d_immatriculation: ["", "", "", ""], Raison_sociale: ["", "", "", ""],
-    Latitude: [0, 0, 0, 0], Longitude: [0, 0, 0, 0], PositionSource: ["", "", "", ""], PositionProof: ["", "", "", ""],
+    id: scenarios.map((_, i) => i + 1), Nom_usuel: scenarios.map(item => item.name), Adresse: scenarios.map(item => item.address),
+    Numero_d_immatriculation: scenarios.map(item => item.inputSiret || ""), Raison_sociale: scenarios.map(() => ""),
+    Latitude: scenarios.map(() => 0), Longitude: scenarios.map(() => 0), PositionSource: scenarios.map(() => ""), PositionProof: scenarios.map(() => ""),
   };
   let onRecord;
   let current = scenarios[0];
@@ -155,6 +172,10 @@ test("Grist shows a single coherent site candidate and preserves the four identi
   t.mock.method(globalThis, "fetch", async (rawUrl, options = {}) => {
     const url = new URL(rawUrl);
     requests.push({ url, signal: options.signal, body: options.body, at: Date.now() });
+    if (url.pathname.includes("/identity-links/site-registry/") || /site-position-indexes\/osm-(?:education|finess-sites)\//.test(url.pathname)) {
+      if (current.fixture) { const file = url.pathname.split("/structure-picker/").at(-1); return registryAssets.has(file) ? new Response(registryAssets.get(file)) : new Response("", { status: 404 }); }
+      return Response.json({ schemaVersion: 1, generatedAt: "2026-10-26T00:00:00Z", communes: [] });
+    }
     if (url.pathname.endsWith("/identity-links/published.json")) return Response.json(published);
     if (url.pathname.endsWith("/identity-links/finess/850002.json")) {
       if (mode === "pending-finess") return new Promise(() => {});
@@ -192,6 +213,12 @@ test("Grist shows a single coherent site candidate and preserves the four identi
       return Response.json({ features: [{ geometry: { coordinates: [current.longitude, current.latitude] }, properties: { label: current.address, postcode: current.postcode, city: current.city, score: 0.64 } }] });
     }
     assert.equal(url.hostname, "recherche-entreprises.api.gouv.fr");
+    if (current.fixture) {
+      const q = url.searchParams.get("q");
+      const fixtureName = q === "78605938600015" ? "marie-seat-annuaire" : q === "78605938600023" ? "marie-site-annuaire"
+        : q === current.siret ? `${current.fixture}-annuaire` : current.fixture === "enfance" ? "enfance-annuaire" : `${current.fixture}-text-annuaire`;
+      return new Response(newOfficialFixtures.get(fixtureName));
+    }
     if (mode === "pending-verification" && url.searchParams.get("q") === scenarios[0].siret) return pendingUntilAborted(options.signal);
     // The unpatched UI searches Super U by text, then nearby, then awaits OSM.
     if (current === scenarios[0] && url.searchParams.get("q") !== current.siret && url.searchParams.get("q") !== current.legalName && url.pathname === "/search") {
@@ -207,6 +234,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     onRecord({ id: index + 1 }, mappings);
     await settle();
     resetOfficialClientForTests();
+    resetRegistryCacheForTests();
     requests.length = 0;
   }
   function click() {
@@ -240,13 +268,13 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.match(uiText, /nom public attesté/);
     assert.equal(nodes["establishment-candidate"].querySelectorAll(".establishment-card").length, 1);
     assert.equal(nodes["establishment-candidate"].querySelectorAll('input[type="radio"]').length, 0);
-    assert.equal(requests[1].url.searchParams.get("q"), "41091808000020");
+    assert.equal(requests.find(item => item.url.hostname === "recherche-entreprises.api.gouv.fr").url.searchParams.get("q"), "41091808000020");
     t.mock.timers.tick(12000);
     await settle();
     assert.equal(nodes["establishment-candidate"].textContent, uiText, "no late timeout may overwrite verified identity");
   });
 
-  for (let index = 1; index < scenarios.length; index += 1) {
+  for (let index = 1; index < 4; index += 1) {
     await t.test(`${scenarios[index].name} keeps its sole expected SIRET`, async () => {
       await select(index);
       click();
@@ -511,18 +539,16 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     mode = "pending-verification";
     click();
     await settle();
-    assert.equal(requests.length, 2);
-    const verificationSignal = requests[1].signal;
+    const verificationSignal = requests.find(item => item.url.hostname === "recherche-entreprises.api.gouv.fr").signal;
     t.mock.timers.tick(11999);
     await settle();
-    assert.equal(nodes["enrich-button"].disabled, true);
     t.mock.timers.tick(1);
     await settle();
     assert.equal(verificationSignal.aborted, true);
     assert.equal(nodes["enrich-button"].disabled, false);
-    assert.match(nodes["enrich-status"].textContent, /délai maximal/);
-    assert.equal(nodes["establishment-candidate"].textContent, "");
-    assert.equal(requests.length, 2, "failed verification must not launch a fallback after the deadline");
+    assert.match(nodes["establishment-candidate"].textContent, /Analyse incomplète/);
+    assert.equal(requests.some(item => item.url.hostname.startsWith("overpass")), false);
+    mode = "normal";
   });
 
   await t.test("changing Grist selection aborts the old verification and cannot overwrite the new identity", async () => {
@@ -530,7 +556,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     mode = "pending-verification";
     click();
     await settle();
-    const oldSignal = requests[1].signal;
+    const oldSignal = requests.find(item => item.url.hostname === "recherche-entreprises.api.gouv.fr").signal;
     await select(2);
     mode = "normal";
     assert.equal(oldSignal.aborted, true);
@@ -632,4 +658,22 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.equal(proof.proof.find(item => item.kind === "UNIQUE_OFFICIAL_BUILDING").addressId, "85280_0250_00010_bis");
     assert.equal(proof.proof.find(item => item.kind === "RNB_BUILDING_FOOTPRINT").building.rnb_id, "6256NPD4SRW3");
   });
+  for (let index = 4; index < scenarios.length; index += 1) {
+    await t.test(`real Grist listener resolves ${scenarios[index].name} / ${scenarios[index].address} without a global timeout`, async () => {
+      await select(index); click(); await settle();
+      for (const ms of [1800, 1500, 1800, 1500, 4500, 1500]) {
+        if (!nodes["enrich-button"].disabled) break;
+        t.mock.timers.tick(ms); await settle();
+      }
+      assert.equal(nodes["enrich-button"].disabled, false);
+      const text = nodes["establishment-candidate"].textContent;
+      assert.match(text, new RegExp(current.label));
+      assert.doesNotMatch(nodes["enrich-status"].textContent, /délai maximal/);
+      assert.match(text, /Diagnostic des sources/);
+      if (current.siret) assert.ok(text.includes(current.siret));
+      if (current.inputSiret || current.fixture === "enfance") assert.equal(nodes["proposal-panel"].querySelector("#identity-apply-proposals"), null);
+      assert.equal(nodes["establishment-candidate"].querySelectorAll('input[type="radio"]').length, 0);
+      assert.equal(writes.length, 3, "analysis alone never writes any field");
+    });
+  }
 });

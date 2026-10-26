@@ -31,7 +31,7 @@ test("site lookup uses only published postcode shards, preserves provenance and 
   assert.deepEqual(result.observations[1].source.datasets, ["meta", "Overture"]);
 });
 
-test("the optional OSM position query targets exactly the resolved SIRET and preserves geometry provenance", async () => {
+test("the optional OSM position query targets exactly the resolved SIRET and refuses an unqualified bounding-box centre", async () => {
   let calls = 0;
   const result = await findOsmSiretPositions({
     candidate: { siret: "41091808000020" },
@@ -44,6 +44,5 @@ test("the optional OSM position query targets exactly the resolved SIRET and pre
     },
   });
   assert.equal(calls, 1);
-  assert.equal(result.observations[0].source.url, "https://www.openstreetmap.org/way/42");
-  assert.equal(result.observations[0].source.geometry, "center");
+  assert.deepEqual(result.observations, []);
 });

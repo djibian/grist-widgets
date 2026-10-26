@@ -4,7 +4,10 @@ import { readFile } from "node:fs/promises";
 import { buildFinessLookupUrl, findFinessIdentityLinks, finessIdentityLink, FINESS_BUDGET } from "../finess-identity.js";
 import { extractOfficialCandidates } from "../search.js";
 import { resolveStructureIdentity } from "../identity-orchestrator.js";
-import { resolveIdentityForEnrichment } from "../identity-service.js";
+import { resolveIdentityForEnrichment as resolveIdentity } from "../identity-service.js";
+// These tests isolate the FINESS completion adapter. The independent reverse
+// site registry has its own real-source, deadline and contradiction corpus.
+const resolveIdentityForEnrichment = options => resolveIdentity({ findRegistrySites: null, ...options });
 import { resolveEstablishmentForEnrichment } from "../establishment-service.js";
 import { candidateCertificate, decideIdentity } from "../identity-resolution.js";
 
@@ -238,7 +241,8 @@ test("the optional registry phase uses only the remaining global identity budget
   await settle();
   t.mock.timers.tick(10000);
   await settle();
-  t.mock.timers.tick(1900);
+  t.mock.timers.tick(1700); // completion reserves time before the outer watchdog
+  await settle();
   const result = await pending;
   assert.equal(result.decision.status, "MATCH_PROBABLE");
   assert.equal(sourceSignal.aborted, true);

@@ -27,6 +27,8 @@ const state = {
   candidate: null,
   analyzedRow: null,
   proposals: [],
+  diagnostics: [],
+  trace: [],
 };
 
 function clearNode(node) {
@@ -66,6 +68,8 @@ function resetAnalysis() {
   state.candidate = null;
   state.analyzedRow = null;
   state.proposals = [];
+  state.diagnostics = [];
+  state.trace = [];
   if (ui.enrichButton) ui.enrichButton.disabled = true;
   clearNode(ui.candidate);
   clearNode(ui.proposalPanel);
@@ -105,7 +109,8 @@ function candidateCard(candidate) {
   const legal = document.createElement("div");
   legal.className = "choice-detail";
   const finessIds = [...new Set((candidate.identityLinks ?? []).filter(link => link.source === "finess" && link.verifiedOfficial).map(link => link.sourceRecordId))];
-  legal.textContent = `${candidate.raisonSociale || ""} — SIRET ${candidate.siret}${finessIds.length ? ` — FINESS ${finessIds.join(", ")}` : ""}`;
+  const uaiIds = candidate.uaiIds ?? [];
+  legal.textContent = `${candidate.raisonSociale || "Identité juridique à revalider"} — SIRET ${candidate.siret}${finessIds.length ? ` — FINESS ${finessIds.join(", ")}` : ""}${uaiIds.length ? ` — UAI ${uaiIds.join(", ")}` : ""}`;
   const address = document.createElement("div");
   address.className = "choice-detail";
   address.textContent = candidate.adresse;
@@ -115,7 +120,8 @@ function candidateCard(candidate) {
   position.className = "choice-detail";
   const point = candidate.position;
   const located = [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(point?.status);
-  const positionEvidence = point?.source?.geometry === "building-point" ? "point de bâtiment — adresse officielle, BDNB et emprise RNB"
+  const positionEvidence = point?.source?.geometry === "site-interior-point" ? "point intérieur de l’emprise du site — identifiant et adresse officiels concordants"
+    : point?.source?.geometry === "building-point" ? "point de bâtiment — adresse officielle, BDNB et emprise RNB"
     : point?.status === POSITION_STATES.SITE_CONFIRMED ? "identifiants d’établissement explicites" : "nom public attesté + adresse de site concordante";
   position.textContent = located
     ? `${point.latitude}, ${point.longitude} — Position ${point.status === POSITION_STATES.SITE_CONFIRMED ? "confirmée" : "corroborée"} : ${point.source.label}, ${positionEvidence}`
@@ -189,6 +195,25 @@ function renderEstablishment() {
   ui.candidate.append(title, summary);
   if (state.candidate) ui.candidate.appendChild(candidateCard(state.candidate));
   else for (const candidate of (decision.alternatives ?? []).slice(0, 2)) ui.candidate.appendChild(candidateCard(candidate));
+  if (decision.identifierConflict) {
+    const warning = document.createElement("div");
+    warning.className = "help";
+    warning.textContent = "Le SIRET saisi appartient à un autre site. Les alternatives sont informatives : corriger explicitement la fiche puis relancer l’analyse. Aucune écriture automatique.";
+    ui.candidate.appendChild(warning);
+  }
+  const details = document.createElement("details");
+  const label = document.createElement("summary");
+  label.textContent = "Diagnostic des sources";
+  details.appendChild(label);
+  for (const message of state.diagnostics) {
+    const line = document.createElement("div"); line.className = "choice-detail"; line.textContent = message; details.appendChild(line);
+  }
+  for (const event of state.trace.filter(item => item.state !== "start")) {
+    const line = document.createElement("div"); line.className = "choice-detail";
+    line.textContent = `${event.source} : ${event.state} — ${event.elapsedMs ?? 0} ms${event.budgetMs ? ` / budget ${event.budgetMs} ms` : ""}`;
+    details.appendChild(line);
+  }
+  ui.candidate.appendChild(details);
 }
 
 function updateApplyButton() {
@@ -335,6 +360,8 @@ async function runIdentityAnalysis() {
 
     state.decision = result.decision;
     state.candidate = result.candidate;
+    state.diagnostics = result.diagnostics ?? [];
+    state.trace = result.trace ?? [];
     state.analyzedRow = Object.fromEntries(["NomCommercial", "RaisonSociale", "Adresse", "SirenSiret", "Latitude", "Longitude"].map(field => [field, row[field]]));
 
     renderEstablishment();

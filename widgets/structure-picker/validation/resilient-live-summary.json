@@ -1,0 +1,2074 @@
+{
+  "capturedAt": "2026-10-26T22:35:06.096Z",
+  "base": "4d96453fdc47e405fec00e30d541a8a02386f111",
+  "note": "Réseau réel ; même service et mêmes callbacks que le contrôleur Grist. Les exactProbe postérieurs ne sont jamais injectés dans la décision.",
+  "cases": [
+    {
+      "id": "alliance",
+      "row": {
+        "NomCommercial": "École de l’Alliance",
+        "Adresse": "55 boulevard Jean XXIII, 85300 Challans",
+        "SirenSiret": ""
+      },
+      "elapsedMs": 11308,
+      "decision": {
+        "status": "MATCH_VERIFIED",
+        "reason": "Un seul établissement possède une chaîne de preuves suffisante.",
+        "selectedSiret": "32548690000062",
+        "alternatives": [],
+        "certificates": [
+          {
+            "siret": "32548690000062",
+            "level": "verified",
+            "admissible": true,
+            "conflict": false,
+            "explanations": [
+              "UAI 0851256D : établissement scolaire ouvert, nom/adresse et SIRET exacts, rattachement UAI revalidé dans l’Annuaire",
+              "Adresse de site complète concordante"
+            ]
+          }
+        ]
+      },
+      "diagnostics": [],
+      "trace": [
+        {
+          "source": "identity:plan",
+          "state": "start",
+          "startedAt": 1793054110498,
+          "budgetMs": 11900,
+          "atMs": 0
+        },
+        {
+          "source": "registry:discovery",
+          "state": "start",
+          "startedAt": 1793054110502,
+          "budgetMs": 1800,
+          "atMs": 4
+        },
+        {
+          "source": "registry:discovery",
+          "state": "ok",
+          "elapsedMs": 17,
+          "budgetMs": 1800,
+          "atMs": 21
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054110520,
+          "budgetMs": 6500,
+          "atMs": 22
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054110520,
+          "budgetMs": 6500,
+          "atMs": 22
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=32548690000062&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "atMs": 22
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=32548690000062&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "elapsedMs": 0,
+          "atMs": 22
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 5084,
+          "budgetMs": 6500,
+          "atMs": 5106
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 5085,
+          "budgetMs": 6500,
+          "atMs": 5107
+        },
+        {
+          "source": "identity:plan",
+          "state": "ok",
+          "elapsedMs": 5113,
+          "budgetMs": 11900,
+          "atMs": 5113
+        }
+      ],
+      "position": {
+        "status": "UNRESOLVED",
+        "latitude": null,
+        "longitude": null,
+        "source": null,
+        "proof": [],
+        "reason": "Position précise du site non démontrée ; aucune coordonnée proposée."
+      },
+      "exactProbe": {
+        "request": {
+          "kind": "siret",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=32548690000062&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
+        },
+        "sirets": [
+          "32548690000062"
+        ],
+        "coverage": {
+          "source": "annuaire",
+          "page": 1,
+          "perPage": 25,
+          "totalResults": 1,
+          "returnedUnits": 1,
+          "unitSirens": [
+            "325486900"
+          ],
+          "candidateCount": 1,
+          "candidateLimitHit": false,
+          "matchingLimitReached": false,
+          "hasNextPage": false,
+          "completenessKnown": true,
+          "complete": true
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "guillonneau",
+      "row": {
+        "NomCommercial": "Résidence Marie et Albert Guillonneau",
+        "Adresse": "27 rue de la Gazonnière, 85300 Challans",
+        "SirenSiret": ""
+      },
+      "elapsedMs": 4701,
+      "decision": {
+        "status": "MATCH_VERIFIED",
+        "reason": "Un seul établissement possède une chaîne de preuves suffisante.",
+        "selectedSiret": "26850050100070",
+        "alternatives": [],
+        "certificates": [
+          {
+            "siret": "26850050100070",
+            "level": "verified",
+            "admissible": true,
+            "conflict": false,
+            "explanations": [
+              "FINESS géographique 850025917 : nom public et adresse concordants, SIRET 26850050100070 explicite et rattachement FINESS revalidé dans l’Annuaire",
+              "Adresse de site complète concordante"
+            ]
+          }
+        ]
+      },
+      "diagnostics": [],
+      "trace": [
+        {
+          "source": "identity:plan",
+          "state": "start",
+          "startedAt": 1793054125216,
+          "budgetMs": 11900,
+          "atMs": 0
+        },
+        {
+          "source": "registry:discovery",
+          "state": "start",
+          "startedAt": 1793054125216,
+          "budgetMs": 1800,
+          "atMs": 0
+        },
+        {
+          "source": "registry:discovery",
+          "state": "ok",
+          "elapsedMs": 4,
+          "budgetMs": 1800,
+          "atMs": 4
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054125220,
+          "budgetMs": 6500,
+          "atMs": 4
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054125220,
+          "budgetMs": 6500,
+          "atMs": 4
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=26850050100070&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "atMs": 4
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=26850050100070&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "elapsedMs": 0,
+          "atMs": 4
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 152,
+          "budgetMs": 6500,
+          "atMs": 156
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 152,
+          "budgetMs": 6500,
+          "atMs": 156
+        },
+        {
+          "source": "identity:plan",
+          "state": "ok",
+          "elapsedMs": 158,
+          "budgetMs": 11900,
+          "atMs": 158
+        }
+      ],
+      "position": {
+        "status": "SITE_CONFIRMED",
+        "latitude": 46.8389449,
+        "longitude": -1.881625298666242,
+        "source": {
+          "id": "osm",
+          "label": "OpenStreetMap",
+          "recordId": "way:1098104437",
+          "url": "https://www.openstreetmap.org/way/1098104437",
+          "geometry": "site-interior-point",
+          "version": 3,
+          "updatedAt": "2024-11-06T17:56:25Z",
+          "changeset": 158828145,
+          "generatedAt": "2026-10-26T22:27:23.928Z",
+          "indexUrl": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/site-position-indexes/osm-finess-sites/850025.json",
+          "snapshotUrl": "https://www.openstreetmap.org/api/0.6/map?bbox=-1.884,46.837,-1.879,46.840",
+          "license": "ODbL 1.0",
+          "tags": {
+            "addr:housenumber": "27",
+            "addr:street": "Rue de la Gazonnière",
+            "amenity": "social_facility",
+            "name": "Ehpad Marie et Albert Guillonneau",
+            "phone": "+33786213944",
+            "ref:FR:FINESS": "850025917",
+            "ref:FR:NAF": "8710A",
+            "ref:FR:SIREN": "268500501",
+            "ref:FR:SIRET": "26850050100070",
+            "social_facility": "nursing_home",
+            "social_facility:for": "senior",
+            "source": "Le ministère des solidarités et de la santé - 03/2019",
+            "type:FR:FINESS": "500",
+            "wikidata": "Q112996565"
+          }
+        },
+        "proof": [
+          {
+            "kind": "EXPLICIT_SIRET",
+            "description": "SIRET du lieu identique à l’établissement revalidé",
+            "source": {
+              "id": "osm",
+              "label": "OpenStreetMap",
+              "recordId": "way:1098104437",
+              "url": "https://www.openstreetmap.org/way/1098104437",
+              "geometry": "site-interior-point",
+              "version": 3,
+              "updatedAt": "2024-11-06T17:56:25Z",
+              "changeset": 158828145,
+              "generatedAt": "2026-10-26T22:27:23.928Z",
+              "indexUrl": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/site-position-indexes/osm-finess-sites/850025.json",
+              "snapshotUrl": "https://www.openstreetmap.org/api/0.6/map?bbox=-1.884,46.837,-1.879,46.840",
+              "license": "ODbL 1.0",
+              "tags": {
+                "addr:housenumber": "27",
+                "addr:street": "Rue de la Gazonnière",
+                "amenity": "social_facility",
+                "name": "Ehpad Marie et Albert Guillonneau",
+                "phone": "+33786213944",
+                "ref:FR:FINESS": "850025917",
+                "ref:FR:NAF": "8710A",
+                "ref:FR:SIREN": "268500501",
+                "ref:FR:SIRET": "26850050100070",
+                "social_facility": "nursing_home",
+                "social_facility:for": "senior",
+                "source": "Le ministère des solidarités et de la santé - 03/2019",
+                "type:FR:FINESS": "500",
+                "wikidata": "Q112996565"
+              }
+            }
+          },
+          {
+            "kind": "EXPLICIT_GEOGRAPHIC_FINESS",
+            "finess": "850025917",
+            "categoryCode": "500",
+            "description": "FINESS géographique 850025917 du POI identique au site FINESS/Annuaire revalidé ; catégorie 500 et nom public concordants",
+            "source": {
+              "id": "osm",
+              "label": "OpenStreetMap",
+              "recordId": "way:1098104437",
+              "url": "https://www.openstreetmap.org/way/1098104437",
+              "geometry": "site-interior-point",
+              "version": 3,
+              "updatedAt": "2024-11-06T17:56:25Z",
+              "changeset": 158828145,
+              "generatedAt": "2026-10-26T22:27:23.928Z",
+              "indexUrl": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/site-position-indexes/osm-finess-sites/850025.json",
+              "snapshotUrl": "https://www.openstreetmap.org/api/0.6/map?bbox=-1.884,46.837,-1.879,46.840",
+              "license": "ODbL 1.0",
+              "tags": {
+                "addr:housenumber": "27",
+                "addr:street": "Rue de la Gazonnière",
+                "amenity": "social_facility",
+                "name": "Ehpad Marie et Albert Guillonneau",
+                "phone": "+33786213944",
+                "ref:FR:FINESS": "850025917",
+                "ref:FR:NAF": "8710A",
+                "ref:FR:SIREN": "268500501",
+                "ref:FR:SIRET": "26850050100070",
+                "social_facility": "nursing_home",
+                "social_facility:for": "senior",
+                "source": "Le ministère des solidarités et de la santé - 03/2019",
+                "type:FR:FINESS": "500",
+                "wikidata": "Q112996565"
+              }
+            },
+            "registryEvidence": {
+              "finess": "850025917",
+              "siret": "26850050100070",
+              "publicNames": [
+                "EHPAD MARIE ET ALBERT GUILLONNEAU"
+              ],
+              "adresse": "27 RUE DE LA GAZONNIERE 85300 CHALLANS",
+              "type": "EGE",
+              "status": "A",
+              "categoryCode": "500",
+              "recordId": "148746",
+              "address": {
+                "usageAdresse": "03",
+                "numeroVoie": "27",
+                "typeVoie": "R",
+                "libelleVoie": "DE LA GAZONNIERE",
+                "complementVoie": null,
+                "complementPointGeographique": null,
+                "lieuDit": null,
+                "cogCommune": "85047",
+                "ligneAcheminement": "CHALLANS",
+                "ligneUne": null,
+                "ligneDeux": null,
+                "ligneTrois": null,
+                "ligneQuatre": "27 RUE DE LA GAZONNIERE",
+                "ligneCinq": null,
+                "ligneSix": null,
+                "codePostal": "85300",
+                "coordonneesGeographique": {
+                  "coordonneeX": "-1.881503",
+                  "coordonneeY": "46.838522",
+                  "directionLatitude": "6649092.17",
+                  "directionLongitude": "328199.88",
+                  "cleInInteropBAN": "85047_6245_00027",
+                  "scoreBAN": "0.9657663636363636"
+                }
+              },
+              "snapshotUrl": "https://static.data.gouv.fr/resources/finess-structures-1/20261002-021915/finess-structures-journalier-20261002.json.gz",
+              "extractedAt": "2026-10-02T02:07:13.718325845Z",
+              "addressPosition": {
+                "latitude": "46.838522",
+                "longitude": "-1.881503",
+                "precision": "Précision de site non documentée",
+                "source": "FINESS / BAN"
+              }
+            },
+            "officialBinding": {
+              "siret": "26850050100070",
+              "adresse": "27 RUE DE LA GAZONNIERE 85300 CHALLANS",
+              "uaiIds": [],
+              "finessIds": [
+                "850025917"
+              ],
+              "checkedAt": "2026-10-26T22:35:25.372Z",
+              "url": "https://recherche-entreprises.api.gouv.fr/search?q=26850050100070&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
+            }
+          },
+          {
+            "kind": "OFFICIAL_REVALIDATION",
+            "description": "Identité et adresse du SIRET revalidées dans l’Annuaire",
+            "source": {
+              "id": "annuaire",
+              "label": "Annuaire des Entreprises",
+              "recordId": "26850050100070",
+              "url": "https://annuaire-entreprises.data.gouv.fr/etablissement/26850050100070"
+            }
+          }
+        ],
+        "reason": "Lieu rattaché par ses identifiants d’établissement explicites et revalidés."
+      },
+      "exactProbe": {
+        "request": {
+          "kind": "siret",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=26850050100070&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
+        },
+        "sirets": [
+          "26850050100070"
+        ],
+        "coverage": {
+          "source": "annuaire",
+          "page": 1,
+          "perPage": 25,
+          "totalResults": 1,
+          "returnedUnits": 1,
+          "unitSirens": [
+            "268500501"
+          ],
+          "candidateCount": 1,
+          "candidateLimitHit": false,
+          "matchingLimitReached": false,
+          "hasNextPage": false,
+          "completenessKnown": true,
+          "complete": true
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "marie-no-postal",
+      "row": {
+        "NomCommercial": "École Sainte Marie",
+        "Adresse": "9 rue de la Paix, Saint-Lumine-de-Coutais",
+        "SirenSiret": "78605938600015"
+      },
+      "elapsedMs": 1992,
+      "decision": {
+        "status": "NO_MATCH",
+        "reason": "Le SIRET 78605938600015 désigne 22 RUE DU GENERAL DE GAULLE 44310 SAINT-LUMINE-DE-COUTAIS : il ne confirme pas le site saisi. Toute correction doit être validée explicitement.",
+        "selectedSiret": null,
+        "alternatives": [
+          "78605938600023"
+        ],
+        "certificates": [
+          {
+            "siret": "78605938600023",
+            "level": "verified",
+            "admissible": true,
+            "conflict": false,
+            "explanations": [
+              "UAI 0441333K : établissement scolaire ouvert, nom/adresse et SIRET exacts, rattachement UAI revalidé dans l’Annuaire",
+              "Adresse de site compatible mais incomplète"
+            ]
+          },
+          {
+            "siret": "78605938600015",
+            "level": "weak",
+            "admissible": false,
+            "conflict": true,
+            "explanations": [
+              "SIRET identique à la fiche et revalidé dans l’Annuaire",
+              "Contradiction d’adresse explicite"
+            ]
+          }
+        ]
+      },
+      "diagnostics": [],
+      "trace": [
+        {
+          "source": "identity:plan",
+          "state": "start",
+          "startedAt": 1793054134524,
+          "budgetMs": 11900,
+          "atMs": 0
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054134525,
+          "budgetMs": 6500,
+          "atMs": 1
+        },
+        {
+          "source": "registry:discovery",
+          "state": "start",
+          "startedAt": 1793054134525,
+          "budgetMs": 1800,
+          "atMs": 1
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054134525,
+          "budgetMs": 6500,
+          "atMs": 1
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054134525,
+          "budgetMs": 6500,
+          "atMs": 1
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600015&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600015&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "elapsedMs": 0,
+          "atMs": 3
+        },
+        {
+          "source": "registry:discovery",
+          "state": "ok",
+          "elapsedMs": 4,
+          "budgetMs": 1800,
+          "atMs": 5
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054134529,
+          "budgetMs": 6500,
+          "atMs": 5
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054134529,
+          "budgetMs": 6500,
+          "atMs": 5
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600023&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "atMs": 5
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 211,
+          "budgetMs": 6500,
+          "atMs": 212
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 211,
+          "budgetMs": 6500,
+          "atMs": 212
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 211,
+          "budgetMs": 6500,
+          "atMs": 212
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600023&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "elapsedMs": 1800,
+          "atMs": 1805
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 1977,
+          "budgetMs": 6500,
+          "atMs": 1982
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 1977,
+          "budgetMs": 6500,
+          "atMs": 1982
+        },
+        {
+          "source": "identity:plan",
+          "state": "ok",
+          "elapsedMs": 1991,
+          "budgetMs": 11900,
+          "atMs": 1991
+        }
+      ],
+      "position": null,
+      "exactProbe": null,
+      "error": null
+    },
+    {
+      "id": "marie-postal",
+      "row": {
+        "NomCommercial": "École Sainte Marie",
+        "Adresse": "9 rue de la Paix, 44310 Saint-Lumine-de-Coutais",
+        "SirenSiret": "78605938600015"
+      },
+      "elapsedMs": 3668,
+      "decision": {
+        "status": "NO_MATCH",
+        "reason": "Le SIRET 78605938600015 désigne 22 RUE DU GENERAL DE GAULLE 44310 SAINT-LUMINE-DE-COUTAIS : il ne confirme pas le site saisi. Toute correction doit être validée explicitement.",
+        "selectedSiret": null,
+        "alternatives": [
+          "78605938600023"
+        ],
+        "certificates": [
+          {
+            "siret": "78605938600023",
+            "level": "verified",
+            "admissible": true,
+            "conflict": false,
+            "explanations": [
+              "UAI 0441333K : établissement scolaire ouvert, nom/adresse et SIRET exacts, rattachement UAI revalidé dans l’Annuaire",
+              "Adresse de site complète concordante"
+            ]
+          },
+          {
+            "siret": "78605938600015",
+            "level": "weak",
+            "admissible": false,
+            "conflict": true,
+            "explanations": [
+              "SIRET identique à la fiche et revalidé dans l’Annuaire",
+              "Contradiction d’adresse explicite"
+            ]
+          }
+        ]
+      },
+      "diagnostics": [],
+      "trace": [
+        {
+          "source": "identity:plan",
+          "state": "start",
+          "startedAt": 1793054136516,
+          "budgetMs": 11900,
+          "atMs": 0
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054136516,
+          "budgetMs": 6500,
+          "atMs": 0
+        },
+        {
+          "source": "registry:discovery",
+          "state": "start",
+          "startedAt": 1793054136516,
+          "budgetMs": 1800,
+          "atMs": 0
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054136516,
+          "budgetMs": 6500,
+          "atMs": 0
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054136516,
+          "budgetMs": 6500,
+          "atMs": 0
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600015&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "atMs": 2
+        },
+        {
+          "source": "registry:discovery",
+          "state": "ok",
+          "elapsedMs": 2,
+          "budgetMs": 1800,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054136518,
+          "budgetMs": 6500,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054136518,
+          "budgetMs": 6500,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600023&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600015&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "elapsedMs": 1613,
+          "atMs": 1615
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 1765,
+          "budgetMs": 6500,
+          "atMs": 1765
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 1765,
+          "budgetMs": 6500,
+          "atMs": 1765
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 1766,
+          "budgetMs": 6500,
+          "atMs": 1766
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600023&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "elapsedMs": 3416,
+          "atMs": 3419
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 3664,
+          "budgetMs": 6500,
+          "atMs": 3666
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 3664,
+          "budgetMs": 6500,
+          "atMs": 3666
+        },
+        {
+          "source": "identity:plan",
+          "state": "ok",
+          "elapsedMs": 3668,
+          "budgetMs": 11900,
+          "atMs": 3668
+        }
+      ],
+      "position": null,
+      "exactProbe": null,
+      "error": null
+    },
+    {
+      "id": "enfance",
+      "row": {
+        "NomCommercial": "Maison de l’enfance",
+        "Adresse": "10 ter place du Champ de Foire, 44650 Legé",
+        "SirenSiret": ""
+      },
+      "elapsedMs": 2967,
+      "decision": {
+        "status": "INCOMPLETE",
+        "reason": "L’analyse ne dispose pas d’une couverture suffisante pour conclure.",
+        "selectedSiret": null,
+        "alternatives": [],
+        "certificates": []
+      },
+      "diagnostics": [
+        "IGN : délai dépassé."
+      ],
+      "trace": [
+        {
+          "source": "identity:plan",
+          "state": "start",
+          "startedAt": 1793054140185,
+          "budgetMs": 11900,
+          "atMs": 0
+        },
+        {
+          "source": "published:discovery",
+          "state": "start",
+          "startedAt": 1793054140185,
+          "budgetMs": 1000,
+          "atMs": 0
+        },
+        {
+          "source": "registry:discovery",
+          "state": "start",
+          "startedAt": 1793054140185,
+          "budgetMs": 1800,
+          "atMs": 0
+        },
+        {
+          "source": "published:discovery",
+          "state": "ok",
+          "elapsedMs": 2,
+          "budgetMs": 1000,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:text",
+          "state": "start",
+          "startedAt": 1793054140187,
+          "budgetMs": 6500,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:text",
+          "state": "start",
+          "startedAt": 1793054140187,
+          "budgetMs": 6500,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054140187,
+          "budgetMs": 6500,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=maison+de+l+enfance&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=44650",
+          "atMs": 2
+        },
+        {
+          "source": "registry:discovery",
+          "state": "ok",
+          "elapsedMs": 3,
+          "budgetMs": 1800,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=maison+de+l+enfance&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=44650",
+          "elapsedMs": 1551,
+          "atMs": 1554
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 1759,
+          "budgetMs": 6500,
+          "atMs": 1761
+        },
+        {
+          "source": "annuaire:text",
+          "state": "ok",
+          "elapsedMs": 1759,
+          "budgetMs": 6500,
+          "atMs": 1761
+        },
+        {
+          "source": "annuaire:text",
+          "state": "ok",
+          "elapsedMs": 1759,
+          "budgetMs": 6500,
+          "atMs": 1761
+        },
+        {
+          "source": "ign:discovery",
+          "state": "start",
+          "startedAt": 1793054141947,
+          "budgetMs": 1200,
+          "atMs": 1762
+        },
+        {
+          "source": "ign:discovery",
+          "state": "timeout",
+          "elapsedMs": 1203,
+          "budgetMs": 1200,
+          "message": "ign:discovery : budget de 1200 ms écoulé",
+          "atMs": 2965
+        },
+        {
+          "source": "identity:plan",
+          "state": "ok",
+          "elapsedMs": 2966,
+          "budgetMs": 11900,
+          "atMs": 2966
+        }
+      ],
+      "position": null,
+      "exactProbe": null,
+      "error": null
+    },
+    {
+      "id": "super-u-machecoul",
+      "row": {
+        "NomCommercial": "Super U Machecoul",
+        "Adresse": "Boulevard Des Prises Zone Commerciale 44270 MACHECOUL ST MEME",
+        "SirenSiret": "",
+        "RaisonSociale": "",
+        "Latitude": "",
+        "Longitude": ""
+      },
+      "elapsedMs": 3257,
+      "decision": {
+        "status": "MATCH_VERIFIED",
+        "reason": "Un seul établissement possède une chaîne de preuves suffisante.",
+        "selectedSiret": "41091808000020",
+        "alternatives": [],
+        "certificates": [
+          {
+            "siret": "41091808000020",
+            "level": "verified",
+            "admissible": true,
+            "conflict": false,
+            "explanations": [
+              "Référence SIRET explicite Magasins U — liste des magasins certifiés pour la vente de phyto, revalidée dans l’Annuaire",
+              "Adresse de site compatible mais incomplète"
+            ]
+          }
+        ]
+      },
+      "diagnostics": [],
+      "trace": [
+        {
+          "source": "identity:plan",
+          "state": "start",
+          "startedAt": 1793054143151,
+          "budgetMs": 11900,
+          "atMs": 1
+        },
+        {
+          "source": "published:discovery",
+          "state": "start",
+          "startedAt": 1793054143152,
+          "budgetMs": 1000,
+          "atMs": 1
+        },
+        {
+          "source": "registry:discovery",
+          "state": "start",
+          "startedAt": 1793054143152,
+          "budgetMs": 1800,
+          "atMs": 1
+        },
+        {
+          "source": "published:discovery",
+          "state": "ok",
+          "elapsedMs": 2,
+          "budgetMs": 1000,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054143155,
+          "budgetMs": 6500,
+          "atMs": 4
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054143155,
+          "budgetMs": 6500,
+          "atMs": 4
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=41091808000020&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "atMs": 4
+        },
+        {
+          "source": "registry:discovery",
+          "state": "ok",
+          "elapsedMs": 5,
+          "budgetMs": 1800,
+          "atMs": 6
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=41091808000020&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "elapsedMs": 381,
+          "atMs": 385
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 630,
+          "budgetMs": 6500,
+          "atMs": 634
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 630,
+          "budgetMs": 6500,
+          "atMs": 634
+        },
+        {
+          "source": "identity:plan",
+          "state": "ok",
+          "elapsedMs": 636,
+          "budgetMs": 11900,
+          "atMs": 636
+        }
+      ],
+      "position": {
+        "status": "SITE_CORROBORATED",
+        "latitude": 46.99808,
+        "longitude": -1.815576,
+        "source": {
+          "id": "overture",
+          "label": "Overture Places",
+          "recordId": "dd01bb16-803f-4a74-bb8f-738051c4c415",
+          "url": "https://explore.overturemaps.org/?id=dd01bb16-803f-4a74-bb8f-738051c4c415",
+          "indexUrl": "https://djibian.github.io/grist-widgets/widgets/structure-picker/contact-indexes/overture/44/44270.json?v=2026-09-14T15%3A54%3A51Z",
+          "generatedAt": "2026-09-14T15:54:51Z",
+          "upstream": {
+            "project": "Overture Maps",
+            "release": "2026-08-19.0",
+            "schemaVersion": null
+          },
+          "datasets": [
+            "meta",
+            "Overture"
+          ],
+          "lineage": []
+        },
+        "proof": [
+          {
+            "kind": "ATTESTED_PUBLIC_NAME",
+            "description": "Nom public attesté : Super U Machecoul",
+            "source": {
+              "id": "published-identity",
+              "label": "Magasins U — liste des magasins certifiés pour la vente de phyto",
+              "recordId": "magasins-u-phyto-2023-12-21:PL00660",
+              "url": "https://www.magasins-u.com/content/dam/ufrfront/edito/assets-u/pdf/reglementation-produits/liste-des-magasins-U-certifies-pour-la-vente-de-phyto.pdf.coredownload.inline.pdf",
+              "publishedAt": "2023-12-21",
+              "historical": true
+            }
+          },
+          {
+            "kind": "EXACT_SITE_ADDRESS",
+            "description": "Commune, code postal, voie et numéro de site concordants (ou voie sans numéro dans les deux sources)",
+            "source": {
+              "id": "overture",
+              "label": "Overture Places",
+              "recordId": "dd01bb16-803f-4a74-bb8f-738051c4c415",
+              "url": "https://explore.overturemaps.org/?id=dd01bb16-803f-4a74-bb8f-738051c4c415",
+              "indexUrl": "https://djibian.github.io/grist-widgets/widgets/structure-picker/contact-indexes/overture/44/44270.json?v=2026-09-14T15%3A54%3A51Z",
+              "generatedAt": "2026-09-14T15:54:51Z",
+              "upstream": {
+                "project": "Overture Maps",
+                "release": "2026-08-19.0",
+                "schemaVersion": null
+              },
+              "datasets": [
+                "meta",
+                "Overture"
+              ],
+              "lineage": []
+            }
+          },
+          {
+            "kind": "OFFICIAL_REVALIDATION",
+            "description": "Identité et adresse du SIRET revalidées dans l’Annuaire",
+            "source": {
+              "id": "annuaire",
+              "label": "Annuaire des Entreprises",
+              "recordId": "41091808000020",
+              "url": "https://annuaire-entreprises.data.gouv.fr/etablissement/41091808000020"
+            }
+          }
+        ],
+        "reason": "Lieu corroboré par son nom public attesté et son adresse de site."
+      },
+      "exactProbe": {
+        "request": {
+          "kind": "siret",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=41091808000020&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
+        },
+        "sirets": [
+          "41091808000020"
+        ],
+        "coverage": {
+          "source": "annuaire",
+          "page": 1,
+          "perPage": 25,
+          "totalResults": 1,
+          "returnedUnits": 1,
+          "unitSirens": [
+            "410918080"
+          ],
+          "candidateCount": 1,
+          "candidateLimitHit": false,
+          "matchingLimitReached": false,
+          "hasNextPage": false,
+          "completenessKnown": true,
+          "complete": true
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "ehpad-la-reynerie",
+      "row": {
+        "NomCommercial": "EHPAD La Reynerie Bouin 85230",
+        "Adresse": "8bis Rue du Pays de Retz 85230 Bouin",
+        "SirenSiret": "",
+        "RaisonSociale": "",
+        "Latitude": "",
+        "Longitude": ""
+      },
+      "elapsedMs": 1841,
+      "decision": {
+        "status": "MATCH_VERIFIED",
+        "reason": "Un seul établissement possède une chaîne de preuves suffisante.",
+        "selectedSiret": "26850025300011",
+        "alternatives": [],
+        "certificates": [
+          {
+            "siret": "26850025300011",
+            "level": "verified",
+            "admissible": true,
+            "conflict": false,
+            "explanations": [
+              "FINESS géographique 850002163 : nom public et adresse concordants, SIRET 26850025300011 explicite et rattachement FINESS revalidé dans l’Annuaire",
+              "Type de site compatible et raison sociale concordante",
+              "Adresse de site compatible mais incomplète"
+            ]
+          }
+        ]
+      },
+      "diagnostics": [],
+      "trace": [
+        {
+          "source": "identity:plan",
+          "state": "start",
+          "startedAt": 1793054146574,
+          "budgetMs": 11900,
+          "atMs": 0
+        },
+        {
+          "source": "registry:discovery",
+          "state": "start",
+          "startedAt": 1793054146574,
+          "budgetMs": 1800,
+          "atMs": 0
+        },
+        {
+          "source": "registry:discovery",
+          "state": "ok",
+          "elapsedMs": 3,
+          "budgetMs": 1800,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "start",
+          "startedAt": 1793054146577,
+          "budgetMs": 6500,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054146577,
+          "budgetMs": 6500,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=26850025300011&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=26850025300011&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "elapsedMs": 1634,
+          "atMs": 1638
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 1796,
+          "budgetMs": 6500,
+          "atMs": 1799
+        },
+        {
+          "source": "annuaire:siret",
+          "state": "ok",
+          "elapsedMs": 1796,
+          "budgetMs": 6500,
+          "atMs": 1799
+        },
+        {
+          "source": "identity:plan",
+          "state": "ok",
+          "elapsedMs": 1801,
+          "budgetMs": 11900,
+          "atMs": 1801
+        }
+      ],
+      "position": {
+        "status": "SITE_CONFIRMED",
+        "latitude": 46.9742242,
+        "longitude": -1.9937342,
+        "source": {
+          "id": "osm",
+          "label": "OpenStreetMap",
+          "recordId": "node:9056350135",
+          "url": "https://www.openstreetmap.org/node/9056350135",
+          "geometry": "point",
+          "version": 4,
+          "updatedAt": "2025-11-01T15:45:18Z",
+          "changeset": 174068961,
+          "generatedAt": "2026-10-02T21:57:01Z",
+          "indexUrl": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/site-position-indexes/osm-finess/850002.json",
+          "snapshotUrl": "https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%5Btimeout%3A60%5D%3Bnwr%5B%22ref%3AFR%3AFINESS%22~%22%5E%2844%7C85%29%22%5D%3Bout+meta+center%3B",
+          "license": "ODbL 1.0",
+          "tags": {
+            "amenity": "social_facility",
+            "name": "La Reynerie",
+            "ref:FR:FINESS": "850002163",
+            "ref:FR:NAF": "8710A",
+            "ref:FR:SIREN": "268500253",
+            "ref:FR:SIRET": "26850025300011",
+            "social_facility": "nursing_home",
+            "social_facility:for": "senior",
+            "source": "cadastre-dgi-fr source : Direction Générale des Impôts - Cadastre. Mise à jour : 2010",
+            "type:FR:FINESS": "500",
+            "wikidata": "Q112920805"
+          }
+        },
+        "proof": [
+          {
+            "kind": "EXPLICIT_SIRET",
+            "description": "SIRET du lieu identique à l’établissement revalidé",
+            "source": {
+              "id": "osm",
+              "label": "OpenStreetMap",
+              "recordId": "node:9056350135",
+              "url": "https://www.openstreetmap.org/node/9056350135",
+              "geometry": "point",
+              "version": 4,
+              "updatedAt": "2025-11-01T15:45:18Z",
+              "changeset": 174068961,
+              "generatedAt": "2026-10-02T21:57:01Z",
+              "indexUrl": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/site-position-indexes/osm-finess/850002.json",
+              "snapshotUrl": "https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%5Btimeout%3A60%5D%3Bnwr%5B%22ref%3AFR%3AFINESS%22~%22%5E%2844%7C85%29%22%5D%3Bout+meta+center%3B",
+              "license": "ODbL 1.0",
+              "tags": {
+                "amenity": "social_facility",
+                "name": "La Reynerie",
+                "ref:FR:FINESS": "850002163",
+                "ref:FR:NAF": "8710A",
+                "ref:FR:SIREN": "268500253",
+                "ref:FR:SIRET": "26850025300011",
+                "social_facility": "nursing_home",
+                "social_facility:for": "senior",
+                "source": "cadastre-dgi-fr source : Direction Générale des Impôts - Cadastre. Mise à jour : 2010",
+                "type:FR:FINESS": "500",
+                "wikidata": "Q112920805"
+              }
+            }
+          },
+          {
+            "kind": "EXPLICIT_GEOGRAPHIC_FINESS",
+            "finess": "850002163",
+            "categoryCode": "500",
+            "description": "FINESS géographique 850002163 du POI identique au site FINESS/Annuaire revalidé ; catégorie 500 et nom public concordants",
+            "source": {
+              "id": "osm",
+              "label": "OpenStreetMap",
+              "recordId": "node:9056350135",
+              "url": "https://www.openstreetmap.org/node/9056350135",
+              "geometry": "point",
+              "version": 4,
+              "updatedAt": "2025-11-01T15:45:18Z",
+              "changeset": 174068961,
+              "generatedAt": "2026-10-02T21:57:01Z",
+              "indexUrl": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/site-position-indexes/osm-finess/850002.json",
+              "snapshotUrl": "https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%5Btimeout%3A60%5D%3Bnwr%5B%22ref%3AFR%3AFINESS%22~%22%5E%2844%7C85%29%22%5D%3Bout+meta+center%3B",
+              "license": "ODbL 1.0",
+              "tags": {
+                "amenity": "social_facility",
+                "name": "La Reynerie",
+                "ref:FR:FINESS": "850002163",
+                "ref:FR:NAF": "8710A",
+                "ref:FR:SIREN": "268500253",
+                "ref:FR:SIRET": "26850025300011",
+                "social_facility": "nursing_home",
+                "social_facility:for": "senior",
+                "source": "cadastre-dgi-fr source : Direction Générale des Impôts - Cadastre. Mise à jour : 2010",
+                "type:FR:FINESS": "500",
+                "wikidata": "Q112920805"
+              }
+            },
+            "registryEvidence": {
+              "finess": "850002163",
+              "siret": "26850025300011",
+              "publicNames": [
+                "EHPAD LA REYNERIE"
+              ],
+              "adresse": "RUE DU PAYS DE RETZ 85230 BOUIN",
+              "type": "EGE",
+              "status": "A",
+              "categoryCode": "500",
+              "recordId": "147262",
+              "address": {
+                "usageAdresse": "03",
+                "numeroVoie": null,
+                "typeVoie": "R",
+                "libelleVoie": "DU PAYS DE RETZ",
+                "complementVoie": null,
+                "complementPointGeographique": null,
+                "lieuDit": null,
+                "cogCommune": "85029",
+                "ligneAcheminement": "BOUIN",
+                "ligneUne": null,
+                "ligneDeux": null,
+                "ligneTrois": null,
+                "ligneQuatre": "RUE DU PAYS DE RETZ",
+                "ligneCinq": null,
+                "ligneSix": null,
+                "codePostal": "85230",
+                "coordonneesGeographique": {
+                  "coordonneeX": "-1.993633",
+                  "coordonneeY": "46.974887",
+                  "directionLatitude": "6664741.45",
+                  "directionLongitude": "320627.93",
+                  "cleInInteropBAN": "85029_0475",
+                  "scoreBAN": "0.9563990909090908"
+                }
+              },
+              "snapshotUrl": "https://static.data.gouv.fr/resources/finess-structures-1/20261002-021915/finess-structures-journalier-20261002.json.gz",
+              "extractedAt": "2026-10-02T02:07:13.718325845Z",
+              "addressPosition": {
+                "latitude": "46.974887",
+                "longitude": "-1.993633",
+                "precision": "Précision de site non documentée",
+                "source": "FINESS / BAN"
+              }
+            },
+            "officialBinding": {
+              "siret": "26850025300011",
+              "adresse": "LA REYNERIE RUE DU PAYS DE RETZ 85230 BOUIN",
+              "uaiIds": [],
+              "finessIds": [
+                "850002163"
+              ],
+              "checkedAt": "2026-10-26T22:35:48.373Z",
+              "url": "https://recherche-entreprises.api.gouv.fr/search?q=26850025300011&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
+            }
+          },
+          {
+            "kind": "OFFICIAL_REVALIDATION",
+            "description": "Identité et adresse du SIRET revalidées dans l’Annuaire",
+            "source": {
+              "id": "annuaire",
+              "label": "Annuaire des Entreprises",
+              "recordId": "26850025300011",
+              "url": "https://annuaire-entreprises.data.gouv.fr/etablissement/26850025300011"
+            }
+          }
+        ],
+        "reason": "Lieu rattaché par ses identifiants d’établissement explicites et revalidés."
+      },
+      "exactProbe": {
+        "request": {
+          "kind": "siret",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=26850025300011&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
+        },
+        "sirets": [
+          "26850025300011"
+        ],
+        "coverage": {
+          "source": "annuaire",
+          "page": 1,
+          "perPage": 25,
+          "totalResults": 1,
+          "returnedUnits": 1,
+          "unitSirens": [
+            "268500253"
+          ],
+          "candidateCount": 1,
+          "candidateLimitHit": false,
+          "matchingLimitReached": false,
+          "hasNextPage": false,
+          "completenessKnown": true,
+          "complete": true
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "o-pre-d-vous",
+      "row": {
+        "NomCommercial": "ô Pré d’Vous",
+        "Adresse": "24 rue des fosses 44270 La Marne",
+        "SirenSiret": "",
+        "RaisonSociale": "",
+        "Latitude": "",
+        "Longitude": ""
+      },
+      "elapsedMs": 1896,
+      "decision": {
+        "status": "MATCH_VERIFIED",
+        "reason": "Un seul établissement possède une chaîne de preuves suffisante.",
+        "selectedSiret": "89306104400028",
+        "alternatives": [],
+        "certificates": [
+          {
+            "siret": "89306104400028",
+            "level": "verified",
+            "admissible": true,
+            "conflict": false,
+            "explanations": [
+              "Nom public distinctif concordant : o pre d vous",
+              "Adresse de site complète concordante"
+            ]
+          },
+          {
+            "siret": "89306104400010",
+            "level": "weak",
+            "admissible": false,
+            "conflict": true,
+            "explanations": [
+              "Contradiction d’adresse explicite"
+            ]
+          }
+        ]
+      },
+      "diagnostics": [],
+      "trace": [
+        {
+          "source": "identity:plan",
+          "state": "start",
+          "startedAt": 1793054150173,
+          "budgetMs": 11900,
+          "atMs": 0
+        },
+        {
+          "source": "published:discovery",
+          "state": "start",
+          "startedAt": 1793054150173,
+          "budgetMs": 1000,
+          "atMs": 0
+        },
+        {
+          "source": "registry:discovery",
+          "state": "start",
+          "startedAt": 1793054150173,
+          "budgetMs": 1800,
+          "atMs": 0
+        },
+        {
+          "source": "published:discovery",
+          "state": "ok",
+          "elapsedMs": 3,
+          "budgetMs": 1000,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:text",
+          "state": "start",
+          "startedAt": 1793054150176,
+          "budgetMs": 6500,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:text",
+          "state": "start",
+          "startedAt": 1793054150176,
+          "budgetMs": 6500,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054150176,
+          "budgetMs": 6500,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=o+pre+d+vous&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=44270",
+          "atMs": 3
+        },
+        {
+          "source": "registry:discovery",
+          "state": "ok",
+          "elapsedMs": 4,
+          "budgetMs": 1800,
+          "atMs": 4
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=o+pre+d+vous&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=44270",
+          "elapsedMs": 1650,
+          "atMs": 1653
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 1853,
+          "budgetMs": 6500,
+          "atMs": 1856
+        },
+        {
+          "source": "annuaire:text",
+          "state": "ok",
+          "elapsedMs": 1853,
+          "budgetMs": 6500,
+          "atMs": 1856
+        },
+        {
+          "source": "annuaire:text",
+          "state": "ok",
+          "elapsedMs": 1853,
+          "budgetMs": 6500,
+          "atMs": 1856
+        },
+        {
+          "source": "identity:plan",
+          "state": "ok",
+          "elapsedMs": 1858,
+          "budgetMs": 11900,
+          "atMs": 1858
+        }
+      ],
+      "position": {
+        "status": "SITE_CORROBORATED",
+        "latitude": 46.99756389,
+        "longitude": -1.7365524,
+        "source": {
+          "id": "overture",
+          "label": "Overture Places",
+          "recordId": "a22f6566-ef76-4fcd-a8c3-4c9b401357c5",
+          "url": "https://explore.overturemaps.org/?id=a22f6566-ef76-4fcd-a8c3-4c9b401357c5",
+          "indexUrl": "https://djibian.github.io/grist-widgets/widgets/structure-picker/contact-indexes/overture/44/44270.json?v=2026-09-14T15%3A54%3A51Z",
+          "generatedAt": "2026-09-14T15:54:51Z",
+          "upstream": {
+            "project": "Overture Maps",
+            "release": "2026-08-19.0",
+            "schemaVersion": null
+          },
+          "datasets": [
+            "meta",
+            "Overture"
+          ],
+          "lineage": []
+        },
+        "proof": [
+          {
+            "kind": "ATTESTED_PUBLIC_NAME",
+            "description": "Nom public attesté : O PRE D'VOUS",
+            "source": {
+              "id": "annuaire",
+              "label": "Annuaire des Entreprises",
+              "recordId": "89306104400028",
+              "url": "https://annuaire-entreprises.data.gouv.fr/etablissement/89306104400028"
+            }
+          },
+          {
+            "kind": "EXACT_SITE_ADDRESS",
+            "description": "Commune, code postal, voie et numéro de site concordants (ou voie sans numéro dans les deux sources)",
+            "source": {
+              "id": "overture",
+              "label": "Overture Places",
+              "recordId": "a22f6566-ef76-4fcd-a8c3-4c9b401357c5",
+              "url": "https://explore.overturemaps.org/?id=a22f6566-ef76-4fcd-a8c3-4c9b401357c5",
+              "indexUrl": "https://djibian.github.io/grist-widgets/widgets/structure-picker/contact-indexes/overture/44/44270.json?v=2026-09-14T15%3A54%3A51Z",
+              "generatedAt": "2026-09-14T15:54:51Z",
+              "upstream": {
+                "project": "Overture Maps",
+                "release": "2026-08-19.0",
+                "schemaVersion": null
+              },
+              "datasets": [
+                "meta",
+                "Overture"
+              ],
+              "lineage": []
+            }
+          },
+          {
+            "kind": "OFFICIAL_REVALIDATION",
+            "description": "Identité et adresse du SIRET revalidées dans l’Annuaire",
+            "source": {
+              "id": "annuaire",
+              "label": "Annuaire des Entreprises",
+              "recordId": "89306104400028",
+              "url": "https://annuaire-entreprises.data.gouv.fr/etablissement/89306104400028"
+            }
+          }
+        ],
+        "reason": "Lieu corroboré par son nom public attesté et son adresse de site."
+      },
+      "exactProbe": {
+        "request": {
+          "kind": "siret",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=89306104400028&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
+        },
+        "sirets": [
+          "89306104400028"
+        ],
+        "coverage": {
+          "source": "annuaire",
+          "page": 1,
+          "perPage": 25,
+          "totalResults": 1,
+          "returnedUnits": 1,
+          "unitSirens": [
+            "893061044"
+          ],
+          "candidateCount": 1,
+          "candidateLimitHit": false,
+          "matchingLimitReached": false,
+          "hasNextPage": false,
+          "completenessKnown": true,
+          "complete": true
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "pom-de-rainette",
+      "row": {
+        "NomCommercial": "CRECHE POM'DE RAINETTE",
+        "Adresse": "10 BIS RUE DES MARGOTINS 85300 SALLERTAINE",
+        "SirenSiret": "",
+        "RaisonSociale": "",
+        "Latitude": "",
+        "Longitude": ""
+      },
+      "elapsedMs": 2004,
+      "decision": {
+        "status": "MATCH_VERIFIED",
+        "reason": "Un seul établissement possède une chaîne de preuves suffisante.",
+        "selectedSiret": "88493583400033",
+        "alternatives": [],
+        "certificates": [
+          {
+            "siret": "88493583400033",
+            "level": "verified",
+            "admissible": true,
+            "conflict": false,
+            "explanations": [
+              "Nom public distinctif concordant : pom de rainette",
+              "Adresse de site complète concordante"
+            ]
+          },
+          {
+            "siret": "88493583400017",
+            "level": "weak",
+            "admissible": false,
+            "conflict": true,
+            "explanations": [
+              "Contradiction d’adresse explicite"
+            ]
+          },
+          {
+            "siret": "88493583400025",
+            "level": "weak",
+            "admissible": false,
+            "conflict": true,
+            "explanations": [
+              "Contradiction d’adresse explicite"
+            ]
+          }
+        ]
+      },
+      "diagnostics": [],
+      "trace": [
+        {
+          "source": "identity:plan",
+          "state": "start",
+          "startedAt": 1793054153789,
+          "budgetMs": 11900,
+          "atMs": 0
+        },
+        {
+          "source": "published:discovery",
+          "state": "start",
+          "startedAt": 1793054153789,
+          "budgetMs": 1000,
+          "atMs": 0
+        },
+        {
+          "source": "registry:discovery",
+          "state": "start",
+          "startedAt": 1793054153789,
+          "budgetMs": 1800,
+          "atMs": 0
+        },
+        {
+          "source": "published:discovery",
+          "state": "ok",
+          "elapsedMs": 2,
+          "budgetMs": 1000,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:text",
+          "state": "start",
+          "startedAt": 1793054153791,
+          "budgetMs": 6500,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:text",
+          "state": "start",
+          "startedAt": 1793054153791,
+          "budgetMs": 6500,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:request",
+          "state": "start",
+          "startedAt": 1793054153791,
+          "budgetMs": 6500,
+          "atMs": 2
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "start",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=pom+de+rainette&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=85300",
+          "atMs": 2
+        },
+        {
+          "source": "registry:discovery",
+          "state": "ok",
+          "elapsedMs": 3,
+          "budgetMs": 1800,
+          "atMs": 3
+        },
+        {
+          "source": "annuaire:queue",
+          "state": "ok",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=pom+de+rainette&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=85300",
+          "elapsedMs": 1646,
+          "atMs": 1648
+        },
+        {
+          "source": "annuaire:request",
+          "state": "ok",
+          "elapsedMs": 1838,
+          "budgetMs": 6500,
+          "atMs": 1840
+        },
+        {
+          "source": "annuaire:text",
+          "state": "ok",
+          "elapsedMs": 1839,
+          "budgetMs": 6500,
+          "atMs": 1841
+        },
+        {
+          "source": "annuaire:text",
+          "state": "ok",
+          "elapsedMs": 1839,
+          "budgetMs": 6500,
+          "atMs": 1841
+        },
+        {
+          "source": "identity:plan",
+          "state": "ok",
+          "elapsedMs": 1844,
+          "budgetMs": 11900,
+          "atMs": 1844
+        }
+      ],
+      "position": {
+        "status": "SITE_CORROBORATED",
+        "latitude": 46.868617815626294,
+        "longitude": -1.942076105568997,
+        "source": {
+          "id": "bdnb-rnb",
+          "label": "BDNB / Référentiel national des bâtiments",
+          "recordId": "6256NPD4SRW3",
+          "url": "https://rnb-api.beta.gouv.fr/api/alpha/buildings/6256NPD4SRW3/",
+          "version": "202602a_1",
+          "generatedAt": "2026-10-26T16:47:00.551Z",
+          "geometry": "building-point",
+          "indexUrl": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/site-position-indexes/address-buildings/85300/10.json",
+          "license": "Licence Ouverte 2.0",
+          "ban": {
+            "id": "ban",
+            "label": "BAN / IGN — adresse certifiée",
+            "recordId": "85280_0250_00010_bis",
+            "url": "https://data.geopf.fr/wfs/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=BAN.DATA.GOUV%3Aban&outputFormat=application%2Fjson&CQL_FILTER=id%3D%2785280_0250_00010_bis%27",
+            "generatedAt": "2026-10-26T16:47:00.551Z"
+          },
+          "bdnb": {
+            "id": "bdnb",
+            "label": "BDNB — relation foncière adresse/bâtiment",
+            "recordId": "bdnb-bg-WMTA-N6CM-TNWA",
+            "url": "https://api.bdnb.io/v1/bdnb/donnees/rel_batiment_groupe_adresse?cle_interop_adr=eq.85280_0250_00010_bis",
+            "version": "202602a_1",
+            "generatedAt": "2026-10-26T16:47:00.551Z"
+          }
+        },
+        "proof": [
+          {
+            "kind": "OFFICIAL_SITE_ADDRESS",
+            "description": "Adresse complète du SIRET 88493583400033 confirmé, numéro et suffixe inclus",
+            "source": {
+              "id": "annuaire",
+              "label": "Annuaire des Entreprises",
+              "recordId": "88493583400033",
+              "url": "https://annuaire-entreprises.data.gouv.fr/etablissement/88493583400033"
+            }
+          },
+          {
+            "kind": "CERTIFIED_BAN_ADDRESS",
+            "description": "Adresse BAN 85280_0250_00010_bis certifiée par la commune ; son point d’entrée sert de référence, pas de position finale",
+            "source": {
+              "id": "ban",
+              "label": "BAN / IGN — adresse certifiée",
+              "recordId": "85280_0250_00010_bis",
+              "url": "https://data.geopf.fr/wfs/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=BAN.DATA.GOUV%3Aban&outputFormat=application%2Fjson&CQL_FILTER=id%3D%2785280_0250_00010_bis%27",
+              "generatedAt": "2026-10-26T16:47:00.551Z"
+            }
+          },
+          {
+            "kind": "UNIQUE_OFFICIAL_BUILDING",
+            "description": "Bâtiment principal BDNB bdnb-bg-WMTA-N6CM-TNWA, liaison foncière unique 17/20 et construction unique bdnb-bc-H6H1-6H45-69ND",
+            "source": {
+              "id": "bdnb",
+              "label": "BDNB — relation foncière adresse/bâtiment",
+              "recordId": "bdnb-bg-WMTA-N6CM-TNWA",
+              "url": "https://api.bdnb.io/v1/bdnb/donnees/rel_batiment_groupe_adresse?cle_interop_adr=eq.85280_0250_00010_bis",
+              "version": "202602a_1",
+              "generatedAt": "2026-10-26T16:47:00.551Z"
+            },
+            "addressId": "85280_0250_00010_bis",
+            "relation": {
+              "batiment_groupe_id": "bdnb-bg-WMTA-N6CM-TNWA",
+              "cle_interop_adr": "85280_0250_00010_bis",
+              "code_departement_insee": "85",
+              "fiabilite": 17,
+              "geom_adresse": {
+                "type": "Point",
+                "crs": {
+                  "type": "name",
+                  "properties": {
+                    "name": "EPSG:2154"
+                  }
+                },
+                "coordinates": [
+                  323798.36,
+                  6652708.15
+                ]
+              },
+              "geom_bat_adresse": {
+                "type": "MultiLineString",
+                "crs": {
+                  "type": "name",
+                  "properties": {
+                    "name": "EPSG:2154"
+                  }
+                },
+                "coordinates": [
+                  [
+                    [
+                      323798.36,
+                      6652708.15
+                    ],
+                    [
+                      323801.9897887324,
+                      6652714.95
+                    ]
+                  ]
+                ]
+              },
+              "libelle_adresse": "10bis Rue des Margotins 85300 Sallertaine"
+            },
+            "group": {
+              "batiment_groupe_id": "bdnb-bg-WMTA-N6CM-TNWA",
+              "cle_interop_adr_principale_ban": "85280_0250_00010_bis",
+              "libelle_adr_principale_ban": "10bis Rue des Margotins 85300 Sallertaine",
+              "fiabilite_cr_adr_niv_1": "données croisées à l'adresse fiables",
+              "fiabilite_cr_adr_niv_2": "batiment sans voisin à l'adresse",
+              "fiabilite_emprise_sol": "BONNE",
+              "l_cle_interop_adr": [
+                "85280_0250_00010_bis",
+                "85280_0250_00007_bis"
+              ],
+              "l_parcelle_id": [
+                "85280000AK0131"
+              ],
+              "contient_fictive_geom_groupe": false,
+              "geom_groupe_pos_wgs84": {
+                "type": "Point",
+                "crs": {
+                  "type": "name",
+                  "properties": {
+                    "name": "EPSG:4326"
+                  }
+                },
+                "coordinates": [
+                  -1.942067969170218,
+                  46.86861612900382
+                ]
+              }
+            },
+            "construction": {
+              "batiment_groupe_id": "bdnb-bg-WMTA-N6CM-TNWA",
+              "batiment_construction_id": "bdnb-bc-H6H1-6H45-69ND",
+              "rnb_id": "6256NPD4SRW3",
+              "fictive_geom_cstr": false
+            }
+          },
+          {
+            "kind": "RNB_BUILDING_FOOTPRINT",
+            "description": "Point publié du bâtiment RNB actif 6256NPD4SRW3, à l’intérieur de son emprise ; aucune sélection par distance",
+            "source": {
+              "id": "bdnb-rnb",
+              "label": "BDNB / Référentiel national des bâtiments",
+              "recordId": "6256NPD4SRW3",
+              "url": "https://rnb-api.beta.gouv.fr/api/alpha/buildings/6256NPD4SRW3/",
+              "version": "202602a_1",
+              "generatedAt": "2026-10-26T16:47:00.551Z",
+              "geometry": "building-point",
+              "indexUrl": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/site-position-indexes/address-buildings/85300/10.json",
+              "license": "Licence Ouverte 2.0",
+              "ban": {
+                "id": "ban",
+                "label": "BAN / IGN — adresse certifiée",
+                "recordId": "85280_0250_00010_bis",
+                "url": "https://data.geopf.fr/wfs/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=BAN.DATA.GOUV%3Aban&outputFormat=application%2Fjson&CQL_FILTER=id%3D%2785280_0250_00010_bis%27",
+                "generatedAt": "2026-10-26T16:47:00.551Z"
+              },
+              "bdnb": {
+                "id": "bdnb",
+                "label": "BDNB — relation foncière adresse/bâtiment",
+                "recordId": "bdnb-bg-WMTA-N6CM-TNWA",
+                "url": "https://api.bdnb.io/v1/bdnb/donnees/rel_batiment_groupe_adresse?cle_interop_adr=eq.85280_0250_00010_bis",
+                "version": "202602a_1",
+                "generatedAt": "2026-10-26T16:47:00.551Z"
+              }
+            },
+            "building": {
+              "rnb_id": "6256NPD4SRW3",
+              "status": "constructed",
+              "point": {
+                "type": "Point",
+                "coordinates": [
+                  -1.942076105568997,
+                  46.868617815626294
+                ]
+              },
+              "shape": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      -1.942060593213819,
+                      46.86863764634501
+                    ],
+                    [
+                      -1.942028500682695,
+                      46.86867511133711
+                    ],
+                    [
+                      -1.941946354204416,
+                      46.86863984989204
+                    ],
+                    [
+                      -1.941982295438949,
+                      46.868601317366895
+                    ],
+                    [
+                      -1.941912434096555,
+                      46.86857094073823
+                    ],
+                    [
+                      -1.941961474367157,
+                      46.86851741097267
+                    ],
+                    [
+                      -1.942222083700541,
+                      46.868634313885686
+                    ],
+                    [
+                      -1.942172961466608,
+                      46.86868694514854
+                    ],
+                    [
+                      -1.942060593213819,
+                      46.86863764634501
+                    ]
+                  ]
+                ]
+              },
+              "addresses": [],
+              "ext_ids": [
+                {
+                  "id": "BATIMENT0000002334721334",
+                  "source": "bdtopo",
+                  "created_at": "2024-08-09T05:14:56.312069+00:00",
+                  "source_version": "2024-03-15"
+                }
+              ],
+              "is_active": true,
+              "plots": [
+                {
+                  "id": "85280000AK0074",
+                  "bdg_cover_ratio": 0.00661556449049577
+                },
+                {
+                  "id": "85280000AK0131",
+                  "bdg_cover_ratio": 0.9933844355049312
+                }
+              ]
+            }
+          }
+        ],
+        "reason": "Point de bâtiment démontré par l’adresse officielle exacte, la liaison foncière BDNB et l’emprise RNB."
+      },
+      "exactProbe": {
+        "request": {
+          "kind": "siret",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=88493583400033&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
+        },
+        "sirets": [
+          "88493583400033"
+        ],
+        "coverage": {
+          "source": "annuaire",
+          "page": 1,
+          "perPage": 25,
+          "totalResults": 1,
+          "returnedUnits": 1,
+          "unitSirens": [
+            "884935834"
+          ],
+          "candidateCount": 1,
+          "candidateLimitHit": false,
+          "matchingLimitReached": false,
+          "hasNextPage": false,
+          "completenessKnown": true,
+          "complete": true
+        }
+      },
+      "error": null
+    }
+  ]
+}

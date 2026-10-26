@@ -233,7 +233,7 @@ test("live OSM fallback searches exact SIRET and revalidated FINESS, preserving 
     const query = new URLSearchParams(options.body).get("data");
     assert.match(query, /ref:FR:SIRET.*26850025300011/);
     assert.match(query, /ref:FR:FINESS.*850002163/);
-    assert.match(query, /out meta center/);
+    assert.match(query, /out meta geom/);
     assert.doesNotMatch(query, /around|name|Bouin|Reynerie/);
     return Response.json(osm);
   } });
@@ -256,7 +256,7 @@ test("published position shards cover a generic departmental cohort and preserve
     for (const record of payload.records) {
       const poi = osmSitePositionFromElement(record, payload.source);
       assert.equal(record.type, "node");
-      assert.equal(poi.kind, "site");
+      assert.equal(poi.kind, record.tags.fixme || record.tags["fixme:position"] ? "address" : "site");
       assert.ok(poi.finessIds.some(id => id.startsWith(payload.prefix)));
       assert.ok(record.timestamp && record.version);
       assert.equal(Object.hasOwn(record, "user"), false);
