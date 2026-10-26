@@ -115,8 +115,10 @@ function candidateCard(candidate) {
   position.className = "choice-detail";
   const point = candidate.position;
   const located = [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(point?.status);
+  const positionEvidence = point?.source?.geometry === "building-point" ? "point de bâtiment — adresse officielle, BDNB et emprise RNB"
+    : point?.status === POSITION_STATES.SITE_CONFIRMED ? "identifiants d’établissement explicites" : "nom public attesté + adresse de site concordante";
   position.textContent = located
-    ? `${point.latitude}, ${point.longitude} — Position ${point.status === POSITION_STATES.SITE_CONFIRMED ? "confirmée" : "corroborée"} : ${point.source.label}, ${point.status === POSITION_STATES.SITE_CONFIRMED ? "identifiants d’établissement explicites" : "nom public attesté + adresse de site concordante"}`
+    ? `${point.latitude}, ${point.longitude} — Position ${point.status === POSITION_STATES.SITE_CONFIRMED ? "confirmée" : "corroborée"} : ${point.source.label}, ${positionEvidence}`
     : `Position : ${point?.reason || "position précise non démontrée"}`;
   content.appendChild(position);
 

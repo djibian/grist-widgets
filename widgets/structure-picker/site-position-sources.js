@@ -1,6 +1,7 @@
 import { loadContactIndexManifest, loadContactIndexShard, resolveContactIndexShard, CONTACT_INDEX_MANIFEST_URL } from "./contact-indexes.js";
 import { extractLocationFromAddress, normalizeIdentifier } from "./search.js";
 import { findIndexedFinessPositions, osmSitePositionFromElement, verifiedGeographicFiness } from "./osm-site-positions.js";
+import { findIndexedAddressBuildings } from "./address-building-positions.js";
 
 const manifestCache = new Map();
 const MANIFEST_CACHE_MS = 5 * 60 * 1000;
@@ -34,6 +35,11 @@ export async function findIndexedSitePositions({ candidate, links = [], identity
   // Identifier lookup is independent of the postcode manifest. Its completed
   // evidence survives a slow optional manifest/shard and the shared deadline.
   const finessPositions = findIndexedFinessPositions({ candidate, links, identityStatus, signal, fetchImpl }).then(result => {
+    if (signal?.aborted) return;
+    observations.push(...result.observations);
+    coverage.push(...result.coverage);
+  });
+  const buildingPositions = findIndexedAddressBuildings({ candidate, identityStatus, signal, fetchImpl }).then(result => {
     if (signal?.aborted) return;
     observations.push(...result.observations);
     coverage.push(...result.coverage);
@@ -73,7 +79,7 @@ export async function findIndexedSitePositions({ candidate, links = [], identity
       }
     }));
   })();
-  await Promise.all([finessPositions, postcodePositions]);
+  await Promise.all([finessPositions, buildingPositions, postcodePositions]);
   return { observations, coverage };
 }
 

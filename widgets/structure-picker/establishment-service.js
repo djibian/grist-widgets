@@ -66,7 +66,7 @@ export async function resolveEstablishmentForEnrichment({
 
   const sourceOptions = { candidate: official, links: identity.links ?? [], identityStatus: decision.status, signal };
   const indexed = await boundedOperation(findIndexedPositions, sourceOptions, ESTABLISHMENT_BUDGET.indexedDeadlineMs, true);
-  const options = { ...indexed, links: identity.links ?? [], requestedAddress: row.Adresse, discovery: identity.geocodeCandidates ?? [] };
+  const options = { ...indexed, links: identity.links ?? [], identityStatus: decision.status, requestedAddress: row.Adresse, discovery: identity.geocodeCandidates ?? [] };
   let position = resolveSitePosition(official, options);
   if (position.status === POSITION_STATES.UNRESOLVED) {
     const osm = await boundedOperation(findOsmPositions, sourceOptions, ESTABLISHMENT_BUDGET.osmDeadlineMs, true);

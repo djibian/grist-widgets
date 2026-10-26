@@ -49,6 +49,7 @@ const atpShard = JSON.parse(await readFile(new URL("./fixtures/all-the-places-44
 const ehpadOfficial = JSON.parse(await readFile(new URL("./fixtures/ehpad-annuaire.json", import.meta.url), "utf8"));
 const ehpadFiness = JSON.parse(await readFile(new URL("./fixtures/ehpad-finess.json", import.meta.url), "utf8"));
 const ehpadPositions = JSON.parse(await readFile(new URL("../site-position-indexes/osm-finess/850002.json", import.meta.url), "utf8"));
+const pomBuildings = JSON.parse(await readFile(new URL("../site-position-indexes/address-buildings/85300/10.json", import.meta.url), "utf8"));
 const manifest = {
   schemaVersion: 1, generatedAt: "2026-09-14T15:54:51Z", sources: Object.fromEntries([
     ["all-the-places", "All The Places"], ["overture", "Overture Places"],
@@ -120,6 +121,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
   let releaseOldPosition;
   let releaseOldFiness;
   let releaseOldFinessPosition;
+  let releaseOldBuilding;
   const requests = [];
   const writes = [];
   const originalDocument = globalThis.document;
@@ -167,6 +169,13 @@ test("Grist shows a single coherent site candidate and preserves the four identi
         record.tags["ref:FR:FINESS"] === "850002163" ? { ...record, tags: { ...record.tags, "ref:FR:SIRET": "26850025300045" } } : record) });
       return Response.json(ehpadPositions);
     }
+    if (url.pathname.endsWith("/site-position-indexes/address-buildings/85300/10.json")) {
+      if (mode === "late-building") return new Promise(resolve => { releaseOldBuilding = () => resolve(Response.json(pomBuildings)); });
+      if (mode === "pending-building") return new Promise(() => {});
+      if (mode === "wrong-building-suffix") return Response.json({ ...pomBuildings, records: pomBuildings.records.filter(record => !record.ban.properties.rep), recordCount: 1 });
+      return Response.json(pomBuildings);
+    }
+    if (url.pathname.includes("/site-position-indexes/address-buildings/")) return new Response("", { status: 404 });
     if (url.pathname.endsWith("/contact-indexes/indexed-departments.json")) return Response.json(manifest);
     if (url.pathname.endsWith("/all-the-places/44/44270.json")) {
       if (mode === "pending-atp") return new Promise(() => {}); // optional fetch ignores abort
@@ -263,8 +272,14 @@ test("Grist shows a single coherent site candidate and preserves the four identi
         assert.match(nodes["establishment-candidate"].textContent, /SIRET 26850025300011 — FINESS 850002163/);
         assert.match(nodes["establishment-candidate"].textContent, /node:9056350135 — version 4 — 2025-11-01/);
         assert.equal(requests.some(item => item.url.hostname.startsWith("overpass")), false);
-      } else {
-        assert.match(nodes["establishment-candidate"].textContent, /Position précise du site non démontrée/);
+      } else if (index === 3) {
+        assert.match(nodes["establishment-candidate"].textContent, /46\.868617815626294, -1\.942076105568997/);
+        assert.match(nodes["establishment-candidate"].textContent, /point de bâtiment — adresse officielle, BDNB et emprise RNB/);
+        assert.match(nodes["establishment-candidate"].textContent, /6256NPD4SRW3/);
+        assert.match(nodes["establishment-candidate"].textContent, /17\/20/);
+        assert.doesNotMatch(nodes["establishment-candidate"].textContent, /43H9GCSB54PW|46\.868553/);
+        assert.equal(requests.some(item => item.url.hostname.startsWith("overpass") || item.url.hostname === "data.geopf.fr"), false);
+        assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").find(input => input.dataset.identityProposalField === "Coordinates").checked, true);
       }
       if (index === 1) {
         const siret = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]:checked:not(:disabled)")
@@ -405,6 +420,58 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     mode = "normal";
   });
 
+  await t.test("the neighbouring n°10 building in the same shard cannot locate POM at 10bis", async () => {
+    await select(3);
+    mode = "wrong-building-suffix";
+    click();
+    await settle();
+    t.mock.timers.tick(1500);
+    await settle();
+    assert.match(nodes["establishment-candidate"].textContent, /Identité confirmée/);
+    assert.match(nodes["establishment-candidate"].textContent, /88493583400033/);
+    assert.match(nodes["establishment-candidate"].textContent, /Position précise du site non démontrée/);
+    assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").some(input => input.dataset.identityProposalField === "Coordinates"), false);
+    mode = "normal";
+  });
+
+  await t.test("a stalled building index stays bounded and keeps the verified identity", async () => {
+    await select(3);
+    mode = "pending-building";
+    click();
+    await settle();
+    const signal = requests.find(item => item.url.pathname.includes("/address-buildings/")).signal;
+    t.mock.timers.tick(10000);
+    await settle();
+    t.mock.timers.tick(1500);
+    await settle();
+    assert.equal(signal.aborted, true);
+    assert.equal(nodes["enrich-button"].disabled, false);
+    assert.match(nodes["establishment-candidate"].textContent, /Identité confirmée.*88493583400033/);
+    assert.match(nodes["establishment-candidate"].textContent, /Position précise du site non démontrée/);
+    mode = "normal";
+  });
+
+  await t.test("a late POM building cannot overwrite the next selected establishment", async () => {
+    await select(3);
+    mode = "late-building";
+    click();
+    await settle();
+    const signal = requests.find(item => item.url.pathname.includes("/address-buildings/")).signal;
+    await select(2);
+    mode = "normal";
+    click();
+    await settle();
+    const text = nodes["establishment-candidate"].textContent;
+    assert.equal(signal.aborted, true);
+    assert.match(text, /89306104400028/);
+    releaseOldBuilding();
+    await settle();
+    t.mock.timers.tick(10000);
+    await settle();
+    assert.equal(nodes["establishment-candidate"].textContent, text);
+    assert.doesNotMatch(text, /88493583400033|6256NPD4SRW3/);
+  });
+
   await t.test("a nearby POI carrying another SIRET cannot supply the candidate's coordinates", async () => {
     await select(0);
     mode = "wrong-neighbour";
@@ -538,5 +605,31 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.equal(proof.proof.find(item => item.kind === "EXPLICIT_GEOGRAPHIC_FINESS").finess, "850002163");
     assert.equal(table.Numero_d_immatriculation[1], "26850025300011");
     assert.equal(table.Latitude[1], 46.9742242);
+  });
+
+  await t.test("POM applies its SIRET, paired building coordinates and complete address-to-building proof in one Grist action", async () => {
+    await select(3);
+    click();
+    await settle();
+    const proposals = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]");
+    const siret = proposals.find(input => input.dataset.identityProposalField === "SirenSiret");
+    const coordinates = proposals.find(input => input.dataset.identityProposalField === "Coordinates");
+    siret.checked = false; siret.dispatchEvent(new Event("change"));
+    assert.equal(coordinates.disabled, true);
+    siret.checked = true; siret.dispatchEvent(new Event("change"));
+    assert.equal(coordinates.disabled, false);
+    nodes["proposal-panel"].querySelector("#identity-apply-proposals").dispatchEvent(new Event("click"));
+    await settle();
+    assert.equal(writes.length, 3);
+    const fields = writes[2][0][3];
+    assert.equal(fields.Numero_d_immatriculation, "88493583400033");
+    assert.equal(fields.Latitude, 46.868617815626294);
+    assert.equal(fields.Longitude, -1.942076105568997);
+    assert.match(fields.PositionSource, /6256NPD4SRW3/);
+    const proof = JSON.parse(fields.PositionProof);
+    assert.equal(proof.siret, fields.Numero_d_immatriculation);
+    assert.equal(proof.source.version, "202602a_1");
+    assert.equal(proof.proof.find(item => item.kind === "UNIQUE_OFFICIAL_BUILDING").addressId, "85280_0250_00010_bis");
+    assert.equal(proof.proof.find(item => item.kind === "RNB_BUILDING_FOOTPRINT").building.rnb_id, "6256NPD4SRW3");
   });
 });
