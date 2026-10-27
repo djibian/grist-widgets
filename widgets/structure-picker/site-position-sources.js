@@ -3,6 +3,7 @@ import { extractLocationFromAddress, normalizeIdentifier } from "./search.js";
 import { findIndexedFinessPositions, osmSitePositionFromElement, verifiedGeographicFiness } from "./osm-site-positions.js";
 import { findIndexedAddressBuildings } from "./address-building-positions.js";
 import { findIndexedEducationPositions } from "./registry-site-positions.js";
+import { findIndexedIgnSites } from "./ign-site-positions.js";
 
 const manifestCache = new Map();
 const MANIFEST_CACHE_MS = 5 * 60 * 1000;
@@ -33,6 +34,10 @@ export function warmSitePositionManifest({ manifestUrl = CONTACT_INDEX_MANIFEST_
 export async function findIndexedSitePositions({ candidate, links = [], identityStatus, signal, fetchImpl = globalThis.fetch, manifestUrl = CONTACT_INDEX_MANIFEST_URL, partial = { observations: [], coverage: [] } } = {}) {
   const postcode = candidate.codePostal || extractLocationFromAddress(candidate.adresse).codePostal;
   const { observations, coverage } = partial;
+  const ignSites = findIndexedIgnSites({ candidate, links, identityStatus, signal, fetchImpl }).then(result => {
+    if (signal?.aborted) return;
+    observations.push(...result.observations); coverage.push(...result.coverage);
+  });
   const educationPositions = findIndexedEducationPositions({ candidate, links, identityStatus, signal, fetchImpl }).then(result => {
     if (signal?.aborted) return;
     observations.push(...result.observations);
@@ -91,7 +96,7 @@ export async function findIndexedSitePositions({ candidate, links = [], identity
       }
     }));
   })();
-  await Promise.all([educationPositions, finessPositions, finessSiteGeometries, buildingPositions, postcodePositions]);
+  await Promise.all([ignSites, educationPositions, finessPositions, finessSiteGeometries, buildingPositions, postcodePositions]);
   return { observations, coverage };
 }
 

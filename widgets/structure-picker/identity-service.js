@@ -4,6 +4,7 @@ import { IDENTITY_STATES, decideIdentity, decisionCandidates } from "./identity-
 import { findPublishedIdentityLinks } from "./published-identity-links.js";
 import { findFinessIdentityLinks, FINESS_BUDGET } from "./finess-identity.js";
 import { findOfficialRegistrySites, verifiedRegistryLink } from "./official-site-registry.js";
+import { findOfficialPublicSites } from "./public-sites.js";
 import { abortable, boundedSource, emitTrace } from "./bounded-source.js";
 import {
   buildOfficialIdentifierSearchRequest,
@@ -261,7 +262,7 @@ async function resolveBaseIdentity({
 // run independently; the Annuaire remains the authority for each geographic
 // SIRET/sector-identifier binding. Completed observations are checkpointed.
 export async function resolveIdentityForEnrichment(options = {}) {
-  const { row, signal, onProgress, onEvent, findRegistrySites = findOfficialRegistrySites } = options;
+  const { row, signal, onProgress, onEvent, findRegistrySites = findOfficialRegistrySites, findPublicSites = findOfficialPublicSites } = options;
   if (!row) throw new Error("Fiche Grist absente.");
   const started = Date.now();
   const trace = [];
@@ -294,6 +295,16 @@ export async function resolveIdentityForEnrichment(options = {}) {
     const unverifiedSites = all.flatMap(result => result.unverifiedSites ?? []);
     if (!decision.candidate && decision.status === IDENTITY_STATES.INCOMPLETE && unverifiedSites.length === 1) {
       decision = { ...decision, candidate: unverifiedSites[0] };
+    }
+    const publicSites = all.flatMap(result => result.publicSites ?? []);
+    if (![IDENTITY_STATES.MATCH_VERIFIED, IDENTITY_STATES.AMBIGUOUS].includes(decision.status) && publicSites.length) {
+      const contradiction = decision.certificates.some(item => item.conflict && item.address.compatible
+        && (item.names.exactDistinctiveAlias || item.names.legalExact));
+      if (!contradiction) decision = publicSites.length === 1 ? {
+        ...decision, status: IDENTITY_STATES.MATCH_VERIFIED, candidate: publicSites[0], alternatives: [],
+        reason: "Site public confirmé par son nom, son adresse et sa fiche cartographique officielle ; SIRET propre au site non établi.",
+      } : { ...decision, status: IDENTITY_STATES.AMBIGUOUS, candidate: null, alternatives: publicSites,
+        reason: "Plusieurs sites publics officiels concordent ; aucun point n’est choisi par proximité." };
     }
     return {
       decision, candidates, links, coverage,
@@ -386,12 +397,20 @@ export async function resolveIdentityForEnrichment(options = {}) {
           }
         } finally { registrySettled = true; releaseRegistry(); }
       })().then(() => "registry");
-      const pending = new Map([["base", base], ["registry", registry]]);
+      const publicSites = (async () => {
+        if (typeof findPublicSites !== "function") return;
+        try {
+          const result = await findPublicSites({ row, signal: sourceSignal, onEvent: event });
+          update("public-sites", { publicSites: result.candidates ?? [] });
+        } catch (error) { if (!sourceSignal.aborted) diagnostics.push(`Annuaire public : ${error.message}`); }
+      })().then(() => "public-sites");
+      const pending = new Map([["base", base], ["registry", registry], ["public-sites", publicSites]]);
       while (pending.size) {
         const name = await Promise.race(pending.values()); pending.delete(name);
         const result = combine();
         if (result.decision.status === IDENTITY_STATES.MATCH_VERIFIED && (registrySettled
-          || !/\b(ecole|college|lycee|ehpad|residence|ssiad)\b/.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()))) return result;
+          || (result.decision.candidate?.identityScope !== "PUBLIC_SITE"
+          && !/\b(ecole|college|lycee|ehpad|residence|ssiad)\b/.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase())))) return result;
       }
       return combine();
     }, { signal, timeoutMs: IDENTITY_BUDGET.deadlineMs - 100, onEvent: event });

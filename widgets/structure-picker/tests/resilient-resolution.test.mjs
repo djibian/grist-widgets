@@ -11,6 +11,7 @@ import {findIndexedEducationPositions,assessEducationPosition,interiorSitePoint}
 import {findIndexedSitePositions} from '../site-position-sources.js';
 import {resolveSitePosition} from '../establishment-position.js';
 import {buildEnrichmentProposals} from '../enrichment.js';
+import {findOfficialPublicSites} from '../public-sites.js';
 import {boundedSource} from '../bounded-source.js';
 import {fetchOfficialRequest,resetOfficialClientForTests} from '../enterprise-client.js';
 
@@ -20,7 +21,7 @@ const cases=[
  {id:'guillonneau',name:'Résidence Marie et Albert Guillonneau',address:'27 rue de la Gazonnière, 85300 Challans',siret:'',expected:'26850050100070',status:'MATCH_VERIFIED'},
  {id:'marie-no-postal',name:'École Sainte Marie',address:'9 rue de la Paix, Saint-Lumine-de-Coutais',siret:'78605938600015',expected:'78605938600023',status:'MATCH_VERIFIED'},
  {id:'marie-postal',name:'École Sainte Marie',address:'9 rue de la Paix, 44310 Saint-Lumine-de-Coutais',siret:'78605938600015',expected:'78605938600023',status:'MATCH_VERIFIED'},
- {id:'enfance',name:"Maison de l'enfance",address:'10 ter place du Champ de Foire, 44650 Legé',siret:'',expected:null,status:'NO_MATCH'},
+ {id:'enfance',name:"Maison de l'enfance",address:'10 ter place du Champ de Foire, 44650 Legé',siret:'',expected:null,status:'MATCH_VERIFIED'},
 ];
 const rowOf=c=>({NomCommercial:c.name,Adresse:c.address,SirenSiret:c.siret});
 const localFetch=async input=>{const url=new URL(input);if(url.protocol!=='file:')return new Response('',{status:503});url.search='';try{return new Response(await readFile(url,'utf8'),{headers:{'Content-Type':'application/json'}});}catch{return new Response('',{status:404});}};
@@ -28,7 +29,7 @@ const payloads=new Map(await Promise.all([['32548690000062','alliance-annuaire']
 const registry=input=>findOfficialRegistrySites({row:input.row??input,fetchImpl:localFetch,allowLive:false});
 async function options(c,extra={}){
  const base=c.id.startsWith('marie')?'marie':c.id;
- return {row:rowOf(c),findRegistrySites:registry,findPublishedLinks:async()=>({candidates:[]}),findSectorLinks:null,
+ return {row:rowOf(c),findPublicSites:args=>findOfficialPublicSites({...args,fetchImpl:localFetch}),findRegistrySites:registry,findPublishedLinks:async()=>({candidates:[]}),findSectorLinks:null,
   geocode:async()=>[],fetchOfficial:async request=>{const p=payloads.get(request.requestedSiret||request.query)||await fixture(base==='alliance'?'alliance-text-annuaire':base==='guillonneau'?'guillonneau-text-annuaire':'enfance-annuaire');return {...extractOfficialCandidates(p,{requestedSiret:request.requestedSiret}),cached:false};},
   findIndexedPositions:args=>findIndexedSitePositions({...args,fetchImpl:localFetch}),findOsmPositions:async()=>({observations:[],coverage:[]}),...extra};
 }
@@ -38,7 +39,8 @@ test('real source replay: all five new rows finish without the former global tim
   const r=await resolveEstablishmentForEnrichment(await options(c));
   assert.equal(r.decision.status,c.status);assert.equal(r.candidate?.siret??null,c.expected);
   assert.ok(!r.diagnostics.some(d=>/délai maximal/.test(d)));
-  if(c.id==='alliance'){assert.equal(r.candidate.position.status,'UNRESOLVED');assert.equal(r.candidate.latitude,null);}
+  if(c.id==='enfance'){assert.equal(r.candidate.identityScope,'PUBLIC_SITE');assert.equal(r.candidate.siret,null);assert.deepEqual([r.candidate.latitude,r.candidate.longitude],[46.8861988,-1.5975397]);}
+  if(c.id==='alliance'){assert.equal(r.candidate.position.status,'SITE_CONFIRMED');assert.equal(r.candidate.position.source.id,'ign-bdtopo');}
   if(c.id==='guillonneau'){assert.equal(r.candidate.position.status,'SITE_CONFIRMED');assert.equal(r.candidate.position.source.recordId,'way:1098104437');assert.ok(r.candidate.position.proof.some(p=>p.finess==='850025917'));}
   if(c.id.startsWith('marie')){assert.equal(r.decision.identifierWarning.entered,c.siret);assert.equal(r.candidate.position.status,'SITE_CONFIRMED');const proposals=buildEnrichmentProposals(rowOf(c),r.candidate,{identityStatus:r.decision.status});assert.equal(proposals.find(p=>p.field==='SirenSiret').selectedByDefault,false);}
   assert.ok(r.trace.some(e=>e.source==='identity:plan'&&e.state==='ok'));
@@ -99,7 +101,7 @@ test('unavailable Annuaire retains the public site as incomplete without proposi
 
 test('all source requests ignoring cancellation still produce an explicit bounded incomplete result',async t=>{
  t.mock.timers.enable({apis:['setTimeout','Date']});let officialSignal;
- const pending=resolveEstablishmentForEnrichment(await options(cases[4],{findRegistrySites:async()=>({records:[],complete:true}),fetchOfficial:(_,{signal})=>{officialSignal=signal;return new Promise(()=>{});}}));
+ const pending=resolveEstablishmentForEnrichment(await options(cases[4],{findPublicSites:null,findRegistrySites:async()=>({records:[],complete:true}),fetchOfficial:(_,{signal})=>{officialSignal=signal;return new Promise(()=>{});}}));
  await settle();t.mock.timers.tick(6500);await settle();
  const result=await pending;assert.equal(result.decision.status,'INCOMPLETE');assert.equal(officialSignal.aborted,true);assert.equal(result.candidate,null);assert.ok(result.trace.some(e=>e.state==='timeout'));
 });
@@ -150,7 +152,7 @@ test('actual Alliance input reproduces the lowercase-l Roman numeral failure and
  assert.ok(actual.Adresse.includes('XXlll'));
  const result=await resolveEstablishmentForEnrichment(await options(cases[0],{row:actual}));
  assert.equal(result.decision.status,'MATCH_VERIFIED');assert.equal(result.candidate.siret,'32548690000062');
- assert.equal(result.candidate.latitude,null);
+ assert.equal(result.candidate.position.source.id,'ign-bdtopo');
  const certificate=result.decision.certificates.find(item=>item.siret===result.candidate.siret);
  assert.deepEqual(certificate.address.target.typography,[{kind:'ROMAN_NUMERAL_HOMOGLYPH',original:'XXlll',normalized:'XXIII'}]);
  assert.ok(certificate.explanations.some(text=>text.includes('XXlll → XXIII')));

@@ -1,3 +1,4 @@
+import { findOfficialPublicSites } from "../widgets/structure-picker/public-sites.js";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { buildGeocodeUrl, geocodeResultsFromPayload } from "../widgets/structure-picker/geocode.js";
 import { fetchOfficialRequest } from "../widgets/structure-picker/enterprise-client.js";
@@ -183,6 +184,7 @@ for (const scenario of cases) {
         fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network),
       }),
       findPublishedLinks: async ({ row }) => publishedLinksFor(row),
+      findPublicSites: options => findOfficialPublicSites({ ...options, fetchImpl: (url, fetchOptions) => staticOrPublicFetch(url, fetchOptions, network) }),
       findRegistrySites: options => findOfficialRegistrySites({ ...options, fetchImpl: (url, fetchOptions) => staticOrPublicFetch(url, fetchOptions, network) }),
       resolveFallback: options => resolveStructureIdentity({ ...options, findPoiLinks: args => findOsmIdentityPois({ ...args, fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network) }) }),
       findSectorLinks: options => findFinessIdentityLinks({ ...options, fetchImpl: async (url, fetchOptions) => {
@@ -209,6 +211,8 @@ for (const scenario of cases) {
     row: scenario.row,
     decision: result?.decision ? {
       status: result.decision.status,
+      identityScope: result.decision.candidate?.identityScope || "LEGAL_ESTABLISHMENT",
+      siteId: result.decision.candidate?.siteId || null,
       reason: result.decision.reason,
       selectedSiret: result.decision.candidate?.siret || null,
       alternatives: (result.decision.alternatives || []).map(item => item.siret),

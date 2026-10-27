@@ -73,6 +73,9 @@ export async function resolveEstablishmentForEnrichment({
   const decision = identity.decision;
   const eligible = [IDENTITY_STATES.MATCH_VERIFIED, IDENTITY_STATES.MATCH_PROBABLE].includes(decision?.status);
   const official = eligible ? decision.candidate : null;
+  if (official?.identityScope === "PUBLIC_SITE") {
+    return { decision, candidate: official, alternatives: [], diagnostics: identity.diagnostics ?? [], trace: identity.trace ?? [] };
+  }
   if (!official) {
     const partial = decision?.status === IDENTITY_STATES.INCOMPLETE && decision.candidate ? {
       ...decision.candidate, latitude: null, longitude: null, identityStatus: decision.status,

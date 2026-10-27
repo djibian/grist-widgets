@@ -52,3 +52,7 @@ Les tests reprennent les espaces, apostrophes, accents, communes sans tirets et 
 La capture réseau du 2026-10-27T16:57:35.948Z confirme les huit fiches pour lesquelles une chaîne de preuves suffisante est disponible, dont les deux Sainte Marie en conservant leur numéro saisi. L’Alliance conserve une abstention de position justifiée ; Legé reste INCOMPLETE (IGN indisponible dans son budget) et ne reçoit aucun SIRET inventé. Les quatre références historiques conservent leurs coordonnées démontrées. Les [réponses publiques du 27 octobre](registration-hints-public-responses.json) sont également versionnées.
 
 Validation automatisée finale du 27 octobre : **418 tests réussis, aucun échec** (7 partagés, 320 structure-picker, 64 affectation, 20 itinéraires et 7 composition). Le numéro seul ne confirme pas un site, un numéro concordant ne départage pas deux homonymes déjà prouvés, et un numéro erroné ne déclenche pas de requête superflue lorsque le nom et l’adresse établissent déjà le candidat.
+
+## Complément du 27 octobre : localisations Alliance et Legé
+
+Les abstentions de position décrites ci-dessus sont historiques. Le [complément sur les sources officielles](official-site-location.md) démontre maintenant les deux localisations, via emprise IGN liée à l’UAI pour l’Alliance et point municipal nominatif pour Legé. Le second cas confirme un **site public**, sans inventer de SIRET propre. Il documente les coordonnées retenues, les limites de précision, les cohortes complètes et les écritures sécurisées.

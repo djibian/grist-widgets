@@ -3,6 +3,7 @@ import { normalizeIdentifier } from "./search.js";
 import { verifiedGeographicFiness } from "./osm-site-positions.js";
 import { assessAddressBuildingPosition } from "./address-building-positions.js";
 import { assessEducationPosition } from "./registry-site-positions.js";
+import { assessIgnSite } from "./ign-site-positions.js";
 
 export const POSITION_STATES = Object.freeze({
   SITE_CONFIRMED: "SITE_CONFIRMED",
@@ -64,6 +65,7 @@ function trustedNames(candidate, links) {
 }
 
 export function assessSitePosition(candidate, poi, { links = [], requestedAddress = "", identityStatus } = {}) {
+  if (poi.kind === "ign-site") return assessIgnSite(candidate, poi, { links, requestedAddress, identityStatus });
   if (poi.kind === "education-site") return assessEducationPosition(candidate, poi, { links, requestedAddress, identityStatus });
   if (poi.kind === "building") return assessAddressBuildingPosition(candidate, poi, { identityStatus, requestedAddress });
   const coordinates = usableCoordinates(poi.latitude, poi.longitude);

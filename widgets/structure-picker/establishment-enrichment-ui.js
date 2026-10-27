@@ -110,7 +110,7 @@ function candidateCard(candidate) {
   legal.className = "choice-detail";
   const finessIds = [...new Set((candidate.identityLinks ?? []).filter(link => link.source === "finess" && link.verifiedOfficial).map(link => link.sourceRecordId))];
   const uaiIds = candidate.uaiIds ?? [];
-  legal.textContent = `${candidate.raisonSociale || "Identité juridique à revalider"} — SIRET ${candidate.siret}${finessIds.length ? ` — FINESS ${finessIds.join(", ")}` : ""}${uaiIds.length ? ` — UAI ${uaiIds.join(", ")}` : ""}`;
+  legal.textContent = candidate.identityScope === "PUBLIC_SITE" ? "Site public confirmé — SIRET propre au site non établi" : `${candidate.raisonSociale || "Identité juridique à revalider"} — SIRET ${candidate.siret}${finessIds.length ? ` — FINESS ${finessIds.join(", ")}` : ""}${uaiIds.length ? ` — UAI ${uaiIds.join(", ")}` : ""}`;
   const address = document.createElement("div");
   address.className = "choice-detail";
   address.textContent = candidate.adresse;
@@ -120,7 +120,8 @@ function candidateCard(candidate) {
   position.className = "choice-detail";
   const point = candidate.position;
   const located = [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(point?.status);
-  const positionEvidence = point?.source?.geometry === "site-interior-point" ? "point intérieur de l’emprise du site — identifiant et adresse officiels concordants"
+  const positionEvidence = point?.source?.geometry === "publisher-site-point" ? "point du lieu publié par la collectivité — précision métrique non documentée"
+    : point?.source?.geometry === "site-interior-point" ? "point intérieur de l’emprise du site — identifiant et adresse officiels concordants"
     : point?.source?.geometry === "building-point" ? "point de bâtiment — adresse officielle, BDNB et emprise RNB"
     : point?.status === POSITION_STATES.SITE_CONFIRMED ? "identifiants d’établissement explicites" : "nom public attesté + adresse de site concordante";
   position.textContent = located
@@ -134,10 +135,10 @@ function candidateCard(candidate) {
   details.appendChild(summary);
   const identity = document.createElement("div");
   identity.className = "choice-detail";
-  identity.textContent = `Identité : ${decisionEvidence(state.decision, candidate).join(" · ")}`;
+  identity.textContent = `Identité : ${candidate.identityScope === "PUBLIC_SITE" ? candidate.identityProof.join(" · ") : decisionEvidence(state.decision, candidate).join(" · ")}`;
   details.appendChild(identity);
   const sources = [
-    { label: "Annuaire des Entreprises", recordId: candidate.siret, url: `https://annuaire-entreprises.data.gouv.fr/etablissement/${candidate.siret}` },
+    ...(candidate.siret ? [{ label: "Annuaire des Entreprises", recordId: candidate.siret, url: `https://annuaire-entreprises.data.gouv.fr/etablissement/${candidate.siret}` }] : []),
     ...(candidate.identityLinks ?? []).flatMap(link => [
       { label: link.sourceLabel, recordId: link.sourceRecordId, url: link.sourceUrl, publishedAt: link.sourcePublishedAt, historical: link.historical },
       ...(link.registryEvidence?.snapshotUrl ? [{ label: "Extraction officielle FINESS", recordId: link.sourceRecordId,
@@ -224,7 +225,7 @@ function updateApplyButton() {
   const coordinateInput = inputs.find(input => input.dataset.identityProposalField === "Coordinates");
   const coordinateProposal = state.proposals.find(item => item.field === "Coordinates");
   if (coordinateInput) coordinateInput.disabled = coordinateInput.dataset.writable !== "true"
-    || !(siretSelected || coordinateProposal.currentSiret === coordinateProposal.requiresSiret);
+    || (coordinateProposal.requiresSiteId ? Boolean(coordinateProposal.currentRegistration) : !(siretSelected || coordinateProposal.currentSiret === coordinateProposal.requiresSiret));
   button.disabled = !Object.keys(selectedChanges(state.proposals,
     inputs.filter(input => input.checked && !input.disabled).map(input => input.dataset.identityProposalField),
   )).length;
@@ -322,7 +323,7 @@ async function applySelectedProposals() {
   setStatus("Mise à jour de la structure dans Grist…");
   try {
     const result = await applyEnrichmentChanges(row.id, changes, state.mappings, {
-      positionSiret: state.candidate?.siret, expectedRow: state.analyzedRow,
+      positionSiret: state.candidate?.siret, publicSitePosition: state.candidate?.identityScope === "PUBLIC_SITE" ? state.candidate.position : null, expectedRow: state.analyzedRow,
     });
     state.snapshot = result.snapshot;
     const skippedMessage = result.skipped.length ? ` Champs ignorés : ${result.skipped.join(", ")}.` : "";

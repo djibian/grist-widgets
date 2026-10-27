@@ -1,3 +1,4 @@
+import { publicSiteWriteProofValid } from "./public-sites.js";
 import { extractLocationFromAddress, identifierParts, normalize } from "./search.js";
 import { IDENTITY_STATES, usableCoordinates } from "./identity-resolution.js";
 import { POSITION_STATES } from "./establishment-position.js";
@@ -79,6 +80,20 @@ function proposal(field, current, proposed, source, { selectedByDefault = !hasVa
 
 export function buildEnrichmentProposals(row, enterpriseCandidate = null, { identityStatus = enterpriseCandidate?.identityStatus ?? "" } = {}) {
   if ([IDENTITY_STATES.INCOMPLETE, IDENTITY_STATES.NO_MATCH, IDENTITY_STATES.AMBIGUOUS].includes(identityStatus)) return [];
+  if (enterpriseCandidate?.identityScope === "PUBLIC_SITE") {
+    const point = enterpriseCandidate.position;
+    if (identityStatus !== IDENTITY_STATES.MATCH_VERIFIED || !publicSiteWriteProofValid(point)
+      || (numericEqual(row.Latitude, point.latitude) && numericEqual(row.Longitude, point.longitude))) return [];
+    const current = usableCoordinates(row.Latitude, row.Longitude);
+    return [{ field: "Coordinates", fields: ["Latitude", "Longitude"], label: FIELD_LABELS.Coordinates,
+      current: current ? `${row.Latitude}, ${row.Longitude}` : "—", proposed: `${point.latitude}, ${point.longitude}`,
+      source: `${point.source.label} — point du site public ; SIRET propre non établi`,
+      requiresSiteId: point.siteId, currentRegistration: String(row.SirenSiret ?? "").trim(), publicSitePosition: point,
+      selectedByDefault: !current && !String(row.SirenSiret ?? "").trim(), replacesExisting: Boolean(current),
+      changes: { Latitude: point.latitude, Longitude: point.longitude,
+        PositionSource: `${point.source.label} (${point.source.recordId}) ${point.source.url}`, PositionProof: JSON.stringify(point) },
+    }];
+  }
   const proposals = [];
   const add = item => { if (item) proposals.push(item); };
   const identityVerified = !identityStatus || identityStatus === IDENTITY_STATES.MATCH_VERIFIED;
@@ -133,13 +148,18 @@ export function selectedChanges(proposals, selectedFields) {
   const selected = selectedFields instanceof Set ? selectedFields : new Set(selectedFields ?? []);
   const changes = {};
   for (const item of proposals ?? []) {
-    if (selected.has(item.field) && !item.requiresSiret) changes[item.field] = item.proposed;
+    if (selected.has(item.field) && !item.requiresSiret && !item.requiresSiteId) changes[item.field] = item.proposed;
   }
   for (const item of proposals ?? []) {
     if (selected.has(item.field) && item.requiresSiret
       && identifierParts(changes.SirenSiret ?? item.currentSiret).siret === item.requiresSiret) {
       Object.assign(changes, item.changes);
     }
+  }
+  for (const item of proposals ?? []) {
+    if (selected.has(item.field) && item.requiresSiteId && !item.currentRegistration
+      && publicSiteWriteProofValid(item.publicSitePosition)
+      && item.requiresSiteId === item.publicSitePosition.siteId) Object.assign(changes, item.changes);
   }
   return changes;
 }

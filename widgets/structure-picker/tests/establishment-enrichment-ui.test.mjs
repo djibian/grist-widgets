@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { setImmediate as settle } from "node:timers/promises";
 import { resetOfficialClientForTests } from "../enterprise-client.js";
 import { resetRegistryCacheForTests } from "../official-site-registry.js";
@@ -87,7 +87,7 @@ const newCases = [
   { name: "Résidence Marie et Albert Guillonneau", address: "27 rue de la Gazonnière, 85300 Challans", siret: "26850050100070", fixture: "guillonneau", label: "Identité confirmée" },
   { name: "École Sainte Marie", address: "9 rue de la Paix, Saint-Lumine-de-Coutais", inputSiret: "78605938600015", siret: "78605938600023", fixture: "marie", label: "Identité confirmée" },
   { name: "École Sainte Marie", address: "9 rue de la Paix, 44310 Saint-Lumine-de-Coutais", inputSiret: "78605938600015", siret: "78605938600023", fixture: "marie", label: "Identité confirmée" },
-  { name: "Maison de l’enfance", address: "10 ter place du Champ de Foire, 44650 Legé", siret: "", fixture: "enfance", label: "Aucune identité démontrée" },
+  { name: "Maison de l’enfance", address: "10 ter place du Champ de Foire, 44650 Legé", siret: "", fixture: "enfance", label: "Identité confirmée" },
 ];
 const actualInputRows = JSON.parse(await readFile(new URL("./fixtures/resolution/grist-inputs-2026-10-27.json", import.meta.url), "utf8")).rows;
 for (let index = 0; index < newCases.length; index += 1) {
@@ -97,7 +97,8 @@ for (let index = 0; index < newCases.length; index += 1) {
 scenarios.push(...newCases);
 const registryManifest = JSON.parse(await readFile(new URL("../identity-links/site-registry/manifest.json", import.meta.url), "utf8"));
 const registryAssets = new Map(await Promise.all([
-  "identity-links/site-registry/manifest.json",
+  "identity-links/site-registry/manifest.json", "identity-links/public-sites/manifest.json", "identity-links/public-sites/44081.json",
+  ...(await readdir(new URL("../site-position-indexes/ign-education/85047/", import.meta.url))).filter(name=>name.endsWith(".json")).map(name=>`site-position-indexes/ign-education/85047/${name}`),
   ...registryManifest.communes.filter(town => ["85047", "44174", "44081"].includes(town.code)).flatMap(town => town.files.map(file => `identity-links/site-registry/${file}`)),
   "site-position-indexes/osm-education/085125.json", "site-position-indexes/osm-education/044133.json", "site-position-indexes/osm-finess-sites/850025.json",
 ].map(async file => [file, await readFile(new URL(`../${file}`, import.meta.url), "utf8")])));
@@ -177,7 +178,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
   t.mock.method(globalThis, "fetch", async (rawUrl, options = {}) => {
     const url = new URL(rawUrl);
     requests.push({ url, signal: options.signal, body: options.body, at: Date.now() });
-    if (url.pathname.includes("/identity-links/site-registry/") || /site-position-indexes\/osm-(?:education|finess-sites)\//.test(url.pathname)) {
+    if (url.pathname.includes("/identity-links/site-registry/") || url.pathname.includes("/identity-links/public-sites/") || url.pathname.includes("/site-position-indexes/ign-education/") || /site-position-indexes\/osm-(?:education|finess-sites)\//.test(url.pathname)) {
       if (current.fixture) { const file = url.pathname.split("/structure-picker/").at(-1); return registryAssets.has(file) ? new Response(registryAssets.get(file)) : new Response("", { status: 404 }); }
       return Response.json({ schemaVersion: 1, generatedAt: "2026-10-26T00:00:00Z", communes: [] });
     }
@@ -683,7 +684,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
         assert.equal(inputs.find(input => input.dataset.identityProposalField === "SirenSiret").checked, false);
         assert.equal(inputs.find(input => input.dataset.identityProposalField === "Coordinates").disabled, true);
       }
-      if (current.fixture === "enfance") assert.equal(nodes["proposal-panel"].querySelector("#identity-apply-proposals"), null);
+      if (current.fixture === "enfance") { assert.match(text, /Site public confirmé/); assert.match(text, /SIRET propre au site non établi/); assert.match(text, /46\.8861988, -1\.5975397/); }
       assert.equal(nodes["establishment-candidate"].querySelectorAll('input[type="radio"]').length, 0);
       assert.equal(writes.length, 3, "analysis alone never writes any field");
     });
@@ -706,5 +707,31 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.equal(JSON.parse(fields.PositionProof).siret, fields.Numero_d_immatriculation);
     assert.equal(JSON.parse(fields.PositionProof).source.recordId, "way:373841583");
     assert.ok(fields.Latitude && fields.Longitude);
+  });
+  await t.test("Legé writes the publisher-proven public site point atomically without assigning any town hall identifier", async () => {
+    await select(8); click(); await settle();
+    for (const ms of [1800,1500,1800]) { if (!nodes["enrich-button"].disabled) break; t.mock.timers.tick(ms); await settle(); }
+    const inputs = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]");
+    assert.deepEqual(inputs.map(input => input.dataset.identityProposalField), ["Coordinates"]);
+    assert.equal(inputs[0].disabled, false); assert.equal(inputs[0].checked, true);
+    const { applyEnrichmentChanges } = await import("../grist.js");
+    const { publicSiteCandidate } = await import("../public-sites.js");
+    const payload = JSON.parse(registryAssets.get("identity-links/public-sites/44081.json"));
+    const expected = actualInputRows[8];
+    const site = publicSiteCandidate(payload.records.find(record => record.id === "6294"), payload.publisher, expected);
+    const changes = { Latitude: site.latitude, Longitude: site.longitude, PositionSource: site.position.source.url, PositionProof: JSON.stringify(site.position) };
+    await assert.rejects(applyEnrichmentChanges(9, { ...changes, SirenSiret: "21440081400015" }, mappings,
+      { publicSitePosition: site.position, expectedRow: { NomCommercial: expected.NomCommercial, Adresse: expected.Adresse, SirenSiret: "" } }), /site public/);
+    assert.equal(writes.length, 4);
+    await assert.rejects(applyEnrichmentChanges(9, { ...changes, Latitude: site.latitude + .001 }, mappings,
+      { publicSitePosition: site.position, expectedRow: { NomCommercial: expected.NomCommercial, Adresse: expected.Adresse, SirenSiret: "" } }), /site public/);
+    assert.equal(writes.length, 4);
+    nodes["proposal-panel"].querySelector("#identity-apply-proposals").dispatchEvent(new Event("click")); await settle();
+    assert.equal(writes.length, 5);
+    const fields = writes[4][0][3];
+    assert.equal(fields.Latitude, 46.8861988); assert.equal(fields.Longitude, -1.5975397);
+    assert.equal(fields.Numero_d_immatriculation, undefined); assert.equal(fields.Raison_sociale, undefined);
+    const proof = JSON.parse(fields.PositionProof);
+    assert.equal(proof.identityScope, "PUBLIC_SITE"); assert.equal(proof.siret, null); assert.equal(proof.siteId, site.siteId);
   });
 });

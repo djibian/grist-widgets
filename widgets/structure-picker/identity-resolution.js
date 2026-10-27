@@ -335,7 +335,7 @@ export function registryPublicNameMatch(target, published, kind, categoryCode = 
     if (input.some(token => categories[token] && categories[token] !== categoryCode)) return false;
   }
   const descriptors = new Set(kind === "education"
-    ? ["ecole", "college", "lycee", "primaire", "prive", "privee", "public", "publique", "elementaire", "maternelle", "general", "generale", "technologique", "professionnel", "professionnelle", "agricole", ...FUNCTION_WORDS]
+    ? ["ecole", "college", "lycee", "groupe", "scolaire", "primaire", "prive", "privee", "public", "publique", "elementaire", "maternelle", "general", "generale", "technologique", "professionnel", "professionnelle", "agricole", ...FUNCTION_WORDS]
     : ["ehpad", "residence", "ssiad", "usld", ...FUNCTION_WORDS]);
   const stem = words => {
     let index = 0;
