@@ -195,10 +195,10 @@ function renderEstablishment() {
   ui.candidate.append(title, summary);
   if (state.candidate) ui.candidate.appendChild(candidateCard(state.candidate));
   else for (const candidate of (decision.alternatives ?? []).slice(0, 2)) ui.candidate.appendChild(candidateCard(candidate));
-  if (decision.identifierConflict) {
+  if (decision.identifierWarning) {
     const warning = document.createElement("div");
     warning.className = "help";
-    warning.textContent = "Le SIRET saisi appartient à un autre site. Les alternatives sont informatives : corriger explicitement la fiche puis relancer l’analyse. Aucune écriture automatique.";
+    warning.textContent = decision.identifierWarning.message;
     ui.candidate.appendChild(warning);
   }
   const details = document.createElement("details");

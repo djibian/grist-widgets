@@ -184,7 +184,7 @@ function repetitionRelation(left, right) {
 }
 
 function streetTokens(address, commune) {
-  const raw = String(address ?? "");
+  const raw = normalizeAddressTypography(address).normalized;
   const postal = [...raw.matchAll(/\b\d{5}\b/g)].at(-1);
   const beforePostal = postal ? raw.slice(0, postal.index) : raw;
   const normalized = comparisonTokens(beforePostal);
@@ -196,6 +196,22 @@ function streetTokens(address, commune) {
     .filter(token => !STREET_TYPE_TOKENS.has(token))
     .filter(token => !STREET_NOISE_TOKENS.has(token))
     .filter(token => !communeWords.has(token));
+}
+
+// A typed Roman numeral can contain lowercase l glyphs instead of uppercase I.
+// Correct only an otherwise invalid numeral with an uppercase Roman prefix and
+// repeated lowercase l suffix. Valid numerals (XL, LIII, XXII), house numbers,
+// arbitrary words and single ambiguous letters are left intact.
+export function normalizeAddressTypography(value) {
+  const changes = [];
+  const valid = text => /^(?=.+)M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/.test(text);
+  const normalized = String(value ?? "").replace(/\b([MDCLXVI]+)(l{2,})\b/g, (token, prefix, suffix) => {
+    const replacement = prefix + "I".repeat(suffix.length);
+    if (valid(token.toUpperCase()) || !valid(replacement)) return token;
+    changes.push({ kind: "ROMAN_NUMERAL_HOMOGLYPH", original: token, normalized: replacement });
+    return replacement;
+  });
+  return { normalized, changes };
 }
 
 function setSimilarity(left, right) {
@@ -227,6 +243,7 @@ export function parseSiteAddress(value, { communeHint = "" } = {}) {
     number: house.number,
     repetition: house.repetition,
     streetTokens: streetTokens(raw, commune),
+    typography: normalizeAddressTypography(raw).changes,
   };
 }
 
@@ -457,16 +474,17 @@ export function candidateCertificate(row, candidate, { location = null, links = 
   const link = linkEvidenceFor(candidate, row, links);
   const inactive = candidate?.etatAdministratif && candidate.etatAdministratif !== "A";
   const conflict = Boolean(inactive || address.conflict
-    || (exactSiret && names.publicAliasMismatch && !["education", "finess"].includes(link.link?.source)));
+    || (names.publicAliasMismatch && !link.verified));
 
   const publicIdentity = names.exactDistinctiveAlias || names.strongDistinctiveAlias;
   const legalIdentity = !names.publicAliasMismatch && (names.legalExact || names.legalStrong);
   const typedLegalIdentity = legalIdentity && names.categoryMatch;
-  const positiveIdentity = exactSiret || link.verified || publicIdentity || typedLegalIdentity || legalIdentity;
+  const supportedIdentifier = exactSiret && (publicIdentity || legalIdentity || link.verified) && address.compatible;
+  const positiveIdentity = supportedIdentifier || link.verified || publicIdentity || typedLegalIdentity || legalIdentity;
 
   let level = "weak";
   if (!conflict) {
-    if (exactSiret || link.verified || (names.exactDistinctiveAlias && address.complete)) level = "verified";
+    if (supportedIdentifier || link.verified || (names.exactDistinctiveAlias && address.complete)) level = "verified";
     else if (
       (publicIdentity && address.compatible)
       || (typedLegalIdentity && address.compatible)
@@ -487,6 +505,7 @@ export function candidateCertificate(row, candidate, { location = null, links = 
   else if (names.legalExact) explanations.push("Raison sociale concordante");
   if (address.complete) explanations.push("Adresse de site complète concordante");
   else if (address.compatible) explanations.push("Adresse de site compatible mais incomplète");
+  for (const change of address.target.typography) explanations.push(`Graphie du chiffre romain normalisée : ${change.original} → ${change.normalized} (confusion l/I)`);
   if (distance !== null && distance <= 300) explanations.push(`Localisation compatible (${Math.round(distance)} m)`);
   if (names.publicAliasMismatch && !link.verified) explanations.push("Nom public de cet établissement incompatible avec la fiche");
   if (address.conflict) explanations.push("Contradiction d’adresse explicite");
@@ -525,47 +544,10 @@ function deterministicCertificates(certificates) {
   return [...certificates].sort((a, b) => (rank[a.level] ?? 9) - (rank[b.level] ?? 9) || a.siret.localeCompare(b.siret));
 }
 
-export function decideIdentity({ row, candidates = [], links = [], coverage = [], location = null } = {}) {
+function decideFromSiteEvidence({ row, candidates = [], links = [], coverage = [], location = null } = {}) {
   const merged = mergeOfficialCandidates(candidates);
   const certificates = deterministicCertificates(merged.map(candidate => candidateCertificate(row, candidate, { links, location })));
   const coverageSummary = summarizeCoverage(coverage);
-  const identifiers = identifierParts(row?.SirenSiret);
-  const exactCertificate = identifiers.siret ? certificates.find(item => item.exactSiret) : null;
-
-  if (identifiers.siret) {
-    if (exactCertificate?.level === "verified") {
-      return {
-        status: IDENTITY_STATES.MATCH_VERIFIED,
-        candidate: exactCertificate.candidate,
-        alternatives: [],
-        certificates,
-        coverage: coverageSummary,
-        reason: "Le SIRET de la fiche a été revalidé sans contradiction de site.",
-      };
-    }
-    if (exactCertificate?.conflict) {
-      return {
-        status: IDENTITY_STATES.NO_MATCH,
-        candidate: null,
-        alternatives: certificates.filter(item => item.level === "verified" && !item.exactSiret && item.admissible).map(item => item.candidate).slice(0, 2),
-        certificates,
-        coverage: coverageSummary,
-        identifierConflict: { siret: identifiers.siret, adresse: exactCertificate.candidate.adresse },
-        reason: `Le SIRET ${identifiers.siret} désigne ${exactCertificate.candidate.adresse} : il ne confirme pas le site saisi. Toute correction doit être validée explicitement.`,
-      };
-    }
-    return {
-      status: coverageSummary.complete ? IDENTITY_STATES.NO_MATCH : IDENTITY_STATES.INCOMPLETE,
-      candidate: null,
-      alternatives: certificates.filter(item => item.level === "verified" && item.admissible).map(item => item.candidate).slice(0, 2),
-      certificates,
-      coverage: coverageSummary,
-      reason: coverageSummary.complete
-        ? "Le SIRET fourni n’a pas été revalidé dans le périmètre exploré."
-        : "La validation du SIRET n’a pas pu être menée à terme.",
-    };
-  }
-
   const verified = certificates.filter(item => item.level === "verified" && item.admissible);
   const probable = certificates.filter(item => item.level === "probable" && item.admissible);
 
@@ -634,6 +616,26 @@ export function decideIdentity({ row, candidates = [], links = [], coverage = []
       ? "Aucun établissement ne dispose des preuves d’identité nécessaires dans le périmètre exploré."
       : "L’analyse ne dispose pas d’une couverture suffisante pour conclure.",
   };
+}
+
+// The entered registration number is fallible user input. It can corroborate
+// evidence for this site, but never veto another independently proven site or
+// choose between two establishments already supported at the same level.
+export function decideIdentity(options = {}) {
+  const decision = decideFromSiteEvidence(options);
+  const supplied = identifierParts(options.row?.SirenSiret);
+  if (!String(options.row?.SirenSiret ?? "").trim()) return decision;
+  const candidate = decision.candidate;
+  const agrees = candidate && (supplied.siret ? candidate.siret === supplied.siret : supplied.siren && candidate.siren === supplied.siren);
+  if (agrees) return decision;
+  const entered = String(options.row.SirenSiret).trim();
+  const other = decision.certificates.find(item => item.siret === supplied.siret)?.candidate;
+  return { ...decision, identifierWarning: {
+    entered, proposedSiret: candidate?.siret ?? null, reportedAddress: other?.adresse ?? null,
+    message: candidate
+      ? `Le numéro renseigné (${entered}) ne corrobore pas l’établissement démontré par son nom et son adresse. SIRET du site : ${candidate.siret}. La correction proposée reste à valider.`
+      : `Le numéro renseigné (${entered}) reste un indice non confirmé ; il n’a pas servi à exclure un établissement.`,
+  } };
 }
 
 export function decisionCandidates(decision) {

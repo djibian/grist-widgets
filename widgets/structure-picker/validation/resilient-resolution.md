@@ -21,7 +21,7 @@ npm test
 
 Le script écrit `artifacts/structure-picker-identity-live.json`, avec réponses réseau brutes, durées, diagnostics, verdicts et preuves. Les sondes exactes de contrôle sont lancées **après** la résolution et ne l'alimentent jamais. L'artefact réseau contient également les grands shards ATP/Overture ; sa synthèse versionnée est [resilient-live-summary.json](resilient-live-summary.json).
 
-## Résultats et limites démontrées
+## Résultats et limites démontrées le 26 octobre (avant ajustement de la saisie)
 
 - Alliance : UAI `0851256D`, SIRET de site `32548690000062`, exploitant OGEC PRIMAIRE ET MATERNELLE DE CHALLANS. Éducation : 55 boulevard Jean XXIII. OSM node `9934213402` porte `fixme=position exacte à définir` : rejet obligatoire. Les relations BDNB de cette adresse ont plusieurs bâtiments et des scores 12/15 ; aucune construction unique assez étayée. L'identité peut être confirmée, mais aucune position finale n'est démontrée par ces sources.
 - Guillonneau : EGE FINESS `850025917`, SIRET `26850050100070`, CCAS, 27 rue de la Gazonnière. OSM way `1098104437`, version 3 du 2024-11-06, porte explicitement ce FINESS, ce SIRET et la catégorie EHPAD 500. Le point intérieur retenu est `46.8389449, -1.881625298666242`. La résidence voisine L'Entracte porte **d'autres** FINESS/SIRET et ne fournit pas ce point.
@@ -40,3 +40,15 @@ Les index locaux couvrent actuellement les départements 44/85, avec complément
 ## Validation du 26 octobre 2026
 
 `npm test` : **409 tests réussis, aucun échec** (7 partagés, 311 structure-picker, 64 affectation, 20 itinéraires, 7 composition de courriel). La capture réseau finale confirme les quatre références et les identités Alliance/Guillonneau. Les deux variantes Sainte Marie sont refusées à raison (SIRET du siège), avec le site correct en alternative. Legé termine en `INCOMPLETE` en 2,97 s car IGN dépasse son budget de découverte ; aucun SIRET n’est inventé. L’Alliance conserve une abstention de position ; Guillonneau obtient son point de site explicite.
+
+## Validation du 27 octobre : saisie réelle et numéro indicatif
+
+La lecture Grist **sans aucune écriture** a confirmé les champs publics exacts du [corpus de saisie](../tests/fixtures/resolution/grist-inputs-2026-10-27.json). L’Alliance était saisie `55 Bd Jean XXlll, 85300 Challans`, avec trois `l` minuscules, alors que le corpus initial utilisait déjà `XXIII`. Cette différence provoquait le rejet de l’adresse dans le registre scolaire, puis le chemin de repli réseau. Le correctif conserve l’original et normalise uniquement ce motif générique de chiffre romain invalide vers une forme valide. Des négatifs conservent les distinctions `XXII`/`XXIII`, les vrais chiffres `XL`/`LIII`, les numéros de maison et les mots ordinaires.
+
+Le numéro d’immatriculation saisi n’est plus un filtre ni un motif de rejet de l’identité. Les sources officielles restent strictement contrôlées. Les deux Sainte Marie, **sans changer leur SIRET saisi**, sont désormais `MATCH_VERIFIED`, site `78605938600023`, UAI `0441333K`, avec le même point intérieur OSM de `way:373841583`. Le numéro de siège `78605938600015` est seulement signalé. Son remplacement reste décoché ; l’UI permet de sélectionner explicitement cette correction avec la paire de coordonnées et sa preuve dans une même action Grist. Aucun remplacement silencieux ni écriture sur le document réel n’a été effectué.
+
+Les tests reprennent les espaces, apostrophes, accents, communes sans tirets et chiffres romains des cinq fiches réellement présentes. Ils couvrent aussi l’absence de numéro, un SIRET erroné, un SIREN d’un autre organisme, une saisie mal formée, deux homonymes déjà prouvés et l’impossibilité pour un numéro concordant de surmonter une contradiction du nom ou du site. Les preuves et captures du 26 octobre ci-dessus sont conservées comme historique ; la capture de référence après cet ajustement est [registration-hints-live-summary.json](registration-hints-live-summary.json).
+
+La capture réseau du 2026-10-27T16:57:35.948Z confirme les huit fiches pour lesquelles une chaîne de preuves suffisante est disponible, dont les deux Sainte Marie en conservant leur numéro saisi. L’Alliance conserve une abstention de position justifiée ; Legé reste INCOMPLETE (IGN indisponible dans son budget) et ne reçoit aucun SIRET inventé. Les quatre références historiques conservent leurs coordonnées démontrées. Les [réponses publiques du 27 octobre](registration-hints-public-responses.json) sont également versionnées.
+
+Validation automatisée finale du 27 octobre : **418 tests réussis, aucun échec** (7 partagés, 320 structure-picker, 64 affectation, 20 itinéraires et 7 composition). Le numéro seul ne confirme pas un site, un numéro concordant ne départage pas deux homonymes déjà prouvés, et un numéro erroné ne déclenche pas de requête superflue lorsque le nom et l’adresse établissent déjà le candidat.

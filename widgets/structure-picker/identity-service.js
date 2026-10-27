@@ -165,7 +165,7 @@ async function resolveBaseIdentity({
   const diagnostics = [];
   let publishedFailed = false;
 
-  if (!String(row.SirenSiret ?? "").trim() && typeof findPublishedLinks === "function") {
+  if (typeof findPublishedLinks === "function") {
     try {
       const published = await findPublishedLinks({ row, signal });
       const links = Array.isArray(published?.candidates) ? published.candidates.slice(0, 2) : [];
@@ -269,7 +269,7 @@ export async function resolveIdentityForEnrichment(options = {}) {
   const fresh = new Map();
   const diagnostics = [];
   let registrySettled = typeof findRegistrySites !== "function";
-  const sectorFirst = !row.SirenSiret && /\b(ecole|college|lycee|ehpad|residence|ssiad)\b/.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
+  const sectorFirst = /\b(ecole|college|lycee|ehpad|residence|ssiad)\b/.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
   let releaseRegistry;
   const registryReady = new Promise(resolve => { releaseRegistry = resolve; });
   if (registrySettled) releaseRegistry();
@@ -288,7 +288,7 @@ export async function resolveIdentityForEnrichment(options = {}) {
       decision = { ...decision, status: IDENTITY_STATES.INCOMPLETE, reason: "Une recherche nécessaire reste incomplète ; aucune identité n’est inventée." };
     }
     const unresolved = all.flatMap(result => result.unresolvedBindings ?? []);
-    if (unresolved.length && !row.SirenSiret && decision.status === IDENTITY_STATES.MATCH_VERIFIED) {
+    if (unresolved.length && decision.status === IDENTITY_STATES.MATCH_VERIFIED) {
       decision = { ...decision, status: IDENTITY_STATES.INCOMPLETE, reason: "Un autre rattachement sectoriel reste à revalider ; aucun choix automatique." };
     }
     const unverifiedSites = all.flatMap(result => result.unverifiedSites ?? []);
@@ -390,7 +390,7 @@ export async function resolveIdentityForEnrichment(options = {}) {
       while (pending.size) {
         const name = await Promise.race(pending.values()); pending.delete(name);
         const result = combine();
-        if (result.decision.status === IDENTITY_STATES.MATCH_VERIFIED && (registrySettled || row.SirenSiret
+        if (result.decision.status === IDENTITY_STATES.MATCH_VERIFIED && (registrySettled
           || !/\b(ecole|college|lycee|ehpad|residence|ssiad)\b/.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()))) return result;
       }
       return combine();
@@ -399,7 +399,7 @@ export async function resolveIdentityForEnrichment(options = {}) {
   } catch (error) {
     if (signal?.aborted) throw error;
     const result = combine();
-    if (result.decision.status !== IDENTITY_STATES.MATCH_VERIFIED && !result.decision.identifierConflict) result.decision = {
+    if (result.decision.status !== IDENTITY_STATES.MATCH_VERIFIED) result.decision = {
       ...result.decision, status: IDENTITY_STATES.INCOMPLETE,
       reason: "Certaines sources nécessaires n’ont pas répondu ; les résultats et preuves déjà reçus sont conservés.",
     };

@@ -220,57 +220,24 @@ export async function resolveStructureIdentity({
   try {
     const location = extractLocationFromAddress(row.Adresse);
     const initialQuery = identitySearchName(row);
-    let initialOfficialPromise;
-    let sirenValidationPromise = null;
-
-    if (identifiers.siret) {
-      initialOfficialPromise = performOfficial(
-        buildOfficialIdentifierSearchRequest(identifiers.siret),
-        "annuaire:siret",
-        { paginate: false, required: true },
-      );
-    } else {
-      initialOfficialPromise = initialQuery
-        ? performOfficial(
-            buildOfficialTextSearchRequest(initialQuery, { codePostal: location.codePostal }),
-            "annuaire:text",
-            { paginate: true, required: true },
-          )
-        : Promise.resolve([]);
-      if (identifiers.siren) {
-        sirenValidationPromise = performOfficial(
-          buildOfficialIdentifierSearchRequest(identifiers.siren),
-          "annuaire:siren",
-          { paginate: false, required: true },
-        );
-      }
-    }
-
-    const [initialOfficial, sirenValidation] = await Promise.all([
-      initialOfficialPromise,
-      sirenValidationPromise ?? Promise.resolve([]),
-    ]);
-
+    const initialRequest = initialQuery
+      ? buildOfficialTextSearchRequest(initialQuery, { codePostal: location.codePostal })
+      : identifiers.identifier ? buildOfficialIdentifierSearchRequest(identifiers.identifier) : null;
+    const initialOfficial = initialRequest ? await performOfficial(initialRequest,
+      initialQuery ? "annuaire:text" : "annuaire:identifier-hint", { paginate: Boolean(initialQuery), required: true }) : [];
     candidates = mergeCandidates(candidates, initialOfficial);
-
-    if (identifiers.siren && !identifiers.siret) {
-      const sirenCoverage = coverage.get("annuaire:siren")?.coverage;
-      const validated = (sirenCoverage?.unitSirens ?? []).some(value => normalizeIdentifier(value) === identifiers.siren)
-        || (sirenValidation ?? []).some(item => normalizeIdentifier(item?.siren) === identifiers.siren);
-      if (!validated) {
-        coverage.set("annuaire:siren", coverageEntry("annuaire:siren", "error", { ...(sirenCoverage ?? {}), complete: false }, true, "SIREN non revalidé"));
-      }
-      candidates = candidates.filter(item => normalizeIdentifier(item?.siren) === identifiers.siren);
-    }
 
     let anchor = locationAnchor(row, null);
     let decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
     checkpoint(decision);
 
-    if (isDecisive(decision) || identifiers.siret || deadline.timedOut) {
+    if (isDecisive(decision) || deadline.timedOut) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }
 
+    // With a public name, the entered identifier is corroboration only. It
+    // does not trigger a second lookup or constrain discovery. Source-published
+    // identifiers are still revalidated explicitly when they supply a bridge.
     // A known site address already supports the identity decision. Waiting for
     // an optional street geocode would consume the budget for stronger registry proof.
     const geocoded = await performGeocode();
@@ -283,7 +250,7 @@ export async function resolveStructureIdentity({
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }
 
-    if (anchor && !identifiers.siret && officialRequestCount < maxOfficialRequests) {
+    if (anchor && officialRequestCount < maxOfficialRequests) {
       const rowCoordinates = usableCoordinates(row.Latitude, row.Longitude);
       const radius = rowCoordinates ? 0.3 : 0.5;
       const nearby = await performOfficial(
@@ -291,9 +258,7 @@ export async function resolveStructureIdentity({
         "annuaire:nearby",
         { paginate: true, required: true },
       );
-      candidates = mergeCandidates(candidates, identifiers.siren
-        ? nearby.filter(item => normalizeIdentifier(item?.siren) === identifiers.siren)
-        : nearby);
+      candidates = mergeCandidates(candidates, nearby);
       decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
       checkpoint(decision);
       if (isDecisive(decision)) {

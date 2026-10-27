@@ -18,8 +18,8 @@ const fixture=async name=>JSON.parse(await readFile(new URL(`./fixtures/resoluti
 const cases=[
  {id:'alliance',name:"École de l'Alliance",address:'55 boulevard Jean XXIII, 85300 Challans',siret:'',expected:'32548690000062',status:'MATCH_VERIFIED'},
  {id:'guillonneau',name:'Résidence Marie et Albert Guillonneau',address:'27 rue de la Gazonnière, 85300 Challans',siret:'',expected:'26850050100070',status:'MATCH_VERIFIED'},
- {id:'marie-no-postal',name:'École Sainte Marie',address:'9 rue de la Paix, Saint-Lumine-de-Coutais',siret:'78605938600015',expected:null,status:'NO_MATCH'},
- {id:'marie-postal',name:'École Sainte Marie',address:'9 rue de la Paix, 44310 Saint-Lumine-de-Coutais',siret:'78605938600015',expected:null,status:'NO_MATCH'},
+ {id:'marie-no-postal',name:'École Sainte Marie',address:'9 rue de la Paix, Saint-Lumine-de-Coutais',siret:'78605938600015',expected:'78605938600023',status:'MATCH_VERIFIED'},
+ {id:'marie-postal',name:'École Sainte Marie',address:'9 rue de la Paix, 44310 Saint-Lumine-de-Coutais',siret:'78605938600015',expected:'78605938600023',status:'MATCH_VERIFIED'},
  {id:'enfance',name:"Maison de l'enfance",address:'10 ter place du Champ de Foire, 44650 Legé',siret:'',expected:null,status:'NO_MATCH'},
 ];
 const rowOf=c=>({NomCommercial:c.name,Adresse:c.address,SirenSiret:c.siret});
@@ -40,20 +40,20 @@ test('real source replay: all five new rows finish without the former global tim
   assert.ok(!r.diagnostics.some(d=>/délai maximal/.test(d)));
   if(c.id==='alliance'){assert.equal(r.candidate.position.status,'UNRESOLVED');assert.equal(r.candidate.latitude,null);}
   if(c.id==='guillonneau'){assert.equal(r.candidate.position.status,'SITE_CONFIRMED');assert.equal(r.candidate.position.source.recordId,'way:1098104437');assert.ok(r.candidate.position.proof.some(p=>p.finess==='850025917'));}
-  if(c.id.startsWith('marie')){assert.equal(r.decision.identifierConflict.siret,c.siret);assert.deepEqual(r.alternatives.map(x=>x.siret),['78605938600023']);assert.deepEqual(buildEnrichmentProposals(rowOf(c),r.alternatives[0],{identityStatus:r.decision.status}),[]);}
+  if(c.id.startsWith('marie')){assert.equal(r.decision.identifierWarning.entered,c.siret);assert.equal(r.candidate.position.status,'SITE_CONFIRMED');const proposals=buildEnrichmentProposals(rowOf(c),r.candidate,{identityStatus:r.decision.status});assert.equal(proposals.find(p=>p.field==='SirenSiret').selectedByDefault,false);}
   assert.ok(r.trace.some(e=>e.source==='identity:plan'&&e.state==='ok'));
  });
 });
 
-test('both Sainte Marie spellings identify the same school site only after explicit SIRET correction',async()=>{
+test('both Sainte Marie spellings identify the same school site independently of a wrong, absent or corrected SIRET',async()=>{
  const results=[];
- for(const c of cases.filter(c=>c.id.startsWith('marie'))){
-  const r=await resolveEstablishmentForEnrichment(await options({...c,siret:'78605938600023'}));
+ for(const c of cases.filter(c=>c.id.startsWith('marie')).flatMap(c=>['','78605938600015','78605938600023','786059386','00000000000000','erroné'].map(siret=>({...c,siret})))){
+  const r=await resolveEstablishmentForEnrichment(await options(c));
   assert.equal(r.decision.status,'MATCH_VERIFIED');assert.equal(r.candidate.siret,'78605938600023');
   assert.equal(r.candidate.position.status,'SITE_CONFIRMED');assert.equal(r.candidate.position.source.recordId,'way:373841583');
   assert.ok(r.candidate.position.proof.some(p=>p.kind==='OFFICIAL_ADDRESS_INSIDE_SITE'));results.push([r.candidate.latitude,r.candidate.longitude]);
  }
- assert.deepEqual(results[0],results[1]);
+ for(const result of results)assert.deepEqual(result,results[0]);
 });
 
 test('education evidence refuses another SIRET, own UAI missing, closed school and wrong public name',async()=>{
@@ -143,4 +143,31 @@ test('an independent real corpus covers public/private schools, college, lycée,
   const link=result.links.find(item=>item.sourceRecordId===source.recordId);assert.ok(link);assert.ok(registryLinkValid(link,result.decision.candidate,row));
   const wrong=structuredClone(source);wrong.siret=source.siret.slice(0,9)+'99999';assert.equal(verifiedRegistryLink(wrong,result.decision.candidate,{checkedAt:capture.capturedAt,url:capture.url}),null);
  });
+});
+
+test('actual Alliance input reproduces the lowercase-l Roman numeral failure and now preserves explicit normalization evidence',async()=>{
+ const actual=(await fixture('grist-inputs-2026-10-27')).rows.find(row=>row.id===5);
+ assert.ok(actual.Adresse.includes('XXlll'));
+ const result=await resolveEstablishmentForEnrichment(await options(cases[0],{row:actual}));
+ assert.equal(result.decision.status,'MATCH_VERIFIED');assert.equal(result.candidate.siret,'32548690000062');
+ assert.equal(result.candidate.latitude,null);
+ const certificate=result.decision.certificates.find(item=>item.siret===result.candidate.siret);
+ assert.deepEqual(certificate.address.target.typography,[{kind:'ROMAN_NUMERAL_HOMOGLYPH',original:'XXlll',normalized:'XXIII'}]);
+ assert.ok(certificate.explanations.some(text=>text.includes('XXlll → XXIII')));
+});
+
+test('actual Sainte Marie rows are confirmed despite seat SIRET, with coordinates gated on explicit correction in the same write',async()=>{
+ const inputs=(await fixture('grist-inputs-2026-10-27')).rows.filter(row=>[7,8].includes(row.id));
+ for(const row of inputs){
+  const result=await resolveEstablishmentForEnrichment(await options(cases[2],{row}));
+  assert.equal(result.decision.status,'MATCH_VERIFIED');assert.equal(result.candidate.siret,'78605938600023');
+  assert.equal(result.decision.identifierWarning.entered,'78605938600015');
+  assert.equal(result.candidate.position.source.recordId,'way:373841583');
+  const proposals=buildEnrichmentProposals(row,result.candidate,{identityStatus:result.decision.status});
+  assert.equal(proposals.find(item=>item.field==='SirenSiret').selectedByDefault,false);
+  const {selectedChanges}=await import('../enrichment.js');
+  assert.deepEqual(selectedChanges(proposals,['Coordinates']),{});
+  const changes=selectedChanges(proposals,['Coordinates','SirenSiret']);
+  assert.equal(changes.SirenSiret,'78605938600023');assert.equal(changes.Latitude,result.candidate.latitude);assert.equal(changes.Longitude,result.candidate.longitude);
+ }
 });

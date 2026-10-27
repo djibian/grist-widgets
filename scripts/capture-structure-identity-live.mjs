@@ -20,8 +20,8 @@ const publishedPayload = JSON.parse(await readFile(
 const cases = [
   { id: "alliance", expectedSiret: "32548690000062", row: { NomCommercial: "École de l’Alliance", Adresse: "55 boulevard Jean XXIII, 85300 Challans", SirenSiret: "" } },
   { id: "guillonneau", expectedSiret: "26850050100070", row: { NomCommercial: "Résidence Marie et Albert Guillonneau", Adresse: "27 rue de la Gazonnière, 85300 Challans", SirenSiret: "" } },
-  { id: "marie-no-postal", expectedSiret: null, row: { NomCommercial: "École Sainte Marie", Adresse: "9 rue de la Paix, Saint-Lumine-de-Coutais", SirenSiret: "78605938600015" } },
-  { id: "marie-postal", expectedSiret: null, row: { NomCommercial: "École Sainte Marie", Adresse: "9 rue de la Paix, 44310 Saint-Lumine-de-Coutais", SirenSiret: "78605938600015" } },
+  { id: "marie-no-postal", expectedSiret: "78605938600023", row: { NomCommercial: "École Sainte Marie", Adresse: "9 rue de la Paix, Saint-Lumine-de-Coutais", SirenSiret: "78605938600015" } },
+  { id: "marie-postal", expectedSiret: "78605938600023", row: { NomCommercial: "École Sainte Marie", Adresse: "9 rue de la Paix, 44310 Saint-Lumine-de-Coutais", SirenSiret: "78605938600015" } },
   { id: "enfance", expectedSiret: null, row: { NomCommercial: "Maison de l’enfance", Adresse: "10 ter place du Champ de Foire, 44650 Legé", SirenSiret: "" } },
   {
     id: "super-u-machecoul",
@@ -72,6 +72,14 @@ const cases = [
     },
   },
 ];
+
+// Replay the actual Grist text, including spaces, punctuation and glyphs. These
+// are public input fields only; expected identifiers never enter discovery.
+const actualRows = JSON.parse(await readFile(new URL("../widgets/structure-picker/tests/fixtures/resolution/grist-inputs-2026-10-27.json", import.meta.url), "utf8")).rows;
+const rowIds = [5, 6, 7, 8, 9, 1, 2, 3, 4];
+for (let i = 0; i < cases.length; i += 1) {
+  const { id, ...row } = actualRows.find(item => item.id === rowIds[i]); cases[i].row = row;
+}
 
 const capture = {
   capturedAt: new Date().toISOString(),

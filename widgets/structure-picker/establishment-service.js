@@ -8,7 +8,7 @@ export const ESTABLISHMENT_BUDGET = Object.freeze({ deadlineMs: 24000, indexedDe
 
 function incompleteIdentity(partial, message) {
   const previous = partial.identity;
-  return previous ? { ...previous, decision: previous.decision?.status === IDENTITY_STATES.MATCH_VERIFIED || previous.decision?.identifierConflict
+  return previous ? { ...previous, decision: previous.decision?.status === IDENTITY_STATES.MATCH_VERIFIED
     ? previous.decision : { ...previous.decision, status: IDENTITY_STATES.INCOMPLETE, reason: "Réponses nécessaires manquantes ; informations reçues conservées." },
     diagnostics: [...(previous.diagnostics ?? []), message] }
     : { decision: { status: IDENTITY_STATES.INCOMPLETE, candidate: null, alternatives: [], certificates: [],

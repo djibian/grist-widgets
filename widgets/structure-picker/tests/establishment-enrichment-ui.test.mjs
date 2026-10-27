@@ -85,10 +85,15 @@ const scenarios = [
 const newCases = [
   { name: "École de l’Alliance", address: "55 boulevard Jean XXIII, 85300 Challans", siret: "32548690000062", fixture: "alliance", label: "Identité confirmée" },
   { name: "Résidence Marie et Albert Guillonneau", address: "27 rue de la Gazonnière, 85300 Challans", siret: "26850050100070", fixture: "guillonneau", label: "Identité confirmée" },
-  { name: "École Sainte Marie", address: "9 rue de la Paix, Saint-Lumine-de-Coutais", inputSiret: "78605938600015", siret: "78605938600023", fixture: "marie", label: "Aucune identité démontrée" },
-  { name: "École Sainte Marie", address: "9 rue de la Paix, 44310 Saint-Lumine-de-Coutais", inputSiret: "78605938600015", siret: "78605938600023", fixture: "marie", label: "Aucune identité démontrée" },
+  { name: "École Sainte Marie", address: "9 rue de la Paix, Saint-Lumine-de-Coutais", inputSiret: "78605938600015", siret: "78605938600023", fixture: "marie", label: "Identité confirmée" },
+  { name: "École Sainte Marie", address: "9 rue de la Paix, 44310 Saint-Lumine-de-Coutais", inputSiret: "78605938600015", siret: "78605938600023", fixture: "marie", label: "Identité confirmée" },
   { name: "Maison de l’enfance", address: "10 ter place du Champ de Foire, 44650 Legé", siret: "", fixture: "enfance", label: "Aucune identité démontrée" },
 ];
+const actualInputRows = JSON.parse(await readFile(new URL("./fixtures/resolution/grist-inputs-2026-10-27.json", import.meta.url), "utf8")).rows;
+for (let index = 0; index < newCases.length; index += 1) {
+  const actual = actualInputRows[index + 4];
+  Object.assign(newCases[index], { name: actual.NomCommercial, address: actual.Adresse, inputSiret: actual.SirenSiret });
+}
 scenarios.push(...newCases);
 const registryManifest = JSON.parse(await readFile(new URL("../identity-links/site-registry/manifest.json", import.meta.url), "utf8"));
 const registryAssets = new Map(await Promise.all([
@@ -671,9 +676,35 @@ test("Grist shows a single coherent site candidate and preserves the four identi
       assert.doesNotMatch(nodes["enrich-status"].textContent, /délai maximal/);
       assert.match(text, /Diagnostic des sources/);
       if (current.siret) assert.ok(text.includes(current.siret));
-      if (current.inputSiret || current.fixture === "enfance") assert.equal(nodes["proposal-panel"].querySelector("#identity-apply-proposals"), null);
+      if (current.inputSiret) {
+        assert.match(text, /Le numéro renseigné.*ne corrobore pas/);
+        assert.match(text, /Position confirmée/);
+        const inputs = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]");
+        assert.equal(inputs.find(input => input.dataset.identityProposalField === "SirenSiret").checked, false);
+        assert.equal(inputs.find(input => input.dataset.identityProposalField === "Coordinates").disabled, true);
+      }
+      if (current.fixture === "enfance") assert.equal(nodes["proposal-panel"].querySelector("#identity-apply-proposals"), null);
       assert.equal(nodes["establishment-candidate"].querySelectorAll('input[type="radio"]').length, 0);
       assert.equal(writes.length, 3, "analysis alone never writes any field");
     });
   }
+  await t.test("Sainte Marie displays a confirmed site despite the entered seat number and writes the correction only after explicit selection", async () => {
+    await select(6); click(); await settle();
+    t.mock.timers.tick(1800); await settle();
+    const inputs = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]");
+    const siret = inputs.find(input => input.dataset.identityProposalField === "SirenSiret");
+    const coordinates = inputs.find(input => input.dataset.identityProposalField === "Coordinates");
+    assert.equal(siret.checked, false); assert.equal(coordinates.disabled, true);
+    assert.equal(table.Numero_d_immatriculation[6], "78605938600015");
+    siret.checked = true; siret.dispatchEvent(new Event("change"));
+    assert.equal(coordinates.disabled, false);
+    nodes["proposal-panel"].querySelector("#identity-apply-proposals").dispatchEvent(new Event("click"));
+    await settle();
+    assert.equal(writes.length, 4);
+    const fields = writes[3][0][3];
+    assert.equal(fields.Numero_d_immatriculation, "78605938600023");
+    assert.equal(JSON.parse(fields.PositionProof).siret, fields.Numero_d_immatriculation);
+    assert.equal(JSON.parse(fields.PositionProof).source.recordId, "way:373841583");
+    assert.ok(fields.Latitude && fields.Longitude);
+  });
 });

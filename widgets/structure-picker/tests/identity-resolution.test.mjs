@@ -51,10 +51,10 @@ test("address comparison preserves number and repetition", () => {
 });
 
 test("explicit SIRET is verified but a site contradiction blocks silent enrichment", () => {
-  const row = { NomCommercial: "Garage Martin", SirenSiret: "12345678900011", Adresse: "12 rue A 44000 Nantes" };
+  const row = { NomCommercial: "Garage Martin", SirenSiret: "12345678900011", Adresse: "12 rue des Acacias 44000 Nantes" };
   const ok = decideIdentity({
     row,
-    candidates: [candidate({ siret: "12345678900011", siren: "123456789", raisonSociale: "MARTIN", adresse: "12 RUE A 44000 NANTES" })],
+    candidates: [candidate({ siret: "12345678900011", siren: "123456789", raisonSociale: "MARTIN", adresse: "12 RUE DES ACACIAS 44000 NANTES" })],
     coverage: completeCoverage,
   });
   assert.equal(ok.status, IDENTITY_STATES.MATCH_VERIFIED);
@@ -65,7 +65,7 @@ test("explicit SIRET is verified but a site contradiction blocks silent enrichme
     coverage: completeCoverage,
   });
   assert.equal(conflict.status, IDENTITY_STATES.NO_MATCH);
-  assert.equal(conflict.identifierConflict.siret, row.SirenSiret);
+  assert.equal(conflict.identifierWarning.entered, row.SirenSiret);
 });
 
 test("Super U cannot be assigned to SIDONAM from boulevard proximity alone", () => {
@@ -198,4 +198,44 @@ test("a probable candidate cannot become a match when required coverage is trunc
     coverage: [{ source: "annuaire:text", status: "ok", required: true, coverage: { complete: false, hasNextPage: true } }],
   });
   assert.equal(decision.status, IDENTITY_STATES.INCOMPLETE);
+});
+
+test('Roman typography correction is limited to invalid numerals, preserving genuine numerals and nearby street distinctions',async()=>{
+ const {normalizeAddressTypography}=await import('../identity-resolution.js');
+ for(const [from,to] of [['XXlll','XXIII'],['Vll','VII'],['XVlll','XVIII']]){
+  assert.equal(normalizeAddressTypography(`12 rue Charles ${from} 44000 Nantes`).normalized,`12 rue Charles ${to} 44000 Nantes`);
+ }
+ for(const token of ['XXII','XXIII','XL','Xl','LIII','Mill','Miller','XXLLL','Xlllfoo'])assert.equal(normalizeAddressTypography(token).normalized,token);
+ assert.equal(addressEvidence('55 Bd Jean XXII 85300 Challans','55 Bd Jean XXIII 85300 Challans').conflict,true);
+ assert.equal(addressEvidence('55 Bd Jean XXlll 85300 Challans','57 Bd Jean XXIII 85300 Challans').conflict,true);
+});
+
+test('a wrong or malformed entered number never vetoes a site proven by public name and address',()=>{
+ const site=candidate({nomCommercial:'LES ACACIAS',aliases:['LES ACACIAS'],nomUsuelDistinct:true,raisonSociale:'OPERATEUR MULTISITE',siret:'12345678900029',siren:'123456789',adresse:'12 RUE DES ACACIAS 44000 NANTES'});
+ for(const number of ['',site.siret,'12345678900011','98765432100019','987654321','erreur de saisie']){
+  const result=decideIdentity({row:{NomCommercial:'Les Acacias',Adresse:'12 rue des Acacias 44000 Nantes',SirenSiret:number},candidates:[site],coverage:completeCoverage});
+  assert.equal(result.status,'MATCH_VERIFIED');assert.equal(result.candidate.siret,site.siret);
+  if(number&&number!==site.siret)assert.ok(result.identifierWarning);
+ }
+});
+
+test('a matching entered number cannot turn an incompatible public name or site address into a verified identity',()=>{
+ const site=candidate({nomCommercial:'AUTRE ECOLE',aliases:['AUTRE ECOLE'],nomUsuelDistinct:true,raisonSociale:'ASSOCIATION',siret:'12345678900029',siren:'123456789',adresse:'12 RUE DES ACACIAS 44000 NANTES'});
+ const result=decideIdentity({row:{NomCommercial:'Les Acacias',Adresse:site.adresse,SirenSiret:site.siret},candidates:[site],coverage:completeCoverage});
+ assert.notEqual(result.status,'MATCH_VERIFIED');
+});
+
+test('even an exact entered SIRET cannot select between two independently verified homonyms at the same site address',()=>{
+ const first=candidate({nomCommercial:'LES ACACIAS',aliases:['LES ACACIAS'],nomUsuelDistinct:true,raisonSociale:'PREMIER OPERATEUR',siret:'12345678900029',siren:'123456789',adresse:'12 RUE DES ACACIAS 44000 NANTES'});
+ const second={...first,siret:'98765432100019',siren:'987654321',raisonSociale:'SECOND OPERATEUR'};
+ for(const entered of [first.siret,second.siret,'00000000000000']){
+  const result=decideIdentity({row:{NomCommercial:'Les Acacias',Adresse:first.adresse,SirenSiret:entered},candidates:[first,second],coverage:completeCoverage});
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.candidate,null);assert.equal(result.alternatives.length,2);
+ }
+});
+
+test('an entered registration number alone is not a demonstrated public-site identity',()=>{
+ const site=candidate({raisonSociale:'OPERATEUR',siret:'12345678900029',siren:'123456789',adresse:'12 RUE DES ACACIAS 44000 NANTES'});
+ const result=decideIdentity({row:{NomCommercial:'',Adresse:'',SirenSiret:site.siret},candidates:[site],coverage:completeCoverage});
+ assert.notEqual(result.status,'MATCH_VERIFIED');assert.equal(result.candidate,null);
 });
