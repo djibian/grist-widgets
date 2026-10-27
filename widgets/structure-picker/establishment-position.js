@@ -1,6 +1,7 @@
 import { addressEvidence, normalizeIdentity, parseSiteAddress, targetNameVariants, usableCoordinates } from "./identity-resolution.js";
 import { normalizeIdentifier } from "./search.js";
 import { verifiedGeographicFiness } from "./osm-site-positions.js";
+import { assessAddressBuildingPosition } from "./address-building-positions.js";
 
 export const POSITION_STATES = Object.freeze({
   SITE_CONFIRMED: "SITE_CONFIRMED",
@@ -61,7 +62,8 @@ function trustedNames(candidate, links) {
   return names;
 }
 
-export function assessSitePosition(candidate, poi, { links = [], requestedAddress = "" } = {}) {
+export function assessSitePosition(candidate, poi, { links = [], requestedAddress = "", identityStatus } = {}) {
+  if (poi.kind === "building") return assessAddressBuildingPosition(candidate, poi, { identityStatus, requestedAddress });
   const coordinates = usableCoordinates(poi.latitude, poi.longitude);
   const assessment = { observation: poi, accepted: false, proof: [], reason: "" };
   const refuse = (reason, conflict = false) => ({ ...assessment, reason, conflict });
@@ -124,8 +126,8 @@ export function assessSitePosition(candidate, poi, { links = [], requestedAddres
   return { ...assessment, accepted: true, coordinates, level: explicitlyLinked ? POSITION_STATES.SITE_CONFIRMED : POSITION_STATES.SITE_CORROBORATED };
 }
 
-export function resolveSitePosition(candidate, { observations = [], links = [], discovery = [], coverage = [], requestedAddress = "" } = {}) {
-  const assessments = observations.map(poi => assessSitePosition(candidate, poi, { links, requestedAddress }));
+export function resolveSitePosition(candidate, { observations = [], links = [], discovery = [], coverage = [], requestedAddress = "", identityStatus } = {}) {
+  const assessments = observations.map(poi => assessSitePosition(candidate, poi, { links, requestedAddress, identityStatus }));
   const administrative = usableCoordinates(candidate.latitude, candidate.longitude);
   const evidence = [
     ...(administrative ? [{ kind: "administrative", source: officialSource(candidate), ...administrative, accepted: false, reason: "Précision de site non documentée : point Annuaire conservé comme référence." }] : []),
@@ -148,6 +150,7 @@ export function resolveSitePosition(candidate, { observations = [], links = [], 
   return {
     ...base, ...selected.coordinates, status: selected.level,
     source: selected.observation.source, proof: selected.proof,
-    reason: selected.level === POSITION_STATES.SITE_CONFIRMED ? "Lieu rattaché par ses identifiants d’établissement explicites et revalidés." : "Lieu corroboré par son nom public attesté et son adresse de site.",
+    reason: selected.observation.kind === "building" ? "Point de bâtiment démontré par l’adresse officielle exacte, la liaison foncière BDNB et l’emprise RNB."
+      : selected.level === POSITION_STATES.SITE_CONFIRMED ? "Lieu rattaché par ses identifiants d’établissement explicites et revalidés." : "Lieu corroboré par son nom public attesté et son adresse de site.",
   };
 }
