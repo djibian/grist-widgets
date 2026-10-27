@@ -77,7 +77,7 @@ test("Super U abstains when no explicit legal bridge exists", async () => {
   assert.equal(result.displayCandidates.length, 0);
 });
 
-test("SIREN validates the legal person but text candidates are restricted to that SIREN", async () => {
+test("a supplied SIREN cannot eliminate an independently verified homonym at the same address", async () => {
   const calls = [];
   const target = candidate({ nomCommercial: "O PRE D'VOUS", aliases: ["O PRE D'VOUS"], nomUsuelDistinct: true, raisonSociale: "PH DISTRIBUTION", siren: "893061044", siret: "89306104400028", adresse: "24 RUE DES FOSSES 44270 LA MARNE", codePostal: "44270", commune: "LA MARNE" });
   const outsider = candidate({ nomCommercial: "O PRE D'VOUS", aliases: ["O PRE D'VOUS"], nomUsuelDistinct: true, raisonSociale: "OTHER", siren: "111111111", siret: "11111111100011", adresse: "24 RUE DES FOSSES 44270 LA MARNE", codePostal: "44270", commune: "LA MARNE" });
@@ -91,9 +91,9 @@ test("SIREN validates the legal person but text candidates are restricted to tha
       return official([]);
     },
   });
-  assert.equal(result.decision.candidate?.siret, "89306104400028");
-  assert.ok(calls.includes("siren"));
-  assert.ok(calls.includes("text"));
+  assert.equal(result.decision.status, "AMBIGUOUS");
+  assert.deepEqual(result.decision.alternatives.map(item => item.siret).sort(), [outsider.siret, target.siret].sort());
+  assert.deepEqual(calls, ["text"]);
 });
 
 test("pagination incompleteness is not hidden", async () => {
@@ -109,4 +109,11 @@ test("pagination incompleteness is not hidden", async () => {
   });
   assert.equal(result.decision.status, IDENTITY_STATES.INCOMPLETE);
   assert.ok(page >= 1);
+});
+
+test('a wrong entered number cannot delay the text/address result through a redundant identifier lookup',async()=>{
+ const site=candidate({nomCommercial:'GARAGE MARTIN',aliases:['GARAGE MARTIN'],nomUsuelDistinct:true,raisonSociale:'MARTIN AUTO',siret:'12345678900029',siren:'123456789',adresse:'12 RUE DES ACACIAS 44000 NANTES'});
+ const calls=[];
+ const result=await resolveStructureIdentity({row:{NomCommercial:'Garage Martin',Adresse:site.adresse,SirenSiret:'98765432100019'},fetchOfficial:async request=>{calls.push(request.kind);assert.equal(request.kind,'text');return official([site]);},geocode:async()=>{throw Error('unnecessary discovery');}});
+ assert.equal(result.decision.status,'MATCH_VERIFIED');assert.equal(result.decision.candidate.siret,site.siret);assert.ok(result.decision.identifierWarning);assert.deepEqual(calls,['text']);
 });

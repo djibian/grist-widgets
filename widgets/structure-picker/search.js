@@ -226,9 +226,13 @@ export function candidateFrom(unit, establishment, departments = getActiveDepart
     // FINESS belongs to this geographic establishment, never to its legal unit.
     finessIds: [...new Set((Array.isArray(establishment.liste_finess) ? establishment.liste_finess : [])
       .map(normalizeFiness).filter(Boolean))],
+    uaiIds: [...new Set((Array.isArray(establishment.liste_uai) ? establishment.liste_uai : [])
+      .map(value => String(value).trim().toUpperCase()).filter(value => /^\d{7}[A-Z]$/.test(value)))],
     adresse: String(establishment.adresse ?? ""),
     codePostal: String(establishment.code_postal ?? ""),
     commune: String(establishment.libelle_commune ?? ""),
+    codeCommune: String(establishment.commune ?? ""),
+    addressId: String(establishment.geo_id ?? ""),
     departement: departmentOf(establishment),
     latitude: coordinate(establishment.latitude, -90, 90),
     longitude: coordinate(establishment.longitude, -180, 180),

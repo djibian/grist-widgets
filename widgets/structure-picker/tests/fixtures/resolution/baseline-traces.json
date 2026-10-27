@@ -1,0 +1,258 @@
+{
+  "base": "4d96453fdc47e405fec00e30d541a8a02386f111",
+  "capturedAt": "2026-10-26T22:28:01.560Z",
+  "cases": [
+    {
+      "id": "alliance",
+      "row": {
+        "NomCommercial": "École de l'Alliance",
+        "Adresse": "55 boulevard Jean XXIII, 85300 Challans",
+        "SirenSiret": "",
+        "Latitude": "",
+        "Longitude": ""
+      },
+      "elapsedMs": 12003,
+      "error": {
+        "name": "TimeoutError",
+        "message": "Le délai maximal de l’analyse d’identité a été atteint."
+      },
+      "trace": [
+        {
+          "url": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/identity-links/published.json",
+          "startedMs": 3,
+          "status": 200,
+          "elapsedMs": 6
+        },
+        {
+          "phase": "official-total-including-queue",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=ecole+de+l+alliance&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=85300",
+          "startedMs": 14,
+          "elapsedMs": 6999
+        },
+        {
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=ecole+de+l+alliance&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=85300",
+          "startedMs": 15,
+          "status": 200,
+          "elapsedMs": 6998
+        },
+        {
+          "url": "https://data.geopf.fr/geocodage/search?q=55+boulevard+Jean+XXIII%2C+85300+Challans&autocomplete=0&index=address&limit=3&returntruegeometry=true",
+          "startedMs": 7014,
+          "status": "TimeoutError",
+          "elapsedMs": 4989
+        }
+      ]
+    },
+    {
+      "id": "guillonneau",
+      "row": {
+        "NomCommercial": "Résidence Marie et Albert Guillonneau",
+        "Adresse": "27 rue de la Gazonnière, 85300 Challans",
+        "SirenSiret": "",
+        "Latitude": "",
+        "Longitude": ""
+      },
+      "elapsedMs": 12001,
+      "error": {
+        "name": "TimeoutError",
+        "message": "Le délai maximal de l’analyse d’identité a été atteint."
+      },
+      "trace": [
+        {
+          "url": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/identity-links/published.json",
+          "startedMs": 0,
+          "status": 200,
+          "elapsedMs": 2
+        },
+        {
+          "phase": "official-total-including-queue",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=residence+marie+et+albert+guillonneau&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=85300",
+          "startedMs": 2,
+          "elapsedMs": 4227
+        },
+        {
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=residence+marie+et+albert+guillonneau&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=85300",
+          "startedMs": 2,
+          "status": 200,
+          "elapsedMs": 4224
+        },
+        {
+          "url": "https://data.geopf.fr/geocodage/search?q=27+rue+de+la+Gazonni%C3%A8re%2C+85300+Challans&autocomplete=0&index=address&limit=3&returntruegeometry=true",
+          "startedMs": 4233,
+          "status": 200,
+          "elapsedMs": 6763
+        },
+        {
+          "phase": "official-total-including-queue",
+          "url": "https://recherche-entreprises.api.gouv.fr/near_point?lat=46.838522&long=-1.881503&radius=0.5&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "startedMs": 10997,
+          "elapsedMs": 1004
+        },
+        {
+          "url": "https://recherche-entreprises.api.gouv.fr/near_point?lat=46.838522&long=-1.881503&radius=0.5&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "startedMs": 10997,
+          "status": "TimeoutError",
+          "elapsedMs": 1004
+        }
+      ]
+    },
+    {
+      "id": "marie-no-postal",
+      "row": {
+        "NomCommercial": "École Sainte Marie",
+        "Adresse": "9 rue de la Paix, Saint-Lumine-de-Coutais",
+        "SirenSiret": "78605938600015",
+        "Latitude": "",
+        "Longitude": ""
+      },
+      "elapsedMs": 12002,
+      "error": {
+        "name": "TimeoutError",
+        "message": "Le délai maximal de l’analyse d’identité a été atteint."
+      },
+      "trace": [
+        {
+          "phase": "official-total-including-queue",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600015&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "startedMs": 1,
+          "elapsedMs": 5096
+        },
+        {
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600015&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "startedMs": 795,
+          "status": 200,
+          "elapsedMs": 4301
+        },
+        {
+          "url": "https://data.geopf.fr/geocodage/search?q=9+rue+de+la+Paix%2C+Saint-Lumine-de-Coutais&autocomplete=0&index=address&limit=3&returntruegeometry=true",
+          "startedMs": 5097,
+          "status": "TimeoutError",
+          "elapsedMs": 6905
+        }
+      ]
+    },
+    {
+      "id": "marie-postal",
+      "row": {
+        "NomCommercial": "École Sainte Marie",
+        "Adresse": "9 rue de la Paix, 44310 Saint-Lumine-de-Coutais",
+        "SirenSiret": "78605938600015",
+        "Latitude": "",
+        "Longitude": ""
+      },
+      "elapsedMs": 12002,
+      "error": {
+        "name": "TimeoutError",
+        "message": "Le délai maximal de l’analyse d’identité a été atteint."
+      },
+      "trace": [
+        {
+          "phase": "official-total-including-queue",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600015&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "startedMs": 1,
+          "elapsedMs": 4951
+        },
+        {
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=78605938600015&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "startedMs": 1,
+          "status": 200,
+          "elapsedMs": 4951
+        },
+        {
+          "url": "https://data.geopf.fr/geocodage/search?q=9+rue+de+la+Paix%2C+44310+Saint-Lumine-de-Coutais&autocomplete=0&index=address&limit=3&returntruegeometry=true",
+          "startedMs": 4953,
+          "status": 200,
+          "elapsedMs": 1028
+        },
+        {
+          "url": "https://overpass-api.de/api/interpreter",
+          "startedMs": 5982,
+          "status": "TimeoutError",
+          "elapsedMs": 6019
+        },
+        {
+          "url": "https://overpass.private.coffee/api/interpreter",
+          "startedMs": 12002,
+          "status": "TimeoutError",
+          "elapsedMs": 1
+        }
+      ]
+    },
+    {
+      "id": "enfance",
+      "row": {
+        "NomCommercial": "Maison de l'enfance",
+        "Adresse": "10 ter place du Champ de Foire, 44650 Legé",
+        "SirenSiret": "",
+        "Latitude": "",
+        "Longitude": ""
+      },
+      "elapsedMs": 12003,
+      "error": {
+        "name": "TimeoutError",
+        "message": "Le délai maximal de l’analyse d’identité a été atteint."
+      },
+      "trace": [
+        {
+          "url": "file:///workspace/scratch/165a7b4406a8/general-resolution/widgets/structure-picker/identity-links/published.json",
+          "startedMs": 0,
+          "status": 200,
+          "elapsedMs": 2
+        },
+        {
+          "phase": "official-total-including-queue",
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=maison+de+l+enfance&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=44650",
+          "startedMs": 3,
+          "elapsedMs": 2849
+        },
+        {
+          "url": "https://recherche-entreprises.api.gouv.fr/search?q=maison+de+l+enfance&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25&code_postal=44650",
+          "startedMs": 3,
+          "status": 200,
+          "elapsedMs": 2849
+        },
+        {
+          "url": "https://data.geopf.fr/geocodage/search?q=10+ter+place+du+Champ+de+Foire%2C+44650+Leg%C3%A9&autocomplete=0&index=address&limit=3&returntruegeometry=true",
+          "startedMs": 2852,
+          "status": 200,
+          "elapsedMs": 3243
+        },
+        {
+          "phase": "official-total-including-queue",
+          "url": "https://recherche-entreprises.api.gouv.fr/near_point?lat=46.886208&long=-1.597542&radius=0.5&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "startedMs": 6095,
+          "elapsedMs": 563
+        },
+        {
+          "url": "https://recherche-entreprises.api.gouv.fr/near_point?lat=46.886208&long=-1.597542&radius=0.5&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+          "startedMs": 6095,
+          "status": 200,
+          "elapsedMs": 561
+        },
+        {
+          "phase": "official-total-including-queue",
+          "url": "https://recherche-entreprises.api.gouv.fr/near_point?lat=46.886208&long=-1.597542&radius=0.5&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=2&per_page=25",
+          "startedMs": 6658,
+          "elapsedMs": 1447
+        },
+        {
+          "url": "https://recherche-entreprises.api.gouv.fr/near_point?lat=46.886208&long=-1.597542&radius=0.5&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=2&per_page=25",
+          "startedMs": 7896,
+          "status": 200,
+          "elapsedMs": 205
+        },
+        {
+          "url": "https://overpass-api.de/api/interpreter",
+          "startedMs": 8136,
+          "status": "TimeoutError",
+          "elapsedMs": 3866
+        },
+        {
+          "url": "https://overpass.private.coffee/api/interpreter",
+          "startedMs": 12002,
+          "status": "pending"
+        }
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import {
   buildOfficialTextSearchRequest,
   extractOfficialCandidates,
 } from "./search.js";
+import { abortable, boundedSource, emitTrace } from "./bounded-source.js";
 
 const MIN_REQUEST_INTERVAL_MS = 1800;
 const DEFAULT_CACHE_TTL_MS = 20 * 60 * 1000;
@@ -57,11 +58,13 @@ function wait(ms, signal) {
   if (signal?.aborted) return Promise.reject(abortError());
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => {
+    const onAbort = () => {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
       reject(abortError());
-    }, { once: true });
+    };
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(); }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -77,9 +80,10 @@ function retryDelayMs(response) {
 async function takeQueueSlot(signal) {
   let release;
   const previous = queue;
-  queue = new Promise(resolve => { release = resolve; });
+  const ownSlot = new Promise(resolve => { release = resolve; });
+  queue = previous.then(() => ownSlot);
   try {
-    await previous;
+    await abortable(previous, signal);
     const now = Date.now();
     const intervalWait = Math.max(0, lastRequestAt + MIN_REQUEST_INTERVAL_MS - now);
     const backoffWait = Math.max(0, backoffUntil - now);
@@ -98,40 +102,57 @@ export async function fetchOfficialRequest(request, {
   localIdentifiers = new Set(),
   limit,
   allowSiegeFallback = false,
+  timeoutMs = 6500,
+  onEvent,
 } = {}) {
   if (!request?.url) throw new Error("Requête Annuaire invalide.");
   const cached = readCache(request, cacheTtlMs);
-  if (cached) return { ...cached, cached: true };
-
-  await takeQueueSlot(signal);
-  const response = await fetchImpl(request.url, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    signal,
-  });
-  if (response.status === 429) {
-    const delay = retryDelayMs(response);
-    backoffUntil = Date.now() + delay;
-    const error = new Error(`L'Annuaire limite temporairement les requêtes. Réessaie dans ${Math.ceil(delay / 1000)} s.`);
-    error.code = "RATE_LIMIT";
-    error.retryAfterMs = delay;
-    throw error;
+  if (cached) {
+    emitTrace(onEvent, { source: "annuaire:cache", state: "ok", url: request.url, elapsedMs: 0 });
+    return { ...cached, cached: true };
   }
-  if (!response.ok) throw new Error(`Recherche Annuaire indisponible (HTTP ${response.status}).`);
 
-  const payload = await response.json();
-  const extracted = extractOfficialCandidates(payload, {
-    localIdentifiers,
-    limit: limit ?? (allowSiegeFallback ? EXTERNAL_LIMIT : undefined),
-    requestedSiret: request.requestedSiret ?? "",
-    allowSiegeFallback,
-    page: request.page ?? 1,
-    perPage: request.perPage ?? 25,
-    matchingLimit: request.matchingLimit ?? 100,
-  });
-  const value = { items: extracted.items, coverage: extracted.coverage };
-  writeCache(request, value, cacheTtlMs);
-  return { ...value, cached: false };
+  return boundedSource("annuaire:request", async requestSignal => {
+    const queuedAt = Date.now();
+    emitTrace(onEvent, { source: "annuaire:queue", state: "start", url: request.url });
+    if (backoffUntil - Date.now() >= timeoutMs) {
+      const error = new Error("Annuaire temporairement limité : reprise après le budget de cette analyse.");
+      error.code = "RATE_LIMIT"; error.retryAfterMs = backoffUntil - Date.now(); throw error;
+    }
+    await takeQueueSlot(requestSignal);
+    emitTrace(onEvent, { source: "annuaire:queue", state: "ok", url: request.url, elapsedMs: Date.now() - queuedAt });
+    if (requestSignal.aborted) throw abortError();
+
+    const response = await fetchImpl(request.url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: requestSignal,
+    });
+    if (response.status === 429) {
+      const delay = retryDelayMs(response);
+      backoffUntil = Date.now() + delay;
+      const error = new Error(`L'Annuaire limite temporairement les requêtes. Réessaie dans ${Math.ceil(delay / 1000)} s.`);
+      error.code = "RATE_LIMIT";
+      error.retryAfterMs = delay;
+      throw error;
+    }
+    if (!response.ok) throw new Error(`Recherche Annuaire indisponible (HTTP ${response.status}).`);
+
+    const payload = await response.json();
+    if (requestSignal.aborted) throw abortError();
+    const extracted = extractOfficialCandidates(payload, {
+      localIdentifiers,
+      limit: limit ?? (allowSiegeFallback ? EXTERNAL_LIMIT : undefined),
+      requestedSiret: request.requestedSiret ?? "",
+      allowSiegeFallback,
+      page: request.page ?? 1,
+      perPage: request.perPage ?? 25,
+      matchingLimit: request.matchingLimit ?? 100,
+    });
+    const value = { items: extracted.items, coverage: extracted.coverage };
+    writeCache(request, value, cacheTtlMs);
+    return { ...value, cached: false };
+  }, { signal, timeoutMs, onEvent });
 }
 
 export async function fetchExternalText(query, {

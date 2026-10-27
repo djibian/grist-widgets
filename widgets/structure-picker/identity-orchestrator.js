@@ -13,12 +13,16 @@ import {
   identitySearchName,
   usableCoordinates,
 } from "./identity-resolution.js";
+import { boundedSource } from "./bounded-source.js";
 
 export const IDENTITY_BUDGET = Object.freeze({
   maxOfficialRequests: 6,
   maxPaginationPages: 1,
   maxPoiSiretsToValidate: 2,
   deadlineMs: 12000,
+  requestMs: 6500,
+  geocodeMs: 1200,
+  poiMs: 1500,
 });
 
 function makeAbortError() {
@@ -125,6 +129,8 @@ export async function resolveStructureIdentity({
   findPoiLinks = null,
   deadlineMs = IDENTITY_BUDGET.deadlineMs,
   maxOfficialRequests = IDENTITY_BUDGET.maxOfficialRequests,
+  onProgress,
+  onEvent,
 } = {}) {
   if (!row) throw new Error("Fiche Grist absente.");
   if (typeof fetchOfficial !== "function") throw new Error("Client Annuaire absent.");
@@ -151,7 +157,8 @@ export async function resolveStructureIdentity({
     requests.push({ source, kind: request.kind, url: request.url });
     officialRequestCount += 1;
     try {
-      const first = await fetchOfficial(request, { signal: deadline.signal });
+      const first = await boundedSource(source, sourceSignal => fetchOfficial(request, { signal: sourceSignal, onEvent }),
+        { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.requestMs, onEvent });
       let items = first?.items ?? [];
       let combined = first?.coverage ?? { complete: true };
       if (paginate && combined?.hasNextPage && paginationPages < IDENTITY_BUDGET.maxPaginationPages && officialRequestCount < maxOfficialRequests) {
@@ -160,7 +167,8 @@ export async function resolveStructureIdentity({
           paginationPages += 1;
           officialRequestCount += 1;
           requests.push({ source: `${source}:page2`, kind: secondRequest.kind, url: secondRequest.url });
-          const second = await fetchOfficial(secondRequest, { signal: deadline.signal });
+          const second = await boundedSource(`${source}:page2`, sourceSignal => fetchOfficial(secondRequest, { signal: sourceSignal, onEvent }),
+            { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.requestMs, onEvent });
           items = mergeCandidates(items, second?.items ?? []);
           combined = combineCoverage(combined, second?.coverage ?? null);
         }
@@ -184,72 +192,52 @@ export async function resolveStructureIdentity({
   const performGeocode = async () => {
     if (!String(row.Adresse ?? "").trim() || typeof geocode !== "function") return [];
     try {
-      return await geocode(row.Adresse, { signal: deadline.signal, limit: 3 });
+      const result = await boundedSource("ign:discovery", sourceSignal => geocode(row.Adresse, { signal: sourceSignal, limit: 3 }),
+        { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.geocodeMs, onEvent });
+      coverage.set("ign:discovery", coverageEntry("ign:discovery", "ok", { complete: true }, false));
+      return result;
     } catch (error) {
       if (signal?.aborted) throw makeAbortError();
       if (deadline.timedOut || error?.name === "TimeoutError") {
+        coverage.set("ign:discovery", coverageEntry("ign:discovery", "timeout", { complete: false }, true, "Découverte d’adresse indisponible"));
         diagnostics.push("IGN : délai dépassé.");
         return [];
       }
       if (error?.name === "AbortError") throw error;
+      coverage.set("ign:discovery", coverageEntry("ign:discovery", "error", { complete: false }, true, error.message));
       diagnostics.push(`IGN : ${error?.message || "indisponible"}`);
       return [];
     }
   };
 
+  const checkpoint = decision => {
+    const result = { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode,
+      links, coverage: [...coverage.values()], requests, diagnostics };
+    if (!signal?.aborted) onProgress?.(result);
+    return result;
+  };
+
   try {
     const location = extractLocationFromAddress(row.Adresse);
     const initialQuery = identitySearchName(row);
-    let initialOfficialPromise;
-    let sirenValidationPromise = null;
-
-    if (identifiers.siret) {
-      initialOfficialPromise = performOfficial(
-        buildOfficialIdentifierSearchRequest(identifiers.siret),
-        "annuaire:siret",
-        { paginate: false, required: true },
-      );
-    } else {
-      initialOfficialPromise = initialQuery
-        ? performOfficial(
-            buildOfficialTextSearchRequest(initialQuery, { codePostal: location.codePostal }),
-            "annuaire:text",
-            { paginate: true, required: true },
-          )
-        : Promise.resolve([]);
-      if (identifiers.siren) {
-        sirenValidationPromise = performOfficial(
-          buildOfficialIdentifierSearchRequest(identifiers.siren),
-          "annuaire:siren",
-          { paginate: false, required: true },
-        );
-      }
-    }
-
-    const [initialOfficial, sirenValidation] = await Promise.all([
-      initialOfficialPromise,
-      sirenValidationPromise ?? Promise.resolve([]),
-    ]);
-
+    const initialRequest = initialQuery
+      ? buildOfficialTextSearchRequest(initialQuery, { codePostal: location.codePostal })
+      : identifiers.identifier ? buildOfficialIdentifierSearchRequest(identifiers.identifier) : null;
+    const initialOfficial = initialRequest ? await performOfficial(initialRequest,
+      initialQuery ? "annuaire:text" : "annuaire:identifier-hint", { paginate: Boolean(initialQuery), required: true }) : [];
     candidates = mergeCandidates(candidates, initialOfficial);
-
-    if (identifiers.siren && !identifiers.siret) {
-      const sirenCoverage = coverage.get("annuaire:siren")?.coverage;
-      const validated = (sirenCoverage?.unitSirens ?? []).some(value => normalizeIdentifier(value) === identifiers.siren)
-        || (sirenValidation ?? []).some(item => normalizeIdentifier(item?.siren) === identifiers.siren);
-      if (!validated) {
-        coverage.set("annuaire:siren", coverageEntry("annuaire:siren", "error", { ...(sirenCoverage ?? {}), complete: false }, true, "SIREN non revalidé"));
-      }
-      candidates = candidates.filter(item => normalizeIdentifier(item?.siren) === identifiers.siren);
-    }
 
     let anchor = locationAnchor(row, null);
     let decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
+    checkpoint(decision);
 
-    if (isDecisive(decision)) {
+    if (isDecisive(decision) || deadline.timedOut) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }
 
+    // With a public name, the entered identifier is corroboration only. It
+    // does not trigger a second lookup or constrain discovery. Source-published
+    // identifiers are still revalidated explicitly when they supply a bridge.
     // A known site address already supports the identity decision. Waiting for
     // an optional street geocode would consume the budget for stronger registry proof.
     const geocoded = await performGeocode();
@@ -257,11 +245,12 @@ export async function resolveStructureIdentity({
     selectedGeocode = geocodeCandidates[0] ?? null;
     anchor = locationAnchor(row, selectedGeocode);
     decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
+    checkpoint(decision);
     if (isDecisive(decision)) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }
 
-    if (anchor && !identifiers.siret && officialRequestCount < maxOfficialRequests) {
+    if (anchor && officialRequestCount < maxOfficialRequests) {
       const rowCoordinates = usableCoordinates(row.Latitude, row.Longitude);
       const radius = rowCoordinates ? 0.3 : 0.5;
       const nearby = await performOfficial(
@@ -269,10 +258,9 @@ export async function resolveStructureIdentity({
         "annuaire:nearby",
         { paginate: true, required: true },
       );
-      candidates = mergeCandidates(candidates, identifiers.siren
-        ? nearby.filter(item => normalizeIdentifier(item?.siren) === identifiers.siren)
-        : nearby);
+      candidates = mergeCandidates(candidates, nearby);
       decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
+      checkpoint(decision);
       if (isDecisive(decision)) {
         return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
       }
@@ -280,8 +268,9 @@ export async function resolveStructureIdentity({
 
     if (anchor && typeof findPoiLinks === "function" && shouldContinue(decision)) {
       try {
-        const poiResult = await findPoiLinks({ row, latitude: anchor.latitude, longitude: anchor.longitude, radius: 500, signal: deadline.signal });
-        coverage.set("osm:identity", coverageEntry("osm:identity", "ok", { complete: poiResult?.complete !== false }, true));
+        const poiResult = await boundedSource("osm:identity", sourceSignal => findPoiLinks({ row, latitude: anchor.latitude, longitude: anchor.longitude, radius: 500, signal: sourceSignal }),
+          { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.poiMs, onEvent });
+        coverage.set("osm:identity", coverageEntry("osm:identity", "ok", { complete: poiResult?.complete !== false }, false));
         const pois = Array.isArray(poiResult?.candidates) ? poiResult.candidates : [];
         const seen = new Set();
         for (const poi of pois) {
@@ -297,12 +286,12 @@ export async function resolveStructureIdentity({
           const exact = verified.find(item => normalizeIdentifier(item?.siret) === siret);
           if (!exact) continue;
           candidates = mergeCandidates(candidates, [exact]);
-          links.push({ ...poi, siret, verifiedOfficial: true });
+          links = [...links, { ...poi, siret, verifiedOfficial: true }];
         }
       } catch (error) {
         if (signal?.aborted) throw makeAbortError();
         if (error?.name === "AbortError" && !deadline.timedOut) throw error;
-        coverage.set("osm:identity", coverageEntry("osm:identity", deadline.timedOut ? "timeout" : "error", { complete: false }, true, error?.message || "OSM indisponible"));
+        coverage.set("osm:identity", coverageEntry("osm:identity", error?.name === "TimeoutError" ? "timeout" : "error", { complete: false }, false, error?.message || "OSM indisponible"));
         diagnostics.push(`OSM identité : ${error?.message || "indisponible"}`);
       }
       decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
@@ -312,21 +301,11 @@ export async function resolveStructureIdentity({
       decision = {
         ...decision,
         status: IDENTITY_STATES.INCOMPLETE,
-        reason: "Le délai maximal de l’analyse a été atteint avant de réunir toutes les preuves nécessaires.",
+        reason: "Les sources nécessaires n’ont pas répondu dans leur budget ; les informations déjà reçues sont conservées.",
       };
     }
 
-    return {
-      decision,
-      candidates,
-      displayCandidates: decisionCandidates(decision),
-      geocodeCandidates,
-      selectedGeocode,
-      links,
-      coverage: [...coverage.values()],
-      requests,
-      diagnostics,
-    };
+    return checkpoint(decision);
   } finally {
     deadline.cleanup();
   }

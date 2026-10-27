@@ -1,3 +1,4 @@
+import { publicSiteWriteProofValid, publicSiteCandidate } from "./public-sites.js";
 import { recordsFromTable } from "../../shared/grist/records.js";
 import { isFormulaColumn } from "../../shared/grist/metadata.js";
 import { candidateMatchesIdentifier, extractLocationFromAddress, identifierParts } from "./search.js";
@@ -251,7 +252,7 @@ function identifierConflict(rows, rowId, value) {
   }) ?? null;
 }
 
-export async function applyEnrichmentChanges(rowId, changes, mappings, { positionSiret = "", expectedRow = null } = {}) {
+export async function applyEnrichmentChanges(rowId, changes, mappings, { positionSiret = "", publicSitePosition = null, expectedRow = null } = {}) {
   if (!rowId || rowId === "new") throw new Error("Sélectionne d'abord une structure existante.");
   const before = await fetchFullSnapshot(mappings);
   if (before.missing.length || before.nonWritableRequired.length) throw new Error(configurationMessage(before));
@@ -265,7 +266,17 @@ export async function applyEnrichmentChanges(rowId, changes, mappings, { positio
       throw new Error("La latitude et la longitude du site doivent être appliquées ensemble dans deux colonnes modifiables.");
     }
     const finalSiret = identifierParts(before.writableMappings.SirenSiret && changes.SirenSiret !== undefined ? changes.SirenSiret : currentRow.SirenSiret).siret;
-    if (!positionSiret || finalSiret !== positionSiret) throw new Error("La position doit rester rattachée au SIRET du candidat retenu.");
+    if (publicSitePosition) {
+      const proof = publicSitePosition.proof?.find(item => item.kind === "EXPLICIT_PUBLISHER_SITE_POINT");
+      let stored; try { stored = JSON.parse(changes.PositionProof); } catch { /* fail closed below */ }
+      if (!expectedRow || !publicSiteWriteProofValid(publicSitePosition) || !publicSiteWriteProofValid(stored)
+        || stored.siteId !== publicSitePosition.siteId || String(currentRow.SirenSiret ?? "").trim()
+        || !publicSiteCandidate(proof?.record, proof?.publisher, currentRow)
+        || changes.Latitude !== publicSitePosition.latitude || changes.Longitude !== publicSitePosition.longitude
+        || Object.keys(changes).some(key => !["Latitude", "Longitude", "PositionSource", "PositionProof"].includes(key))) {
+        throw new Error("La position du site public exige sa preuve, la fiche analysée inchangée et aucune attribution d’un identifiant juridique.");
+      }
+    } else if (!positionSiret || finalSiret !== positionSiret) throw new Error("La position doit rester rattachée au SIRET du candidat retenu.");
   }
 
   if (Object.prototype.hasOwnProperty.call(changes ?? {}, "SirenSiret")) {

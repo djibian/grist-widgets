@@ -1,3 +1,4 @@
+import { findOfficialPublicSites } from "../widgets/structure-picker/public-sites.js";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { buildGeocodeUrl, geocodeResultsFromPayload } from "../widgets/structure-picker/geocode.js";
 import { fetchOfficialRequest } from "../widgets/structure-picker/enterprise-client.js";
@@ -6,6 +7,9 @@ import { findIndexedSitePositions, findOsmSiretPositions, warmSitePositionManife
 import { matchPublishedIdentityLinks } from "../widgets/structure-picker/published-identity-links.js";
 import { buildOfficialIdentifierSearchRequest } from "../widgets/structure-picker/search.js";
 import { findFinessIdentityLinks } from "../widgets/structure-picker/finess-identity.js";
+import { findOfficialRegistrySites } from "../widgets/structure-picker/official-site-registry.js";
+import { resolveStructureIdentity } from "../widgets/structure-picker/identity-orchestrator.js";
+import { findOsmIdentityPois } from "../widgets/structure-picker/osm-identity.js";
 
 const manifestUrl = process.env.CONTACT_INDEX_MANIFEST_URL || "https://djibian.github.io/grist-widgets/widgets/structure-picker/contact-indexes/indexed-departments.json";
 
@@ -15,6 +19,11 @@ const publishedPayload = JSON.parse(await readFile(
 ));
 
 const cases = [
+  { id: "alliance", expectedSiret: "32548690000062", row: { NomCommercial: "École de l’Alliance", Adresse: "55 boulevard Jean XXIII, 85300 Challans", SirenSiret: "" } },
+  { id: "guillonneau", expectedSiret: "26850050100070", row: { NomCommercial: "Résidence Marie et Albert Guillonneau", Adresse: "27 rue de la Gazonnière, 85300 Challans", SirenSiret: "" } },
+  { id: "marie-no-postal", expectedSiret: "78605938600023", row: { NomCommercial: "École Sainte Marie", Adresse: "9 rue de la Paix, Saint-Lumine-de-Coutais", SirenSiret: "78605938600015" } },
+  { id: "marie-postal", expectedSiret: "78605938600023", row: { NomCommercial: "École Sainte Marie", Adresse: "9 rue de la Paix, 44310 Saint-Lumine-de-Coutais", SirenSiret: "78605938600015" } },
+  { id: "enfance", expectedSiret: null, row: { NomCommercial: "Maison de l’enfance", Adresse: "10 ter place du Champ de Foire, 44650 Legé", SirenSiret: "" } },
   {
     id: "super-u-machecoul",
     expectedSiret: "41091808000020",
@@ -65,6 +74,14 @@ const cases = [
   },
 ];
 
+// Replay the actual Grist text, including spaces, punctuation and glyphs. These
+// are public input fields only; expected identifiers never enter discovery.
+const actualRows = JSON.parse(await readFile(new URL("../widgets/structure-picker/tests/fixtures/resolution/grist-inputs-2026-10-27.json", import.meta.url), "utf8")).rows;
+const rowIds = [5, 6, 7, 8, 9, 1, 2, 3, 4];
+for (let i = 0; i < cases.length; i += 1) {
+  const { id, ...row } = actualRows.find(item => item.id === rowIds[i]); cases[i].row = row;
+}
+
 const capture = {
   capturedAt: new Date().toISOString(),
   commit: process.env.GITHUB_SHA || "local",
@@ -93,6 +110,14 @@ async function recordingFetch(url, options = {}, network = []) {
     body,
   });
   return response;
+}
+
+async function staticOrPublicFetch(input, options, network) {
+  const url = new URL(input);
+  if (url.protocol !== "file:") return recordingFetch(url, options, network);
+  url.search = "";
+  try { return new Response(await readFile(url, "utf8"), { headers: { "Content-Type": "application/json" } }); }
+  catch { return new Response("", { status: 404 }); }
 }
 
 async function liveGeocode(address, options, network) {
@@ -147,6 +172,7 @@ for (const scenario of cases) {
   let result = null;
   let error = null;
   const controller = new AbortController();
+  const startedAt = Date.now();
   try {
     result = await resolveEstablishmentForEnrichment({
       row: scenario.row,
@@ -158,15 +184,16 @@ for (const scenario of cases) {
         fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network),
       }),
       findPublishedLinks: async ({ row }) => publishedLinksFor(row),
+      findPublicSites: options => findOfficialPublicSites({ ...options, fetchImpl: (url, fetchOptions) => staticOrPublicFetch(url, fetchOptions, network) }),
+      findRegistrySites: options => findOfficialRegistrySites({ ...options, fetchImpl: (url, fetchOptions) => staticOrPublicFetch(url, fetchOptions, network) }),
+      resolveFallback: options => resolveStructureIdentity({ ...options, findPoiLinks: args => findOsmIdentityPois({ ...args, fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network) }) }),
       findSectorLinks: options => findFinessIdentityLinks({ ...options, fetchImpl: async (url, fetchOptions) => {
         // Like published.json above, the new static asset is local until this PR
         // is published. Its upstream FINESS snapshot URL is retained in each proof.
-        if (url.protocol === "file:") return Response.json(JSON.parse(await readFile(url, "utf8")));
-        return recordingFetch(url, fetchOptions, network);
+        return staticOrPublicFetch(url, fetchOptions, network);
       } }),
       findIndexedPositions: options => findIndexedSitePositions({ ...options, manifestUrl, fetchImpl: async (url, fetchOptions) => {
-        if (url.protocol === "file:") return Response.json(JSON.parse(await readFile(url, "utf8")));
-        return recordingFetch(url, fetchOptions, network);
+        return staticOrPublicFetch(url, fetchOptions, network);
       } }),
       findOsmPositions: options => findOsmSiretPositions({ ...options, fetchImpl: (url, fetchOptions) => recordingFetch(url, fetchOptions, network) }),
     });
@@ -174,13 +201,18 @@ for (const scenario of cases) {
     error = { name: caught?.name || "Error", message: caught?.message || String(caught) };
   }
 
-  const exactProbe = await officialProbe(buildOfficialIdentifierSearchRequest(scenario.expectedSiret), network);
+  const elapsedMs = Date.now() - startedAt;
+  const exactProbe = scenario.expectedSiret ? await officialProbe(buildOfficialIdentifierSearchRequest(scenario.expectedSiret), network) : null;
   capture.cases.push({
     id: scenario.id,
+    elapsedMs,
+    trace: result?.trace ?? [],
     expectedSiret: scenario.expectedSiret,
     row: scenario.row,
     decision: result?.decision ? {
       status: result.decision.status,
+      identityScope: result.decision.candidate?.identityScope || "LEGAL_ESTABLISHMENT",
+      siteId: result.decision.candidate?.siteId || null,
       reason: result.decision.reason,
       selectedSiret: result.decision.candidate?.siret || null,
       alternatives: (result.decision.alternatives || []).map(item => item.siret),

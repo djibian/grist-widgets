@@ -1,0 +1,43 @@
+name: Structure reference snapshot
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1'
+permissions:
+  contents: read
+concurrency:
+  group: structure-reference-snapshot
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Refresh the complete regional registries
+        run: |
+          python3 scripts/generate-finess-identity-index.py
+          node scripts/generate-site-registry.mjs
+      - name: Refresh complete identifier cohorts with object geometry
+        run: |
+          node scripts/generate-osm-education-positions.mjs
+          python3 scripts/generate-osm-finess-positions.py
+          node scripts/generate-osm-finess-site-geometries.mjs --source-url 'https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%5Btimeout%3A60%5D%3Bnwr%5B%22ref%3AFR%3AFINESS%22~%22%5E%2844%7C85%29%22%5D%3Bout%20meta%20geom%3B'
+      - name: Validate before making a reviewable snapshot available
+        run: npm test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: structure-reference-snapshot
+          path: |
+            widgets/structure-picker/identity-links/finess
+            widgets/structure-picker/identity-links/site-registry
+            widgets/structure-picker/site-position-indexes/osm-finess
+            widgets/structure-picker/site-position-indexes/osm-finess-sites
+            widgets/structure-picker/site-position-indexes/osm-education
+          retention-days: 30

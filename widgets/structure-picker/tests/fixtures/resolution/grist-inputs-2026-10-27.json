@@ -1,0 +1,60 @@
+{
+  "capturedAt": "2026-10-27",
+  "note": "Champs publics de recherche lus sans modification dans les neuf fiches Grist de validation. Graphie et espaces conservés.",
+  "rows": [
+    {
+      "id": 1,
+      "NomCommercial": "Super U Machecoul",
+      "Adresse": "Boulevard Des Prises Zone Commerciale 44270 MACHECOUL ST MEME",
+      "SirenSiret": ""
+    },
+    {
+      "id": 2,
+      "NomCommercial": "EHPAD La Reynerie Bouin 85230",
+      "Adresse": "8bis Rue du Pays de Retz 85230 Bouin",
+      "SirenSiret": ""
+    },
+    {
+      "id": 3,
+      "NomCommercial": "ô Pré d’Vous",
+      "Adresse": "24 rue des fosses 44270 La Marne",
+      "SirenSiret": ""
+    },
+    {
+      "id": 4,
+      "NomCommercial": "CRECHE POM'DE RAINETTE ",
+      "Adresse": "10 BIS RUE DES MARGOTINS 85300 SALLERTAINE ",
+      "SirenSiret": ""
+    },
+    {
+      "id": 5,
+      "NomCommercial": "Ecole de l'Alliance",
+      "Adresse": "55 Bd Jean XXlll, 85300 Challans",
+      "SirenSiret": ""
+    },
+    {
+      "id": 6,
+      "NomCommercial": "Résidence Marie et Albert Guillonneau",
+      "Adresse": "27 rue de la Gazonnière 85300 Challans",
+      "SirenSiret": ""
+    },
+    {
+      "id": 7,
+      "NomCommercial": "Ecole sainte Marie",
+      "Adresse": "9 rue de la paix saint lumine de coutais ",
+      "SirenSiret": "78605938600015"
+    },
+    {
+      "id": 8,
+      "NomCommercial": "Ecole Sainte Marie ",
+      "Adresse": "9 rue de la paix 44310 Saint Lumine de Coutais ",
+      "SirenSiret": "78605938600015"
+    },
+    {
+      "id": 9,
+      "NomCommercial": "maison de l’enfance",
+      "Adresse": "10TER Place du Champ de Foire, 44650 Legé",
+      "SirenSiret": ""
+    }
+  ]
+}
