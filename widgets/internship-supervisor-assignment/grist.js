@@ -1,6 +1,6 @@
 import { recordsFromTable } from "../../shared/grist/records.js";
 import { isWritableColumn } from "../../shared/grist/metadata.js";
-import { configurationFingerprint, stageCoverage } from "./assignment.js";
+import { analyzeClass, configurationFingerprint, stageCoverage } from "./assignment.js";
 import {
   CONFIGURABLE_MAPPING_DEFS,
   DOCUMENT_TABLES,
@@ -8,10 +8,11 @@ import {
   mappingSignature,
   serializeBindings,
   validateMappings,
+  usesPeriodReferences,
 } from "./mapping.js";
 
 const OPTION_KEY = "internshipSupervisorAssignmentV11";
-const CONFIG_VERSION = 6;
+const CONFIG_VERSION = 7;
 const DEFAULT_CLASS_TABLE_ID = "Classe";
 const DEFAULT_TABLE_IDS = Object.freeze(Object.fromEntries(DOCUMENT_TABLES.map(role => [role, role])));
 const DEFAULT_OPTIMIZATION = Object.freeze({
@@ -142,6 +143,15 @@ export function resolveTableRoles(tableRows, columnRows, selectedClassTableId, s
 
   for (let pass = 0; pass < 6; pass += 1) {
     let changed = false;
+
+    if (unresolved("Periodes_de_stage") && roles.Stage && roles.Affectation && roles.Classe) {
+      const targets = referenceTargets(columnRows, roles.Affectation);
+      const candidates = referenceTargets(columnRows, roles.Stage)
+        .filter(target => targets.includes(target) && target !== actualId("Classe") && target !== actualId("Enseignant"))
+        .map(target => rawTableById(tableRows, target))
+        .filter(table => table && !usedRefs.has(ref(table.id)) && tableReferences(columnRows, table, actualId("Classe")));
+      if (candidates.length === 1) changed = assign("Periodes_de_stage", candidates[0]) || changed;
+    }
 
     if (unresolved("Enseignant") && roles.Affectation && roles.Classe) {
       const candidates = referenceTargets(columnRows, roles.Affectation)
@@ -399,7 +409,7 @@ export async function loadConfiguration() {
     try {
       await persistConfiguration(metadata, mappings, optimization);
     } catch {
-      // Les anciens formats restent lisibles tant que Grist n'a pas pu enregistrer la migration V6.
+      // Les anciens formats restent lisibles tant que Grist n'a pas pu enregistrer la migration V7.
     }
   }
 
@@ -471,13 +481,14 @@ export async function fetchSnapshot(mappings, { geography = false } = {}) {
     getSourceMappings(),
   ]);
   const metadata = await fetchMetadata(selectedTableId, stored);
-  const [classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw] = await Promise.all([
+  const [classesRaw, studentsRaw, teachersRaw, quotasRaw, stagesRaw, structuresRaw, periodsRaw] = await Promise.all([
     fetchRoleRawTable(metadata, "Classe"),
     fetchRoleRawTable(metadata, "Eleves"),
     fetchRoleRawTable(metadata, "Enseignant"),
     fetchRoleRawTable(metadata, "Affectation"),
     fetchRoleRawTable(metadata, "Stage"),
     fetchRoleRawTable(metadata, "Structures_de_stage", { optional: !geography }),
+    fetchRoleRawTable(metadata, "Periodes_de_stage", { optional: !usesPeriodReferences(metadata) }),
   ]);
   const effectiveMappings = inferMappings(metadata, storedMappingSource(stored, mappings));
   const mappingIssues = validateMappings(metadata, effectiveMappings, { geography });
@@ -490,6 +501,12 @@ export async function fetchSnapshot(mappings, { geography = false } = {}) {
     const columnId = sourceMappings?.[key];
     return columnId ? row?.[columnId] : null;
   };
+
+  const periods = usesPeriodReferences(metadata) ? rowsFromTable(periodsRaw).map(row => ({
+    id: row.id,
+    classId: ref(readSecondary(row, "periodClass")),
+    number: display(readSecondary(row, "periodNumber"), ""),
+  })) : undefined;
 
   const classes = rowsFromTable(classesRaw).map(row => ({
     id: row.id,
@@ -516,7 +533,7 @@ export async function fetchSnapshot(mappings, { geography = false } = {}) {
     id: row.id,
     teacherId: ref(readSecondary(row, "quotaTeacher")),
     classId: ref(readSecondary(row, "quotaClass")),
-    period: integer(readSecondary(row, "quotaPeriod")),
+    periodId: periods ? ref(readSecondary(row, "quotaPeriod")) : integer(readSecondary(row, "quotaPeriod")),
     target: integer(readSecondary(row, "quotaTarget")),
   }));
 
@@ -537,7 +554,7 @@ export async function fetchSnapshot(mappings, { geography = false } = {}) {
       studentId,
       studentLabel: student?.label ?? `Élève #${studentId ?? "?"}`,
       classId: student?.classId ?? null,
-      period: integer(readSecondary(row, "stagePeriod")),
+      periodId: periods ? ref(readSecondary(row, "stagePeriod")) : integer(readSecondary(row, "stagePeriod")),
       teacherId: ref(readSecondary(row, "stageSupervisor")),
       structureId,
       latitude: structure?.latitude ?? null,
@@ -547,6 +564,7 @@ export async function fetchSnapshot(mappings, { geography = false } = {}) {
 
   return {
     classes,
+    ...(periods ? { periods } : {}),
     students,
     teachers,
     quotas,
@@ -574,7 +592,7 @@ export function configurationProblems(snapshot) {
 
 export function stagePeriodWriteValue(period, columnType = "Numeric") {
   const value = integer(period);
-  if (value === null) throw new Error(`Période de stage invalide : ${period}.`);
+  if (value === null || (columnType.startsWith("Ref:") && value <= 0)) throw new Error(`Période de stage invalide : ${period}.`);
   return columnType === "Choice" ? String(value) : value;
 }
 
@@ -586,7 +604,7 @@ export function buildStageCreationAction(missing, mappings, stageTableId = DEFAU
     rows.map(() => null),
     {
       [mappings.stageStudent]: rows.map(row => row.studentId),
-      [mappings.stagePeriod]: rows.map(row => stagePeriodWriteValue(row.period, stagePeriodType)),
+      [mappings.stagePeriod]: rows.map(row => stagePeriodWriteValue(row.periodId, stagePeriodType)),
     },
   ];
 }
@@ -605,6 +623,7 @@ export async function createMissingStages(classId, periods, mappings) {
   const problems = configurationProblems(fresh);
   if (problems.length) throw new Error(problems.join(" "));
 
+  if (fresh.periods) throw new Error("Les stages attendus sans déclaration ne doivent pas être créés par le widget. Déclare une structure d'accueil avant l'affectation.");
   const coverage = stageCoverage(fresh, classId, periods);
   if (coverage.errors.length) {
     throw new Error(coverage.errors.map(row => row.message).join(" "));
@@ -649,13 +668,28 @@ export async function applyPlan(plan, mappings) {
     throw new Error("Les données ont changé depuis la génération de la proposition. Actualise puis génère une nouvelle proposition.");
   }
 
+  const analysis = analyzeClass(fresh, plan.classId, plan.periods, plan.criteria);
+  if (analysis.errors.length) throw new Error(analysis.errors.map(row => row.message).join(" "));
+  const modifiableIds = new Set(analysis.periodStates.flatMap(row => row.unassignedStages.map(stage => stage.id)));
+  const seenIds = new Set();
   const stageById = new Map(fresh.stages.map(stage => [stage.id, stage]));
   for (const assignment of plan.assignments) {
     const stage = stageById.get(assignment.stageId);
     if (!stage) throw new Error(`Le stage #${assignment.stageId} n'existe plus.`);
+    if (!modifiableIds.has(stage.id) || seenIds.has(stage.id) || assignment.periodId !== stage.periodId) throw new Error("La proposition contient un stage hors périmètre ou répété.");
+    seenIds.add(stage.id);
     if (stage.teacherId) throw new Error(`Le stage #${assignment.stageId} possède désormais un enseignant. La proposition doit être régénérée.`);
   }
 
+  if (seenIds.size !== modifiableIds.size) throw new Error("La proposition ne couvre pas tous les stages affectables.");
+  for (const state of analysis.periodStates) {
+    for (const assignment of plan.assignments.filter(row => row.periodId === state.periodId)) {
+      if (!state.capacities.some(row => row.teacherId === assignment.teacherId)) throw new Error("La proposition contient un enseignant non autorisé.");
+    }
+    for (const capacity of state.capacities) {
+      if (plan.assignments.filter(row => row.periodId === state.periodId && row.teacherId === capacity.teacherId).length !== capacity.remaining) throw new Error("La proposition ne respecte plus les quotas.");
+    }
+  }
   if (!plan.assignments.length) return fresh;
   const effectiveMappings = fresh.configuration.mappings;
   const stageTableId = fresh.configuration.tableIds?.Stage ?? DEFAULT_TABLE_IDS.Stage;

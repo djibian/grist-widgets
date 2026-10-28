@@ -1,0 +1,258 @@
+[
+  {
+    "tableId": "Structures_de_stage",
+    "columns": [
+      {
+        "colId": "Latitude",
+        "label": "Latitude",
+        "type": "Numeric",
+        "isFormula": false,
+        "formula": ""
+      },
+      {
+        "colId": "Longitude",
+        "label": "Longitude",
+        "type": "Numeric",
+        "isFormula": false,
+        "formula": ""
+      }
+    ]
+  },
+  {
+    "tableId": "Eleves",
+    "columns": [
+      {
+        "colId": "Classe",
+        "label": "Classe",
+        "type": "Ref:Classes",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Classe"
+      },
+      {
+        "colId": "Identite",
+        "label": "Identité",
+        "type": "Text",
+        "isFormula": true,
+        "formula": "f\"{$Prenom} {$Nom} - {$Classe.Classe}\""
+      }
+    ]
+  },
+  {
+    "tableId": "Stages",
+    "columns": [
+      {
+        "colId": "Eleve",
+        "label": "Elève",
+        "type": "Ref:Eleves",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Identite"
+      },
+      {
+        "colId": "Structure_de_stage",
+        "label": "Structure de stage",
+        "type": "Ref:Structures_de_stage",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Nom_usuel"
+      },
+      {
+        "colId": "Periode",
+        "label": "Période",
+        "type": "Ref:Periodes_de_stage",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Periode"
+      },
+      {
+        "colId": "Suivi_par",
+        "label": "Suivi par",
+        "type": "Ref:Enseignants",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Identite"
+      },
+      {
+        "colId": "Classe",
+        "label": "Classe",
+        "type": "Ref:Classes",
+        "isFormula": true,
+        "formula": "$Eleve.Classe",
+        "visibleColumnId": "Classe"
+      }
+    ]
+  },
+  {
+    "tableId": "Classes",
+    "columns": [
+      {
+        "colId": "Classe",
+        "label": "Classe",
+        "type": "Text",
+        "isFormula": false,
+        "formula": ""
+      },
+      {
+        "colId": "Nombre_de_periodes_de_stage",
+        "label": "Nombre de périodes de stage",
+        "type": "Numeric",
+        "isFormula": true,
+        "formula": "len(Periodes_de_stage.lookupRecords(Classe=$id))"
+      },
+      {
+        "colId": "Professeur_principal",
+        "label": "Professeur principal",
+        "type": "Ref:Enseignants",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Identite"
+      }
+    ]
+  },
+  {
+    "tableId": "Enseignants",
+    "columns": [
+      {
+        "colId": "Identite",
+        "label": "Identité",
+        "type": "Any",
+        "isFormula": true,
+        "formula": "f\"{$Titre} {$Nom} {$Prenom}\".strip()"
+      },
+      {
+        "colId": "Latitude",
+        "label": "Latitude",
+        "type": "Numeric",
+        "isFormula": false,
+        "formula": ""
+      },
+      {
+        "colId": "Longitude",
+        "label": "Longitude",
+        "type": "Numeric",
+        "isFormula": false,
+        "formula": ""
+      },
+      {
+        "colId": "Localisation_validee",
+        "label": "Localisation validée",
+        "type": "Bool",
+        "isFormula": false,
+        "formula": ""
+      }
+    ]
+  },
+  {
+    "tableId": "Affectation",
+    "columns": [
+      {
+        "colId": "Enseignant",
+        "label": "Enseignant",
+        "type": "Ref:Enseignants",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Identite"
+      },
+      {
+        "colId": "Classe",
+        "label": "Classe",
+        "type": "Ref:Classes",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Classe"
+      },
+      {
+        "colId": "Stage_a_suivre",
+        "label": "Stage à suivre",
+        "type": "Numeric",
+        "isFormula": false,
+        "formula": ""
+      },
+      {
+        "colId": "Stages_attribues",
+        "label": "Stages attribués",
+        "type": "Numeric",
+        "isFormula": true,
+        "formula": "sum(\n    1 for s in Stages.lookupRecords(\n        Suivi_par=$Enseignant,\n        Classe=$Classe,\n        Periode=$Periode\n    )\n    if s.Structure_de_stage\n)"
+      },
+      {
+        "colId": "Periode",
+        "label": "Période",
+        "type": "Ref:Periodes_de_stage",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Periode"
+      },
+      {
+        "colId": "Reste_a_attribuer",
+        "label": "Reste à attribuer",
+        "type": "Any",
+        "isFormula": true,
+        "formula": "$Stage_a_suivre - $Stages_attribues"
+      }
+    ]
+  },
+  {
+    "tableId": "Periodes_de_stage",
+    "columns": [
+      {
+        "colId": "Classe",
+        "label": "Classe",
+        "type": "Ref:Classes",
+        "isFormula": false,
+        "formula": "",
+        "visibleColumnId": "Classe"
+      },
+      {
+        "colId": "Numero",
+        "label": "Numéro",
+        "type": "Text",
+        "isFormula": false,
+        "formula": ""
+      },
+      {
+        "colId": "Periode",
+        "label": "Période",
+        "type": "Text",
+        "isFormula": true,
+        "formula": "if $Numero:\n    debut_str = f\"{$Date_debut.day:02d}/{$Date_debut.month:02d}/{$Date_debut.year}\" if $Date_debut else \"\"\n    fin_str = f\"{$Date_fin.day:02d}/{$Date_fin.month:002d}/{$Date_fin.year}\" if $Date_fin else \"\"\n\n    if debut_str and fin_str:\n        return f\"{$Numero} - {$Classe.Classe} - {debut_str} au {fin_str}\"\n    elif debut_str:\n        return f\"{$Numero} - {$Classe.Classe} - {debut_str}\"\n    elif fin_str:\n        return f\"{$Numero} - {$Classe.Classe} - {fin_str}\"\n\"\""
+      },
+      {
+        "colId": "Effectif",
+        "label": "Effectif",
+        "type": "Numeric",
+        "isFormula": true,
+        "formula": "len(Eleves.lookupRecords(Classe=$Classe))"
+      },
+      {
+        "colId": "Stages_declares",
+        "label": "Stages déclarés",
+        "type": "Numeric",
+        "isFormula": true,
+        "formula": "stages = Stages.lookupRecords(Periode=$id)\n\nlen({\n    s.Eleve.id\n    for s in stages\n    if s.Eleve and s.Structure_de_stage\n})"
+      },
+      {
+        "colId": "Sans_stage",
+        "label": "Sans stage",
+        "type": "Numeric",
+        "isFormula": true,
+        "formula": "max(0, $Effectif - $Stages_declares)"
+      },
+      {
+        "colId": "Stages_attribues",
+        "label": "Stages attribués",
+        "type": "Numeric",
+        "isFormula": true,
+        "formula": "sum(\n    1 for s in Stages.lookupRecords(Periode=$id)\n    if s.Structure_de_stage and s.Suivi_par\n)"
+      },
+      {
+        "colId": "Stages_sans_enseignants",
+        "label": "Stages sans enseignants",
+        "type": "Numeric",
+        "isFormula": true,
+        "formula": "sum(\n    1 for s in Stages.lookupRecords(Periode=$id)\n    if s.Structure_de_stage and not s.Suivi_par\n)"
+      }
+    ]
+  }
+]

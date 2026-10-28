@@ -119,6 +119,7 @@ test("all assignment table roles survive arbitrary Grist table renames", async (
       Affectation: "Affectations",
       Stage: "Stages",
       Structures_de_stage: "Structures",
+      Periodes_de_stage: null,
     });
     assert.deepEqual(snapshot.configuration.mappingIssues, []);
     assert.deepEqual(snapshot.configuration.sourceMappingProblems, []);
@@ -155,7 +156,7 @@ test("all assignment table roles survive arbitrary Grist table renames", async (
 
 test("stage writes target the renamed stage table", () => {
   const mappings = { stageStudent: "Eleve", stagePeriod: "Periode", stageSupervisor: "Suivi_par" };
-  const create = buildStageCreationAction([{ studentId: 10, period: 2 }], mappings, "Stages");
+  const create = buildStageCreationAction([{ studentId: 10, periodId: 2 }], mappings, "Stages");
   assert.equal(create[1], "Stages");
 
   const update = buildAssignmentActions([{ stageId: 40, teacherId: 20 }], mappings, "Stages");

@@ -25,16 +25,16 @@ function fixture() {
       { id: 22, label: "M. Martin" },
     ],
     quotas: [
-      { id: 31, teacherId: 21, classId: 1, period: 1, target: 1 },
-      { id: 32, teacherId: 22, classId: 1, period: 1, target: 1 },
-      { id: 33, teacherId: 21, classId: 1, period: 2, target: 1 },
-      { id: 34, teacherId: 22, classId: 1, period: 2, target: 1 },
+      { id: 31, teacherId: 21, classId: 1, periodId: 1, target: 1 },
+      { id: 32, teacherId: 22, classId: 1, periodId: 1, target: 1 },
+      { id: 33, teacherId: 21, classId: 1, periodId: 2, target: 1 },
+      { id: 34, teacherId: 22, classId: 1, periodId: 2, target: 1 },
     ],
     stages: [
-      { id: 41, studentId: 11, studentLabel: "Alice", classId: 1, period: 1, teacherId: null },
-      { id: 42, studentId: 12, studentLabel: "Bob", classId: 1, period: 1, teacherId: null },
-      { id: 43, studentId: 11, studentLabel: "Alice", classId: 1, period: 2, teacherId: null },
-      { id: 44, studentId: 12, studentLabel: "Bob", classId: 1, period: 2, teacherId: null },
+      { id: 41, studentId: 11, studentLabel: "Alice", classId: 1, periodId: 1, teacherId: null },
+      { id: 42, studentId: 12, studentLabel: "Bob", classId: 1, periodId: 1, teacherId: null },
+      { id: 43, studentId: 11, studentLabel: "Alice", classId: 1, periodId: 2, teacherId: null },
+      { id: 44, studentId: 12, studentLabel: "Bob", classId: 1, periodId: 2, teacherId: null },
     ],
   };
 }
@@ -63,7 +63,7 @@ test("stageCoverage reports only missing stages in selected periods", () => {
   const p2 = stageCoverage(data, 1, [2]);
   assert.equal(p2.expectedCount, 2);
   assert.equal(p2.presentCount, 1);
-  assert.deepEqual(p2.missing.map(row => [row.studentId, row.period]), [[12, 2]]);
+  assert.deepEqual(p2.missing.map(row => [row.studentId, row.periodId]), [[12, 2]]);
 });
 
 test("analysis distinguishes missing stages from quota consistency", () => {
@@ -85,14 +85,14 @@ test("analysis compares quotas with expected students even when rows are missing
 
 test("analysis blocks duplicate stage rows for one student and period", () => {
   const data = fixture();
-  data.stages.push({ id: 45, studentId: 11, studentLabel: "Alice", classId: 1, period: 1, teacherId: null });
+  data.stages.push({ id: 45, studentId: 11, studentLabel: "Alice", classId: 1, periodId: 1, teacherId: null });
   const analysis = analyzeClass(data, 1, [1]);
   assert.ok(analysis.errors.some(row => row.code === "DUPLICATE_STAGE"));
 });
 
 test("analysis blocks duplicate quota rows for a teacher/class/period", () => {
   const data = fixture();
-  data.quotas.push({ id: 35, teacherId: 21, classId: 1, period: 1, target: 0 });
+  data.quotas.push({ id: 35, teacherId: 21, classId: 1, periodId: 1, target: 0 });
   const analysis = analyzeClass(data, 1, [1]);
   assert.ok(analysis.errors.some(row => row.code === "DUPLICATE_QUOTA"));
 });
@@ -125,7 +125,7 @@ test("plan respects every teacher quota and diversifies across periods", () => {
   assert.equal(plan.metrics.introducedRepeats, 0);
 
   for (const period of [1, 2]) {
-    const rows = plan.assignments.filter(row => row.period === period);
+    const rows = plan.assignments.filter(row => row.periodId === period);
     assert.equal(rows.filter(row => row.teacherId === 21).length, 1);
     assert.equal(rows.filter(row => row.teacherId === 22).length, 1);
   }
@@ -140,7 +140,7 @@ test("plan can treat only one selected period", () => {
   const data = fixture();
   const plan = generatePlan(data, { classId: 1, periods: [2] });
   assert.equal(plan.assignments.length, 2);
-  assert.ok(plan.assignments.every(row => row.period === 2));
+  assert.ok(plan.assignments.every(row => row.periodId === 2));
 });
 
 test("existing assignments are preserved and deducted from remaining quota", () => {
@@ -150,7 +150,7 @@ test("existing assignments are preserved and deducted from remaining quota", () 
   assert.equal(plan.assignments.length, 1);
   assert.equal(plan.assignments[0].stageId, 42);
   assert.equal(plan.assignments[0].teacherId, 22);
-  const dupont = plan.summary.find(row => row.period === 1 && row.teacherId === 21);
+  const dupont = plan.summary.find(row => row.periodId === 1 && row.teacherId === 21);
   assert.deepEqual(
     { existing: dupont.existing, proposed: dupont.proposed, total: dupont.total },
     { existing: 1, proposed: 0, total: 1 },

@@ -3,6 +3,7 @@ import {
   AssignmentError,
   generatePlan,
   periodsForClass,
+  periodLabel,
 } from "./assignment.js";
 import {
   applyPlan,
@@ -129,7 +130,7 @@ function renderPeriods(preferred = null) {
     el.periods.textContent = "—";
     return;
   }
-  const available = periodsForClass(cls);
+  const available = periodsForClass(cls, state.snapshot);
   if (!available.length) {
     el.periods.textContent = "Aucune période valide";
     return;
@@ -147,7 +148,7 @@ function renderPeriods(preferred = null) {
       invalidatePlan();
       renderAnalysis();
     });
-    label.append(input, document.createTextNode(`P${period}`));
+    label.append(input, document.createTextNode(periodLabel(state.snapshot, period)));
     el.periods.append(label);
   }
 }
@@ -190,16 +191,16 @@ function renderAnalysis() {
   const periods = selectedPeriods();
   const analysis = analyzeClass(state.snapshot, cls.id, periods, state.optimization);
   const nonMissingErrors = analysis.errors.filter(row => row.code !== "MISSING_STAGES");
-  const periodText = analysis.periods.length ? analysis.periods.map(period => `P${period}`).join(", ") : "—";
+  const periodText = analysis.periods.length ? analysis.periods.map(period => periodLabel(state.snapshot, period)).join(", ") : "—";
 
   let html = '<div class="analysis-grid">'
     + metric(analysis.students?.length ?? 0, "Élèves")
     + metric(analysis.expectedCount ?? 0, "Stages attendus")
-    + metric(analysis.presentCount ?? 0, "Stages présents")
-    + ((analysis.missingCount ?? 0) > 0 ? metric(analysis.missingCount, "Stages manquants") : "")
+    + metric(analysis.declaredCount ?? analysis.presentCount ?? 0, state.snapshot.periods ? "Stages déclarés affectables" : "Stages présents")
+    + (state.snapshot.periods ? metric(Math.max(0, (analysis.expectedCount ?? 0) - (analysis.declaredCount ?? 0)), "Attendus sans déclaration") : ((analysis.missingCount ?? 0) > 0 ? metric(analysis.missingCount, "Stages manquants") : ""))
     + "</div>";
 
-  html += `<div class="control-line"><strong>${esc(periodText)}</strong> : ${analysis.existingSelectedCount ?? 0} déjà affecté(s), ${analysis.unassignedSelectedCount ?? 0} présent(s) sans enseignant.</div>`;
+  html += `<div class="control-line"><strong>${esc(periodText)}</strong> : ${analysis.existingSelectedCount ?? 0} déjà affecté(s), ${analysis.unassignedSelectedCount ?? 0} déclaré(s) sans enseignant.</div>`;
 
   if (state.optimization?.geography?.enabled && analysis.geography) {
     const geoClass = analysis.geography.ready ? "geo-readiness ready" : "geo-readiness warning";
@@ -220,7 +221,7 @@ function renderAnalysis() {
   el.analysis.className = "analysis";
   el.analysis.innerHTML = html;
 
-  if ((analysis.missingCount ?? 0) > 0) {
+  if (!state.snapshot.periods && (analysis.missingCount ?? 0) > 0) {
     el.stageCreation.hidden = false;
     el.stageCreation.style.display = "";
     el.stageCreationTitle.textContent = `${analysis.missingCount} stage(s) manquant(s) sur ${analysis.expectedCount} attendu(s)`;
@@ -251,10 +252,10 @@ function formatDistance(value) {
 function renderPlan(plan) {
   state.plan = plan;
   el.proposalCard.hidden = false;
-  el.proposalPeriods.textContent = plan.periods.map(period => `P${period}`).join(", ");
+  el.proposalPeriods.textContent = plan.periods.map(period => periodLabel(state.snapshot, period)).join(", ");
 
   const diversityLine = plan.metrics.newCount
-    ? `${plan.metrics.diversifiedAssignments}/${plan.metrics.newCount} nouvelle(s) affectation(s) sans répétition enseignant–élève.`
+    ? `${plan.metrics.diversifiedAssignments}/${plan.metrics.newCount} nouvelle(s) affectation(s) sans répétition enseignant–élève, historique de toutes les périodes compris.`
     : "Aucune nouvelle affectation nécessaire.";
   const geographyLine = plan.criteria?.geography?.enabled && plan.metrics.geographicAssignments
     ? `<div class="summary-line">Distance directe totale : <strong>${esc(formatDistance(plan.metrics.totalDistanceKm))}</strong> · moyenne : ${esc(formatDistance(plan.metrics.averageDistanceKm))} · maximum : ${esc(formatDistance(plan.metrics.maxDistanceKm))}.</div>`
@@ -265,17 +266,17 @@ function renderPlan(plan) {
   el.proposalSummary.innerHTML = [
     '<div class="summary-line"><strong>✓ Tous les quotas sélectionnés sont respectés.</strong></div>',
     `<div class="summary-line">${plan.metrics.newCount} nouvelle(s) affectation(s), ${plan.metrics.existingCount} déjà existante(s).</div>`,
-    `<div class="summary-line">${esc(diversityLine)}${plan.metrics.introducedRepeats ? ` ${plan.metrics.introducedRepeats} répétition(s) restent nécessaires.` : ""}</div>`,
+    `<div class="summary-line">${esc(diversityLine)}${plan.metrics.introducedRepeats ? ` ${plan.metrics.introducedRepeats} répétition(s) dans la proposition.` : ""}</div>`,
     geographyLine,
     tradeoffLine,
   ].join("");
 
   el.proposalDetails.innerHTML = plan.assignments.map(row => (
-    `<tr><td>P${row.period}</td><td>${esc(row.studentLabel)}</td><td>${esc(row.teacherLabel)}</td><td>${esc(formatDistance(row.distanceKm))}</td></tr>`
+    `<tr><td>${esc(periodLabel(state.snapshot, row.periodId))}</td><td>${esc(row.studentLabel)}</td><td>${esc(row.teacherLabel)}</td><td>${esc(formatDistance(row.distanceKm))}</td></tr>`
   )).join("") || '<tr><td colspan="4">Aucune nouvelle affectation.</td></tr>';
 
   el.quotaDetails.innerHTML = plan.summary.map(row => (
-    `<tr><td>P${row.period}</td><td>${esc(row.teacherLabel)}</td><td>${row.target}</td><td>${row.existing}</td><td>${row.proposed}</td><td><strong>${row.total}</strong></td></tr>`
+    `<tr><td>${esc(periodLabel(state.snapshot, row.periodId))}</td><td>${esc(row.teacherLabel)}</td><td>${row.target}</td><td>${row.existing}</td><td>${row.proposed}</td><td><strong>${row.total}</strong></td></tr>`
   )).join("");
 
   updateApplyButton();

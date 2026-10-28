@@ -20,13 +20,46 @@ const key = (a, b) => String(a) + ":" + String(b);
 const issue = (code, message, details = {}) => ({ code, message, ...details });
 const EPSILON = 1e-9;
 
-export function periodsForClass(row) {
+// periodId is an opaque row ID, never Periodes_de_stage.Numero.
+// periodCount is used only for pre-relational documents without a period catalogue.
+export function periodsForClass(row, snapshot) {
+  if (snapshot?.periods) return snapshot.periods.filter(period => period.classId === row?.id)
+    .sort((a, b) => String(a.number).localeCompare(String(b.number), "fr", { numeric: true }) || a.id - b.id)
+    .map(period => period.id);
   const n = int(row?.periodCount);
   return n && n >= 1 && n <= 4 ? Array.from({ length: n }, (_, i) => i + 1) : [];
 }
 
-function selectedPeriodsForClass(cls, selectedPeriods) {
-  const available = periodsForClass(cls);
+export function periodLabel(snapshot, periodId) {
+  const period = snapshot?.periods?.find(row => row.id === periodId);
+  return period ? `P${period.number || "?"}` : `P${periodId}`;
+}
+
+function periodConsistencyProblems(snapshot, classId) {
+  if (!snapshot.periods) return [];
+  const errors = [];
+  const periods = new Map(snapshot.periods.map(row => [row.id, row]));
+  const students = new Map(snapshot.students.map(row => [row.id, row]));
+  for (const row of snapshot.periods.filter(row => row.classId === classId)) {
+    if (!id(row.id) || !String(row.number ?? "").trim()) errors.push(issue("INVALID_PERIOD", `La période #${row.id} doit posséder un numéro.`));
+  }
+  // Check both sides: a foreign-class stage referencing this class's period is also inconsistent.
+  for (const row of snapshot.stages) {
+    const owner = students.get(row.studentId)?.classId;
+    const period = periods.get(row.periodId);
+    if (owner !== classId && period?.classId !== classId) continue;
+    if (!owner || !period || owner !== period.classId) errors.push(issue("STAGE_PERIOD_CLASS_MISMATCH", `Le stage #${row.id} référence une période incompatible avec la classe de l'élève.`, { stageId: row.id }));
+  }
+  for (const row of snapshot.quotas) {
+    const period = periods.get(row.periodId);
+    if (row.classId !== classId && period?.classId !== classId) continue;
+    if (!period || row.classId !== period.classId) errors.push(issue("QUOTA_PERIOD_CLASS_MISMATCH", `L'affectation #${row.id} référence une période incompatible avec sa classe.`, { quotaId: row.id }));
+  }
+  return errors;
+}
+
+function selectedPeriodsForClass(cls, selectedPeriods, snapshot) {
+  const available = periodsForClass(cls, snapshot);
   const selected = [...new Set((selectedPeriods || []).map(int).filter(period => available.includes(period)))].sort((a, b) => a - b);
   return { available, selected };
 }
@@ -48,8 +81,11 @@ export function stageCoverage(snapshot, classId, selectedPeriods) {
     };
   }
 
-  const { available, selected } = selectedPeriodsForClass(cls, selectedPeriods);
-  if (!available.length) errors.push(issue("INVALID_PERIOD_COUNT", `Le nombre de périodes de ${cls.label} doit être un entier entre 1 et 4.`));
+  const { available, selected } = selectedPeriodsForClass(cls, selectedPeriods, snapshot);
+  if (!available.length) errors.push(issue("INVALID_PERIOD_COUNT", `Aucune période de stage valide n'est définie pour ${cls.label}.`));
+  if ((selectedPeriods || []).some(period => !available.includes(int(period)))) errors.push(issue("INVALID_SELECTED_PERIOD", "Une période sélectionnée n'appartient pas à cette classe."));
+  if (selected.length > 4) errors.push(issue("TOO_MANY_PERIODS", "Sélectionne au maximum quatre périodes par calcul."));
+  errors.push(...periodConsistencyProblems(snapshot, cid));
   if (!selected.length) errors.push(issue("NO_PERIOD_SELECTED", "Sélectionne au moins une période à traiter."));
 
   const students = snapshot.students.filter(row => row.classId === cid).sort((a, b) => a.id - b.id);
@@ -57,12 +93,12 @@ export function stageCoverage(snapshot, classId, selectedPeriods) {
   const studentIds = new Set(students.map(row => row.id));
   const selectedSet = new Set(selected);
   const existing = snapshot.stages
-    .filter(stage => studentIds.has(stage.studentId) && selectedSet.has(stage.period))
-    .sort((a, b) => a.period - b.period || a.studentId - b.studentId || a.id - b.id);
+    .filter(stage => studentIds.has(stage.studentId) && selectedSet.has(stage.periodId))
+    .sort((a, b) => a.periodId - b.periodId || a.studentId - b.studentId || a.id - b.id);
 
   const byPair = new Map();
   for (const stage of existing) {
-    const pair = key(stage.studentId, stage.period);
+    const pair = key(stage.studentId, stage.periodId);
     const rows = byPair.get(pair) ?? [];
     rows.push(stage);
     byPair.set(pair, rows);
@@ -73,8 +109,8 @@ export function stageCoverage(snapshot, classId, selectedPeriods) {
     const first = rows[0];
     errors.push(issue(
       "DUPLICATE_STAGE",
-      `${first.studentLabel} possède plusieurs stages en période ${first.period}.`,
-      { studentId: first.studentId, period: first.period, stageIds: rows.map(row => row.id) },
+      `${first.studentLabel} possède plusieurs stages en ${periodLabel(snapshot, first.periodId)}.`,
+      { studentId: first.studentId, periodId: first.periodId, stageIds: rows.map(row => row.id) },
     ));
   }
 
@@ -83,7 +119,7 @@ export function stageCoverage(snapshot, classId, selectedPeriods) {
   for (const period of selected) {
     for (const student of students) {
       const pair = key(student.id, period);
-      const row = { studentId: student.id, studentLabel: student.label, period };
+      const row = { studentId: student.id, studentLabel: student.label, periodId: period };
       expected.push(row);
       if (!byPair.has(pair)) missing.push(row);
     }
@@ -98,6 +134,7 @@ export function stageCoverage(snapshot, classId, selectedPeriods) {
     existing,
     missing,
     errors,
+    declared: snapshot.periods ? existing.filter(row => row.structureId) : existing,
     expectedCount: expected.length,
     presentCount: existing.length,
     uniquePresentCount: byPair.size,
@@ -109,7 +146,7 @@ function geographyEnabled(criteria) {
   return criteria?.geography?.enabled === true;
 }
 
-function geographyPrecheck(errors, periodStates, teachers) {
+function geographyPrecheck(errors, periodStates, teachers, snapshot) {
   const requiredTeacherIds = new Set();
   const validTeacherIds = new Set();
   const requiredStageIds = new Set();
@@ -154,13 +191,13 @@ function geographyPrecheck(errors, periodStates, teachers) {
       if (!stage.structureId) {
         errors.push(issue(
           "MISSING_STAGE_STRUCTURE",
-          `${stage.studentLabel} — période ${stage.period} : aucune structure de stage n'est renseignée.`,
+          `${stage.studentLabel} — ${periodLabel(snapshot, stage.periodId)} : aucune structure de stage n'est renseignée.`,
           { stageId: stage.id },
         ));
       } else {
         errors.push(issue(
           "MISSING_STAGE_COORDINATES",
-          `${stage.studentLabel} — période ${stage.period} : la structure de stage n'a pas de coordonnées géographiques exploitables.`,
+          `${stage.studentLabel} — ${periodLabel(snapshot, stage.periodId)} : la structure de stage n'a pas de coordonnées géographiques exploitables.`,
           { stageId: stage.id, structureId: stage.structureId },
         ));
       }
@@ -185,18 +222,18 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
   const cls = coverage.classRow;
   const teachers = new Map(snapshot.teachers.map(row => [row.id, row]));
   const selectedSet = new Set(coverage.periods);
-  const quotas = snapshot.quotas.filter(row => row.classId === cid && selectedSet.has(row.period));
+  const quotas = snapshot.quotas.filter(row => row.classId === cid && selectedSet.has(row.periodId));
   const quotaPairs = new Set();
 
   for (const quota of quotas) {
     if (!teachers.has(quota.teacherId)) errors.push(issue("INVALID_QUOTA_TEACHER", `L'affectation #${quota.id} ne référence aucun enseignant valide.`));
     if (!Number.isInteger(quota.target) || quota.target < 0) errors.push(issue("INVALID_QUOTA_TARGET", `Le quota de l'affectation #${quota.id} doit être un entier positif ou nul.`));
-    const pair = key(quota.teacherId, quota.period);
-    if (quotaPairs.has(pair)) errors.push(issue("DUPLICATE_QUOTA", `Un enseignant apparaît plusieurs fois dans Affectation pour la période ${quota.period}.`));
+    const pair = key(quota.teacherId, quota.periodId);
+    if (quotaPairs.has(pair)) errors.push(issue("DUPLICATE_QUOTA", `Un enseignant apparaît plusieurs fois dans Affectation pour ${periodLabel(snapshot, quota.periodId)}.`));
     quotaPairs.add(pair);
   }
 
-  if (coverage.missing.length) {
+  if (!snapshot.periods && coverage.missing.length) {
     errors.push(issue(
       "MISSING_STAGES",
       `${coverage.missing.length} stage(s) sont encore à créer pour les périodes sélectionnées.`,
@@ -206,15 +243,15 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
 
   const periodStates = [];
   for (const period of coverage.periods) {
-    const stages = coverage.existing.filter(row => row.period === period);
-    const periodQuotas = quotas.filter(row => row.period === period);
+    const stages = coverage.declared.filter(row => row.periodId === period);
+    const periodQuotas = quotas.filter(row => row.periodId === period);
     const targetTotal = periodQuotas.reduce((sum, row) => sum + (Number.isInteger(row.target) ? row.target : 0), 0);
-    const expectedCount = coverage.students.length;
+    const expectedCount = snapshot.periods ? stages.length : coverage.students.length;
     if (targetTotal !== expectedCount) {
       errors.push(issue(
         "QUOTA_TOTAL_MISMATCH",
-        `${cls.label} — période ${period} : ${expectedCount} stage(s) attendu(s), mais ${targetTotal} suivi(s) prévus dans Affectation.`,
-        { period, expectedCount, targetTotal },
+        `${cls.label} — ${periodLabel(snapshot, period)} : ${expectedCount} stage(s) ${snapshot.periods ? "déclaré(s)" : "attendu(s)"}, mais ${targetTotal} suivi(s) prévus dans Affectation.`,
+        { periodId: period, expectedCount, targetTotal },
       ));
     }
 
@@ -225,8 +262,8 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
       if (!quotaByTeacher.has(stage.teacherId)) {
         errors.push(issue(
           "EXISTING_ASSIGNMENT_NOT_ALLOWED",
-          `${stage.studentLabel} est déjà suivi par un enseignant non affecté à cette classe en période ${period}.`,
-          { stageId: stage.id, teacherId: stage.teacherId, period },
+          `${stage.studentLabel} est déjà suivi par un enseignant non affecté à cette classe en ${periodLabel(snapshot, period)}.`,
+          { stageId: stage.id, teacherId: stage.teacherId, periodId: period },
         ));
       }
       existingByTeacher.set(stage.teacherId, (existingByTeacher.get(stage.teacherId) || 0) + 1);
@@ -237,8 +274,8 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
       if (already > row.target) {
         errors.push(issue(
           "EXISTING_ASSIGNMENT_OVER_QUOTA",
-          `${teachers.get(row.teacherId)?.label || (`Enseignant #${row.teacherId}`)} dépasse déjà son quota en période ${period}.`,
-          { teacherId: row.teacherId, period, existing: already, target: row.target },
+          `${teachers.get(row.teacherId)?.label || (`Enseignant #${row.teacherId}`)} dépasse déjà son quota en ${periodLabel(snapshot, period)}.`,
+          { teacherId: row.teacherId, periodId: period, existing: already, target: row.target },
         ));
       }
       return {
@@ -251,7 +288,7 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
     });
 
     periodStates.push({
-      period,
+      periodId: period,
       stages,
       quotas: periodQuotas,
       capacities,
@@ -259,8 +296,8 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
     });
   }
 
-  const geography = geographyEnabled(criteria) ? geographyPrecheck(errors, periodStates, teachers) : null;
-  const existingSelectedCount = coverage.existing.filter(row => row.teacherId).length;
+  const geography = geographyEnabled(criteria) ? geographyPrecheck(errors, periodStates, teachers, snapshot) : null;
+  const existingSelectedCount = coverage.declared.filter(row => row.teacherId).length;
   return {
     ...coverage,
     errors,
@@ -268,9 +305,10 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
     geography,
     classQuotas: quotas,
     periodStates,
-    selectedStageCount: coverage.expectedCount,
+    selectedStageCount: snapshot.periods ? coverage.declared.length : coverage.expectedCount,
+    declaredCount: coverage.declared.length,
     existingSelectedCount,
-    unassignedSelectedCount: Math.max(0, coverage.presentCount - existingSelectedCount),
+    unassignedSelectedCount: Math.max(0, coverage.declared.length - existingSelectedCount),
   };
 }
 
@@ -473,9 +511,9 @@ export function scoreAssignmentsGlobally(assignments, { stagesById, basePairs, s
 function swapCandidates(assignments) {
   const byPeriod = new Map();
   assignments.forEach((row, index) => {
-    const indices = byPeriod.get(row.period) ?? [];
+    const indices = byPeriod.get(row.periodId) ?? [];
     indices.push(index);
-    byPeriod.set(row.period, indices);
+    byPeriod.set(row.periodId, indices);
   });
   const result = new Map();
   for (const [period, indices] of byPeriod) {
@@ -485,7 +523,7 @@ function swapCandidates(assignments) {
         const left = indices[a];
         const right = indices[b];
         if (assignments[left].teacherId === assignments[right].teacherId) continue;
-        swaps.push({ period, left, right });
+        swaps.push({ periodId: period, left, right });
       }
     }
     result.set(period, swaps);
@@ -642,19 +680,22 @@ export function configurationFingerprint(snapshot, classId, criteria = {}) {
   const stages = snapshot.stages
     .filter(row => studentIds.has(row.studentId))
     .map(row => includeGeography
-      ? [row.id, row.studentId, row.period, row.teacherId || 0, row.structureId || 0, row.latitude ?? null, row.longitude ?? null]
-      : [row.id, row.studentId, row.period, row.teacherId || 0])
+      ? [row.id, row.studentId, row.periodId, row.teacherId || 0, row.structureId || 0, row.latitude ?? null, row.longitude ?? null]
+      : [row.id, row.studentId, row.periodId, row.teacherId || 0, ...(snapshot.periods ? [row.structureId || 0] : [])])
     .sort((a, b) => a[0] - b[0]);
   const quotas = snapshot.quotas
     .filter(row => row.classId === cid)
-    .map(row => [row.id, row.teacherId, row.period, row.target])
+    .map(row => [row.id, row.teacherId, row.periodId, row.target])
     .sort((a, b) => a[0] - b[0]);
   const teachers = includeGeography
     ? snapshot.teachers
       .map(row => [row.id, row.latitude ?? null, row.longitude ?? null, row.locationValidated === true])
       .sort((a, b) => a[0] - b[0])
     : undefined;
-  return JSON.stringify({ class: cls ? [cls.id, cls.periodCount] : null, students, stages, quotas, ...(includeGeography ? { teachers } : {}) });
+  const periods = snapshot.periods?.map(row => [row.id, row.classId, row.number]).sort((a, b) => a[0] - b[0]);
+  const tableIds = snapshot.configuration?.tableIds;
+  const mappings = snapshot.configuration?.mappings;
+  return JSON.stringify({ periods, tableIds, mappings, class: cls ? [cls.id, cls.periodCount] : null, students, stages, quotas, ...(includeGeography ? { teachers } : {}) });
 }
 
 export function generatePlan(snapshot, options) {
@@ -667,7 +708,10 @@ export function generatePlan(snapshot, options) {
   const stagesById = new Map(snapshot.stages.map(row => [row.id, row]));
   const teachers = new Map(snapshot.teachers.map(row => [row.id, row]));
   const basePairs = new Map();
-  for (const stage of analysis.existing) {
+  const studentIds = new Set(analysis.students.map(row => row.id));
+  const classPeriods = new Set(analysis.availablePeriods);
+  const history = snapshot.stages.filter(stage => studentIds.has(stage.studentId) && classPeriods.has(stage.periodId));
+  for (const stage of history) {
     if (!stage.studentId || !stage.teacherId) continue;
     const pair = key(stage.studentId, stage.teacherId);
     basePairs.set(pair, (basePairs.get(pair) || 0) + 1);
@@ -676,7 +720,7 @@ export function generatePlan(snapshot, options) {
   const objectiveContext = { stagesById, basePairs, scoring, geographyByStage };
 
   let best = null;
-  const stateByPeriod = new Map(analysis.periodStates.map(row => [row.period, row]));
+  const stateByPeriod = new Map(analysis.periodStates.map(row => [row.periodId, row]));
   for (const order of permutations(analysis.periods)) {
     const pairs = new Map(basePairs);
     const assignments = [];
@@ -697,7 +741,7 @@ export function generatePlan(snapshot, options) {
         const geographyData = scoring.geography ? geographyByStage.get(stage.id)?.get(row.teacherId) : null;
         assignments.push({
           ...row,
-          period,
+          periodId: period,
           distanceKm: scoring.geography && Number.isFinite(geographyData?.distanceKm) ? geographyData.distanceKm : null,
         });
         const pair = key(stage.studentId, row.teacherId);
@@ -720,14 +764,14 @@ export function generatePlan(snapshot, options) {
       studentLabel: stage.studentLabel,
       teacherLabel: teachers.get(row.teacherId)?.label || (`Enseignant #${row.teacherId}`),
     };
-  }).sort((a, b) => a.period - b.period || a.studentLabel.localeCompare(b.studentLabel, "fr") || a.stageId - b.stageId);
+  }).sort((a, b) => a.periodId - b.periodId || a.studentLabel.localeCompare(b.studentLabel, "fr") || a.stageId - b.stageId);
 
   const summary = [];
   for (const state of analysis.periodStates) {
     for (const capacity of state.capacities) {
-      const proposed = assignments.filter(row => row.period === state.period && row.teacherId === capacity.teacherId).length;
+      const proposed = assignments.filter(row => row.periodId === state.periodId && row.teacherId === capacity.teacherId).length;
       summary.push({
-        period: state.period,
+        periodId: state.periodId,
         teacherId: capacity.teacherId,
         teacherLabel: capacity.teacherLabel,
         target: capacity.target,
