@@ -12,7 +12,7 @@ import {
 
 test("stage period mapping accepts a Grist Choice column", () => {
   const definition = mappingDefinition("stagePeriod");
-  assert.deepEqual(definition.allowedTypes, ["Numeric", "Int", "Choice"]);
+  assert.deepEqual(definition.allowedTypes, ["Ref:Periodes_de_stage", "Numeric", "Int", "Choice"]);
 
   const metadata = {
     tables: {
@@ -38,7 +38,7 @@ test("stage periods stay numeric for Numeric and Int columns", () => {
   assert.equal(stagePeriodWriteValue(3, "Int"), 3);
 
   const action = buildStageCreationAction(
-    [{ studentId: 11, period: 1 }, { studentId: 12, period: 2 }],
+    [{ studentId: 11, periodId: 1 }, { studentId: 12, periodId: 2 }],
     { stageStudent: "Eleve", stagePeriod: "Periode" },
     "Stages",
     "Numeric",
@@ -50,7 +50,7 @@ test("stage periods are serialized as text for a Choice column", () => {
   assert.equal(stagePeriodWriteValue(2, "Choice"), "2");
 
   const action = buildStageCreationAction(
-    [{ studentId: 11, period: 1 }, { studentId: 12, period: 3 }],
+    [{ studentId: 11, periodId: 1 }, { studentId: 12, periodId: 3 }],
     { stageStudent: "Eleve", stagePeriod: "Periode" },
     "Stages",
     "Choice",

@@ -40,8 +40,8 @@ test("source mapping signature accepts normalized source mappings", () => {
 
 test("stage creation writes only the mapped student and period columns", () => {
   const action = buildStageCreationAction([
-    { studentId: 11, period: 1 },
-    { studentId: 12, period: 2 },
+    { studentId: 11, periodId: 1 },
+    { studentId: 12, periodId: 2 },
   ], {
     stageStudent: "Stagiaire",
     stagePeriod: "Numero_periode",

@@ -7,7 +7,7 @@ import {
 
 function teacherCounts(rows, period) {
   const counts = new Map();
-  for (const row of rows.filter(item => item.period === period)) {
+  for (const row of rows.filter(item => item.periodId === period)) {
     counts.set(row.teacherId, (counts.get(row.teacherId) || 0) + 1);
   }
   return [...counts.entries()].sort((a, b) => a[0] - b[0]);
@@ -30,10 +30,10 @@ test("coordinated refinement escapes a local optimum without changing period quo
   for (const period of [1, 2]) {
     for (let studentIndex = 0; studentIndex < 3; studentIndex += 1) {
       const currentStageId = stageId++;
-      stages.push({ id: currentStageId, studentId: studentIndex + 1, period });
+      stages.push({ id: currentStageId, studentId: studentIndex + 1, periodId: period });
       assignments.push({
         stageId: currentStageId,
-        period,
+        periodId: period,
         teacherId: initialTeachers[period][studentIndex],
         distanceKm: null,
       });
@@ -77,8 +77,8 @@ test("coordinated refinement escapes a local optimum without changing period quo
 
 test("global refinement never mutates the proposal passed by the caller", () => {
   const assignments = [
-    { stageId: 1, period: 1, teacherId: 10, distanceKm: 2 },
-    { stageId: 2, period: 1, teacherId: 11, distanceKm: 1 },
+    { stageId: 1, periodId: 1, teacherId: 10, distanceKm: 2 },
+    { stageId: 2, periodId: 1, teacherId: 11, distanceKm: 1 },
   ];
   const original = structuredClone(assignments);
   const context = {

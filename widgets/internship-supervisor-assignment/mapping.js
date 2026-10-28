@@ -1,8 +1,9 @@
 export const CORE_TABLES = Object.freeze(["Classe", "Eleves", "Enseignant", "Affectation", "Stage"]);
 export const GEOGRAPHY_TABLES = Object.freeze(["Structures_de_stage"]);
-export const DOCUMENT_TABLES = Object.freeze([...CORE_TABLES, ...GEOGRAPHY_TABLES]);
+export const DOCUMENT_TABLES = Object.freeze([...CORE_TABLES, ...GEOGRAPHY_TABLES, "Periodes_de_stage"]);
 
 const STRUCTURAL_DEFS = Object.freeze([
+  { key: "periodClass", table: "Periodes_de_stage", label: "Classe", refTarget: "Classe", scope: "periods", mode: "structural" },
   {
     key: "studentClass",
     table: "Eleves",
@@ -70,6 +71,7 @@ const VISIBLE_LABEL_DEFS = Object.freeze([
 ]);
 
 export const CONFIGURABLE_MAPPING_DEFS = Object.freeze([
+  { key: "periodNumber", table: "Periodes_de_stage", label: "Numéro de période", candidates: ["Numero", "Numéro"], allowedTypes: ["Text", "Numeric", "Int"], scope: "periods", mode: "semantic" },
   {
     key: "teacherLatitude",
     table: "Enseignant",
@@ -102,7 +104,7 @@ export const CONFIGURABLE_MAPPING_DEFS = Object.freeze([
     table: "Affectation",
     label: "Période",
     candidates: ["Periode", "Période", "Periode_de_stage", "Période de stage"],
-    allowedTypes: ["Numeric", "Int"],
+    allowedTypes: ["Ref:Periodes_de_stage", "Numeric", "Int"],
     mode: "semantic",
   },
   {
@@ -127,7 +129,7 @@ export const CONFIGURABLE_MAPPING_DEFS = Object.freeze([
     table: "Stage",
     label: "Période",
     candidates: ["Periode", "Période", "Periode_de_stage", "Période de stage"],
-    allowedTypes: ["Numeric", "Int", "Choice"],
+    allowedTypes: ["Ref:Periodes_de_stage", "Numeric", "Int", "Choice"],
     writable: true,
     mode: "semantic",
   },
@@ -178,7 +180,13 @@ function columnForRef(metadata, tableId, columnRef) {
   return tableFor(metadata, tableId)?.columns?.find(column => Number(column.ref) === wanted) ?? null;
 }
 
-function definitionEnabled(definition, { geography = true } = {}) {
+export function usesPeriodReferences(metadata) {
+  return Boolean(tableFor(metadata, "Periodes_de_stage")) || ["Stage", "Affectation"].some(role => tableFor(metadata, role)?.columns?.some(column => column.type === "Ref:Periodes_de_stage"));
+}
+
+function definitionEnabled(definition, { geography = true, relational = false } = {}) {
+  if (definition.scope === "periods") return relational;
+  if (definition.key === "stageStructure" && relational) return true;
   return definition.scope !== "geography" || geography;
 }
 
@@ -288,7 +296,7 @@ export function mappingDefinition(key) {
 }
 
 export function mappingGroups() {
-  const tables = ["Enseignant", "Affectation", "Stage", "Structures_de_stage"];
+  const tables = ["Enseignant", "Affectation", "Stage", "Structures_de_stage", "Periodes_de_stage"];
   return tables.map(table => ({
     table,
     fields: CONFIGURABLE_MAPPING_DEFS.filter(definition => definition.table === table),
@@ -298,7 +306,8 @@ export function mappingGroups() {
 export function validateMappings(metadata, mappings, { geography = true } = {}) {
   const issues = [];
   const effectiveMappings = inferMappings(metadata, mappings ?? {});
-  const requiredTables = geography ? DOCUMENT_TABLES : CORE_TABLES;
+  const relational = usesPeriodReferences(metadata);
+  const requiredTables = [...CORE_TABLES, ...(geography ? GEOGRAPHY_TABLES : []), ...(relational ? ["Periodes_de_stage"] : [])];
   for (const tableId of requiredTables) {
     if (!tableFor(metadata, tableId)) {
       issues.push({ code: "MISSING_TABLE", table: tableId, message: `Table Grist introuvable : ${tableId}.` });
@@ -306,7 +315,7 @@ export function validateMappings(metadata, mappings, { geography = true } = {}) 
   }
 
   for (const definition of MAPPING_DEFS) {
-    if (!definitionEnabled(definition, { geography })) continue;
+    if (!definitionEnabled(definition, { geography, relational })) continue;
     const columnId = effectiveMappings?.[definition.key];
     if (!columnId) {
       const origin = definition.mode === "structural"
@@ -339,6 +348,9 @@ export function validateMappings(metadata, mappings, { geography = true } = {}) 
         table: definition.table,
         message: `${definition.table} — ${definition.label} doit être une référence vers ${definition.refTarget}.`,
       });
+    }
+    if (relational && ["stagePeriod", "quotaPeriod"].includes(definition.key) && column.type !== "Ref:Periodes_de_stage") {
+      issues.push({ code: "INVALID_PERIOD_REFERENCE", key: definition.key, table: definition.table, message: `${definition.table} — la période doit référencer Periodes_de_stage.` });
     }
     if (definition.allowedTypes && !definition.allowedTypes.includes(column.type)) {
       issues.push({

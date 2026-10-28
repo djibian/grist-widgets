@@ -44,17 +44,26 @@ Toute incohérence bloque l'optimisation géographique avec un message précis.
 
 ### Quotas et stages
 
-Le widget calcule l'ensemble attendu :
+Le modèle relationnel actuel utilise `Periodes_de_stage` comme référentiel unique :
 
-`élèves de la classe × périodes sélectionnées`
+- `Periodes_de_stage.Classe` détermine les périodes proposées pour la classe ;
+- `Stages.Periode` et `Affectation.Periode` contiennent des **identifiants de lignes Grist**, représentés en interne par `periodId` ;
+- `Periodes_de_stage.Numero` sert à l'affichage, sans hypothèse de numérotation consécutive ;
+- les références absentes, inexistantes ou incompatibles avec la classe bloquent le calcul ;
+- les tables et colonnes de périodes bénéficient des bindings Grist stables existants.
 
-Les lignes `Stage` manquantes peuvent être créées explicitement. Les doublons élève × période bloquent le calcul.
+Le nombre de périodes de la classe reste lisible via le mapping natif, mais ne sert pas à reconstruire les périodes du modèle relationnel. Aucune colonne de période supplémentaire n'est créée.
+
+Les stages **attendus** correspondent à `élèves de la classe × périodes sélectionnées`. Les stages **déclarés et affectables** sont les lignes existantes avec `Structure_de_stage`, conformément aux formules de comptage du document. Les lignes absentes ou sans structure ne sont ni créées ni affectées par le widget. Leurs suivis éventuels restent inchangés.
 
 Pour chaque période sélectionnée :
 
-- la somme des quotas doit être exactement égale au nombre d'élèves ;
-- les suivis déjà renseignés sont conservés et déduits des quotas restants ;
-- un enseignant déjà au-dessus de son quota ou non autorisé pour la classe bloque le calcul.
+- la somme des quotas doit être exactement égale au nombre de stages déclarés ;
+- les suivis déjà renseignés sur ces stages sont conservés et déduits des quotas restants ;
+- un enseignant déjà au-dessus de son quota ou non autorisé pour la classe bloque le calcul ;
+- les doublons élève × période bloquent le calcul.
+
+La compatibilité avec les anciens documents **sans référentiel de périodes**, dont les périodes sont numériques ou Choice, conserve leur création explicite de lignes manquantes. Un modèle mêlant références et numéros est refusé.
 
 ### Solveur d'affectation
 
@@ -62,7 +71,7 @@ L'ancien choix glouton par ordre de lignes est remplacé par un **solveur d'affe
 
 Pour chaque période, le solveur recherche globalement l'affectation de coût minimal entre tous les stages non affectés et tous les enseignants ayant encore du quota. Il peut donc faire un choix localement moins avantageux pour un stage si cela améliore fortement la solution de la période.
 
-Le widget évalue les différents ordres possibles des périodes sélectionnées — au maximum quatre — afin de prendre en compte la diversification entre les périodes d'un même élève.
+Le widget évalue les différents ordres possibles des périodes sélectionnées — au maximum quatre — afin de prendre en compte la diversification entre les périodes d'un même élève. L'historique inclut tous les suivis existants des élèves de la classe dans ses périodes, y compris celles qui ne sont pas sélectionnées et les lignes sans structure portant déjà un suivi. Seuls les stages déclarés sans enseignant des périodes sélectionnées sont modifiables. Les métriques de répétition utilisent ce même historique, même lorsque le critère de diversification est désactivé.
 
 Enfin, une passe de **raffinement inter-périodes** réévalue le score global. Elle cherche d'abord des échanges améliorants entre deux stages d'une même période ; si aucun échange isolé ne suffit, elle peut appliquer deux échanges coordonnés dans deux périodes différentes. Ces mouvements conservent exactement, par construction, le nombre de stages attribué à chaque enseignant dans chaque période : les quotas ne peuvent donc pas être modifiés par le raffinement.
 
@@ -107,8 +116,13 @@ Le plan conserve également des métriques internes de score avant/après raffin
 - aucun suivi existant n'est écrasé ;
 - le calcul est prévisualisé avant toute écriture ;
 - les données sont relues avant application ;
-- une modification des stages, quotas, coordonnées, validation géographique ou mappings invalide la proposition ;
+- une modification des stages, suivis historiques, quotas, références/numéros/classes des périodes ou mappings invalide la proposition ;
+- les changements de structure invalident aussi la proposition sans optimisation géographique, puisqu'ils changent le périmètre affectable ;
+- les coordonnées et validations géographiques sont contrôlées lorsque ce critère est activé ;
+- le périmètre, l'exhaustivité des écritures et les quotas sont revérifiés avant application ;
 - seules les colonnes réellement configurées sont écrites.
+
+La relecture détecte les changements intervenus avant le contrôle. Elle ne constitue pas une opération atomique de comparaison et écriture côté serveur : une écriture concurrente entre cette relecture et `applyUserActions` reste une limite de ce protocole client.
 
 ## Évolutions prévues
 
@@ -130,3 +144,5 @@ npm run test:internship-supervisor-assignment
 ```
 
 L'ensemble du dépôt peut également être testé avec `npm test`.
+
+La suite relationnelle utilise les types et formules du schéma dev2 observés le 28 octobre 2026, avec des données de test synthétiques : identifiants distincts des numéros, périodes non consécutives, cohérence classe–période, stages attendus/déclarés, quotas exacts, historique hors sélection, conservation des suivis et invalidation avant application. Un oracle exhaustif vérifie la diversification pour de petits cas à une période ; les tests de raffinement multi-périodes existants sont conservés.

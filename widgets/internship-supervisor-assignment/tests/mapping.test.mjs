@@ -83,15 +83,15 @@ test("inferMappings recognises the standard semantic contract", () => {
   assert.equal(mappings.structureLongitude, "Longitude");
 });
 
-test("only the eight semantic mappings remain configurable", () => {
-  assert.equal(CONFIGURABLE_MAPPING_DEFS.length, 8);
-  assert.deepEqual(mappingGroups().map(group => group.table), ["Enseignant", "Affectation", "Stage", "Structures_de_stage"]);
+test("semantic mappings include the relational period number", () => {
+  assert.equal(CONFIGURABLE_MAPPING_DEFS.length, 9);
+  assert.deepEqual(mappingGroups().map(group => group.table), ["Enseignant", "Affectation", "Stage", "Structures_de_stage", "Periodes_de_stage"]);
   assert.deepEqual(
     mappingGroups().flatMap(group => group.fields.map(field => field.key)),
     [
       "teacherLatitude", "teacherLongitude", "teacherLocationValidated",
       "quotaPeriod", "quotaTarget", "stagePeriod",
-      "structureLatitude", "structureLongitude",
+      "structureLatitude", "structureLongitude", "periodNumber",
     ],
   );
 });
