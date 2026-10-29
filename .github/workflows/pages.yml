@@ -85,7 +85,8 @@ jobs:
               continue
             fi
 
-            if [[ "$branch" != "preview/structure-picker" ]] && git -C source diff --quiet main "$ref" --; then
+            # Preserve stable preview URLs even when their widget changes are merged into main.
+            if [[ "$branch" != "preview/structure-picker" && "$branch" != "preview/internship-supervisor-assignment" ]] && git -C source diff --quiet main "$ref" --; then
               echo "Skipping $branch: preview content is identical to main"
               continue
             fi
