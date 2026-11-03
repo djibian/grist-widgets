@@ -1,3 +1,4 @@
+import { readNamedSites, namedSiteCandidate, namedSitePositionValid, namedSiteAddressSuggestions } from "./named-site-directory.js";
 import {
   addressEvidence,
   normalizeIdentity,
@@ -177,6 +178,7 @@ export function publicSiteCandidate(record, publisher, row) {
   };
 }
 export function publicSiteWriteProofValid(position) {
+  if (position?.proof?.some(p => p.kind === "REVIEWED_NAMED_SITE")) return namedSitePositionValid(position);
   const proof = position?.proof?.find(
     (item) => item.kind === "EXPLICIT_PUBLISHER_SITE_POINT",
   );
@@ -216,11 +218,14 @@ export async function findOfficialPublicSites({
           throw Error("Index public hors budget");
         return JSON.parse(t);
       };
+      let named = [];
+      try { named = await readNamedSites({ signal: child, fetchImpl }); } catch { /* An optional directory cannot hide completed municipal evidence. */ }
+      const namedCandidates = named.map(record => namedSiteCandidate(record, row)).filter(Boolean);
       const manifest = await read(new URL("manifest.json", baseUrl));
-      if (!manifest) return { candidates: [] };
+      if (!manifest) return { candidates: namedCandidates, records: named };
       if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.communes))
         throw Error("Manifest public invalide");
-      const candidates = [];
+      const candidates = [...namedCandidates];
       for (const town of manifest.communes) {
         if (!/^\d{5}$/.test(town.code))
           throw Error("Code commune public invalide");
@@ -242,7 +247,7 @@ export async function findOfficialPublicSites({
           if (c) candidates.push(c);
         }
       }
-      return { candidates };
+      return { candidates, records: named, suggestions: namedSiteAddressSuggestions(named, row) };
     },
     { signal, timeoutMs: 1500, onEvent },
   );

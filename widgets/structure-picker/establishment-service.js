@@ -49,8 +49,10 @@ async function boundedOperation(source, options, timeoutMs, optional = false) {
 function publicName(candidate, row, links) {
   const linked = (links ?? []).find(link => link.verifiedOfficial && link.siret === candidate.siret);
   const targets = new Set(targetNameVariants(row, { includeCategoryFallback: false }));
-  return (candidate.aliases ?? []).find(name => normalizeIdentity(name) === normalizeIdentity(row.NomCommercial))
+  return (links ?? []).find(link => link.verifiedOfficial && link.siret === candidate.siret && link.siteRecord)?.siteRecord.name
+    || (candidate.aliases ?? []).find(name => normalizeIdentity(name) === normalizeIdentity(row.NomCommercial))
     || linked?.publicNames?.find(name => targets.has(normalizeIdentity(name)))
+    || linked?.registryRecord?.name || linked?.siteRecord?.name
     || (candidate.nomUsuelDistinct ? candidate.nomCommercial : row.NomCommercial)
     || candidate.raisonSociale;
 }
@@ -101,12 +103,19 @@ export async function resolveEstablishmentForEnrichment({
     });
   }
   if (signal?.aborted) throw signal.reason ?? new DOMException("Aborted", "AbortError");
+  const siteLinks = (identity.links ?? []).filter(link => link.verifiedOfficial && link.siret === official.siret);
+  const siteAddress = siteLinks.find(link => link.siteRecord)?.siteRecord.adresse
+    || siteLinks.find(link => link.registryRecord)?.registryRecord.adresse || official.adresse;
   const candidate = {
-    ...official, nomCommercial: publicName(official, row, identity.links),
+    ...official, officialAddress: official.adresse, adresse: siteAddress, nomCommercial: publicName(official, row, identity.links),
+    nomUsuelDistinct: official.nomUsuelDistinct || (identity.links ?? []).some(link => link.verifiedOfficial && link.siret === official.siret),
     latitude: position.latitude, longitude: position.longitude,
     identityStatus: decision.status, position,
     identityProof: decision.certificates?.find(item => item.siret === official.siret)?.explanations ?? [],
     identityLinks: (identity.links ?? []).filter(link => link.siret === official.siret),
+    ...(() => { const contact = [...(identity.links ?? [])].sort((a,b) => Number(Boolean(b.siteRecord))-Number(Boolean(a.siteRecord))).find(link => link.siret === official.siret && link.verifiedOfficial && (link.siteRecord?.contacts || link.registryRecord?.contacts));
+      const c = contact?.siteRecord?.contacts ?? contact?.registryRecord?.contacts;
+      return c ? { telephone: c.phones?.[0] || "", courriel: c.emails?.[0] || "", siteWeb: c.websites?.[0] || "" } : {}; })(),
   };
   return { decision: { ...decision, candidate }, candidate, alternatives: [], diagnostics: identity.diagnostics ?? [], trace: identity.trace ?? [] };
 }

@@ -1,3 +1,4 @@
+import { namedSiteIdentityLinks } from "./named-site-directory.js";
 import { fetchOfficialRequest } from "./enterprise-client.js";
 import { IDENTITY_BUDGET, resolveStructureIdentity } from "./identity-orchestrator.js";
 import { IDENTITY_STATES, decideIdentity, decisionCandidates } from "./identity-resolution.js";
@@ -270,6 +271,8 @@ export async function resolveIdentityForEnrichment(options = {}) {
   const fresh = new Map();
   const diagnostics = [];
   let registrySettled = typeof findRegistrySites !== "function";
+  let baseSettled = false;
+  let publicSitesSettled = typeof findPublicSites !== "function";
   const sectorFirst = /\b(ecole|college|lycee|ehpad|residence|ssiad)\b/.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
   let releaseRegistry;
   const registryReady = new Promise(resolve => { releaseRegistry = resolve; });
@@ -282,6 +285,7 @@ export async function resolveIdentityForEnrichment(options = {}) {
     const all = [...results.values()];
     const candidates = all.flatMap(result => result.candidates ?? []);
     const links = all.flatMap(result => result.links ?? []);
+    links.push(...namedSiteIdentityLinks(all.flatMap(result => result.namedSiteRecords ?? []), candidates, row, links));
     const coverage = all.flatMap(result => result.coverage ?? []);
     const location = all.find(result => result.selectedGeocode)?.selectedGeocode ?? null;
     let decision = decideIdentity({ row, candidates, links, coverage, location });
@@ -302,9 +306,14 @@ export async function resolveIdentityForEnrichment(options = {}) {
         && (item.names.exactDistinctiveAlias || item.names.legalExact));
       if (!contradiction) decision = publicSites.length === 1 ? {
         ...decision, status: IDENTITY_STATES.MATCH_VERIFIED, candidate: publicSites[0], alternatives: [],
-        reason: "Site public confirmé par son nom, son adresse et sa fiche cartographique officielle ; SIRET propre au site non établi.",
+        reason: "Lieu confirmé par son nom et son adresse publiés ; SIRET propre au site non établi.",
       } : { ...decision, status: IDENTITY_STATES.AMBIGUOUS, candidate: null, alternatives: publicSites,
         reason: "Plusieurs sites publics officiels concordent ; aucun point n’est choisi par proximité." };
+    }
+    const suggestions = all.flatMap(result => result.siteSuggestions ?? []);
+    if (!decision.candidate && ![IDENTITY_STATES.AMBIGUOUS, IDENTITY_STATES.MATCH_VERIFIED].includes(decision.status) && suggestions.length === 1) {
+      decision = {...decision, status: IDENTITY_STATES.MATCH_PROBABLE, candidate: suggestions[0], alternatives: [],
+        reason: "Ce lieu porte un nom concordant mais son adresse diffère. Confirmez l’adresse avant de poursuivre."};
     }
     return {
       decision, candidates, links, coverage,
@@ -344,7 +353,8 @@ export async function resolveIdentityForEnrichment(options = {}) {
         resolveFallback: args => fallback({ ...args, onEvent: event, onProgress: result => update("base", result),
           deadlineMs: Math.max(1, IDENTITY_BUDGET.deadlineMs - (Date.now() - started) - 300) }),
         });
-      })().then(result => { update("base", result); return "base"; }).catch(error => {
+      })().then(result => { baseSettled = true; update("base", result); return "base"; }).catch(error => {
+        baseSettled = true;
         if (!sourceSignal.aborted) diagnostics.push(`Résolution Annuaire : ${error.message}`);
         return "base";
       });
@@ -401,14 +411,29 @@ export async function resolveIdentityForEnrichment(options = {}) {
         if (typeof findPublicSites !== "function") return;
         try {
           const result = await findPublicSites({ row, signal: sourceSignal, onEvent: event });
-          update("public-sites", { publicSites: result.candidates ?? [] });
+          const records = result.records ?? [];
+          const candidates = [];
+          // An explicit number published by the site's operator is revalidated;
+          // the number typed in Grist is not a veto or a source of identity.
+          for (const siret of [...new Set(records.filter(record => record.siret && (result.candidates ?? []).some(c => c.siteEvidence?.id === record.id)).map(record => record.siret))].slice(0, 2)) {
+            try {
+              const request = buildOfficialIdentifierSearchRequest(siret);
+              const response = await fetchValidated(request, {signal: sourceSignal, cacheTtlMs: 0});
+              const exact = exactCandidate(response, siret);
+              if (exact) candidates.push(exact);
+            } catch (error) { if (!sourceSignal.aborted) diagnostics.push(`Vérification du lieu publié : ${error.message}`); }
+          }
+          update("public-sites", { candidates, publicSites: result.candidates ?? [], namedSiteRecords: records, siteSuggestions: result.suggestions ?? [] });
         } catch (error) { if (!sourceSignal.aborted) diagnostics.push(`Annuaire public : ${error.message}`); }
-      })().then(() => "public-sites");
+      })().then(() => { publicSitesSettled = true; return "public-sites"; });
       const pending = new Map([["base", base], ["registry", registry], ["public-sites", publicSites]]);
       while (pending.size) {
         const name = await Promise.race(pending.values()); pending.delete(name);
         const result = combine();
-        if (result.decision.status === IDENTITY_STATES.MATCH_VERIFIED && (registrySettled
+        if (result.decision.status === IDENTITY_STATES.MATCH_VERIFIED
+          && publicSitesSettled
+          && !(result.decision.candidate?.identityScope === "PUBLIC_SITE" && row.SirenSiret && !baseSettled)
+          && (registrySettled
           || (result.decision.candidate?.identityScope !== "PUBLIC_SITE"
           && !/\b(ecole|college|lycee|ehpad|residence|ssiad)\b/.test(String(row.NomCommercial).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase())))) return result;
       }

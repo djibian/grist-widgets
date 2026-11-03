@@ -255,7 +255,7 @@ export function addressEvidence(targetAddress, candidateAddress) {
   const postal = target.codePostal && candidate.codePostal
     ? target.codePostal === candidate.codePostal ? "same" : "conflict"
     : "unknown";
-  const commune = target.commune && candidate.commune
+  let commune = target.commune && candidate.commune
     ? target.commune === candidate.commune ? "same" : "conflict"
     : "unknown";
   const streetSimilarity = setSimilarity(target.streetTokens, candidate.streetTokens);
@@ -264,6 +264,12 @@ export function addressEvidence(targetAddress, candidateAddress) {
     ? target.number === candidate.number ? "same" : "conflict"
     : "unknown";
   const repetition = repetitionRelation(target.repetition, candidate.repetition);
+  if (commune === "conflict" && postal === "same" && street === "same" && number === "same") {
+    const shorter = target.commune.length < candidate.commune.length ? target.commune : candidate.commune;
+    const longer = shorter === target.commune ? candidate.commune : target.commune;
+    if (! ["saint", "sainte"].includes(shorter) && longer.startsWith(shorter + " ")) commune = "same";
+  }
+
 
   const conflict = postal === "conflict" || commune === "conflict" || street === "conflict" || number === "conflict" || repetition === "conflict";
   const compatible = !conflict
@@ -347,10 +353,8 @@ export function registryPublicNameMatch(target, published, kind, categoryCode = 
 }
 
 export function registrySiteMatches(row, record) {
-  const names = targetNameVariants(row, { includeCategoryFallback: false });
-  if (!names.some(name => (record.publicNames ?? [record.name]).some(published => registryPublicNameMatch(name, published, record.kind, record.categoryCode, record.siteType)))) return false;
-  const address = addressEvidence(row.Adresse, record.adresse);
-  return address.compatible && address.commune === "same" && address.postal !== "conflict";
+  const context = siteContextEvidence(row, record);
+  return context.matched;
 }
 
 export function registryLinkValid(link, candidate, row) {
@@ -410,7 +414,9 @@ function linkEvidenceFor(candidate, row, links) {
     const rowCoords = targetCoordinates(row, null);
     const linkCoords = usableCoordinates(link?.latitude, link?.longitude);
     const distance = distanceMeters(rowCoords, linkCoords);
-    const nameCompatible = names.exactDistinctiveAlias || names.strongDistinctiveAlias;
+    const nameCompatible = names.exactDistinctiveAlias || names.strongDistinctiveAlias
+      || (link.source === "named-site-directory" && siteContextEvidence(row, link.siteRecord).matched)
+      || (link.source === "published-identity" && siteContextEvidence(row, {name: link.publicNames?.[0], publicNames: link.publicNames, adresse: link.adresse, commune: link.city}).matched);
     const siteCompatible = address.compatible && !address.conflict;
     if (nameCompatible && siteCompatible) {
       return { verified: true, link, nameCompatible, siteCompatible, distance };
@@ -647,4 +653,63 @@ export function decisionCandidates(decision) {
 export function decisionEvidence(decision, candidate) {
   const siret = normalizeIdentifier(candidate?.siret);
   return decision?.certificates?.find(item => item.siret === siret)?.explanations ?? [];
+}
+
+
+export function phoneKey(value) {
+  const digits = String(value ?? '').replace(/\D/g, '').replace(/^0033/, '0').replace(/^33(?=\d{9}$)/, '0');
+  return /^0[1-9]\d{8}$/.test(digits) ? digits : '';
+}
+export const emailKey = value => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(String(value ?? '').trim()) ? String(value).trim().toLowerCase() : '';
+export function webKey(value) {
+  try { const u = new URL(value); return /^https?:$/.test(u.protocol) ? u.hostname.toLowerCase().replace(/^www\./, '') + u.pathname.replace(/\/$/, '') : ''; } catch { return ''; }
+}
+const contextNoise = new Set(['ecole','groupe','scolaire','primaire','maternelle','elementaire','publique','public','privee','prive','ehpad','residence','association','creche','de','du','des','la','le','les','l','d','et','en','a','saint','sainte','periscolaire','saad','saa','g2l']);
+function contextNearWord(a, b) {
+  if (a === b) return true;
+  if (Math.min(a.length,b.length)<4 || Math.abs(a.length-b.length)>1) return false;
+  let i=0,j=0,errors=0;
+  while(i<a.length && j<b.length){if(a[i]===b[j]){i++;j++;continue;}if(++errors>1)return false;if(a.length>=b.length)i++;if(b.length>=a.length)j++;}
+  return errors+(i<a.length||j<b.length?1:0)<=1;
+}
+export function contextualNameMatch(row, record) {
+  const name=String(row.NomCommercial??'');
+  const requested=comparisonTokens(name).find(t=>['ecole','college','lycee','ehpad','ssiad','usld'].includes(t));
+  const actual=comparisonTokens(record.name).find(t=>['ecole','college','lycee','ehpad','ssiad','usld'].includes(t));
+  if(requested&&actual&&requested!==actual)return false;
+  if (targetNameVariants(row,{includeCategoryFallback:false}).some(target => (record.publicNames??[record.name]).some(n=>registryPublicNameMatch(target,n,record.kind??'directory',record.categoryCode,record.siteType)))) return true;
+  const place=new Set(comparisonTokens(record.commune));
+  const tokens=v=>comparisonTokens(v).filter(t=>!contextNoise.has(t)&&!place.has(t)&&!/^\d+$/.test(t));
+  const a=tokens(name);
+  // Typo tolerance never supplies identity alone: the caller must also bind
+  // the full site address or an independently published contact/identifier.
+  return (record.publicNames??[record.name]).some(alias => {
+    const b=tokens(alias), remaining=[...b]; let edits=0;
+    if(a.length<2 || a.length>b.length)return false;
+    for(const token of a){
+      let index=remaining.indexOf(token);
+      if(index<0){index=remaining.findIndex(other=>contextNearWord(token,other));if(index<0||++edits>1)return false;}
+      remaining.splice(index,1);
+    }
+    return true;
+  });
+}
+export function siteContextEvidence(row, record) {
+  const address=addressEvidence(row.Adresse,record.adresse);
+  const contact=record.contacts??{};
+  const phone=phoneKey(row.Telephone);
+  const email=emailKey(row.Courriel);
+  const web=webKey(row.SiteWeb);
+  const uai=String(row.Courriel??'').match(/\b(\d{7}[a-z])@ac-[a-z-]+\.fr\b/i)?.[1]?.toUpperCase();
+  const anchors=[phone&&(contact.phones??[]).map(phoneKey).includes(phone)?'phone':null,
+    email&&(contact.emails??[]).map(emailKey).includes(email)?'email':null,
+    web&&(contact.websites??[]).map(webKey).includes(web)?'website':null,
+    uai&&uai===record.recordId?'uai-email':null].filter(Boolean);
+  const name=contextualNameMatch(row,record);
+  const exactStreet=address.street==='same'&&address.number==='same'&&address.repetition!=='conflict'
+    &&(!address.target.repetition||address.candidate.repetition);
+  const location=address.commune==='same'||address.postal==='same';
+  const suffixUnresolved=Boolean(address.target.number&&address.candidate.number&&Boolean(address.target.repetition)!==Boolean(address.candidate.repetition));
+  return {name,address,anchors,matched:name&&!address.conflict&&!suffixUnresolved&&(location||exactStreet||anchors.length>0),
+    conflict:name&&address.conflict&&anchors.length>0};
 }

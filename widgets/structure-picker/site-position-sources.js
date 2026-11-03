@@ -1,3 +1,4 @@
+import { findNamedSitePositions } from "./named-site-directory.js";
 import { loadContactIndexManifest, loadContactIndexShard, resolveContactIndexShard, CONTACT_INDEX_MANIFEST_URL } from "./contact-indexes.js";
 import { extractLocationFromAddress, normalizeIdentifier } from "./search.js";
 import { findIndexedFinessPositions, osmSitePositionFromElement, verifiedGeographicFiness } from "./osm-site-positions.js";
@@ -34,6 +35,10 @@ export function warmSitePositionManifest({ manifestUrl = CONTACT_INDEX_MANIFEST_
 export async function findIndexedSitePositions({ candidate, links = [], identityStatus, signal, fetchImpl = globalThis.fetch, manifestUrl = CONTACT_INDEX_MANIFEST_URL, partial = { observations: [], coverage: [] } } = {}) {
   const postcode = candidate.codePostal || extractLocationFromAddress(candidate.adresse).codePostal;
   const { observations, coverage } = partial;
+  const namedSites = findNamedSitePositions({candidate,links,identityStatus,signal,fetchImpl}).then(result => {
+    if (signal?.aborted) return;
+    observations.push(...result.observations); coverage.push(...result.coverage);
+  }).catch(error => { if (!signal?.aborted) coverage.push({source:"named-site-directory",status:"error",message:error.message}); });
   const ignSites = findIndexedIgnSites({ candidate, links, identityStatus, signal, fetchImpl }).then(result => {
     if (signal?.aborted) return;
     observations.push(...result.observations); coverage.push(...result.coverage);
@@ -96,7 +101,7 @@ export async function findIndexedSitePositions({ candidate, links = [], identity
       }
     }));
   })();
-  await Promise.all([ignSites, educationPositions, finessPositions, finessSiteGeometries, buildingPositions, postcodePositions]);
+  await Promise.all([namedSites, ignSites, educationPositions, finessPositions, finessSiteGeometries, buildingPositions, postcodePositions]);
   return { observations, coverage };
 }
 

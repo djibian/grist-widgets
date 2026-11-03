@@ -1,5 +1,6 @@
+import { buildLocator } from "./generate-site-locator.mjs";
 import { readFile, readdir, mkdir, writeFile, rm } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { normalizeRegistryRecords, SITE_REGISTRY_BUDGET } from "../widgets/structure-picker/official-site-registry.js";
 
@@ -54,7 +55,7 @@ async function main() {
   if (!Array.isArray(education) || education.length < 100) throw new Error("Incomplete regional education export");
   // Retain original identifiers/name/address/type/precision, without contacts or
   // unrelated attributes. The transform has no school-name or SIRET exceptions.
-  const keys = ["identifiant_de_l_etablissement", "nom_etablissement", "type_etablissement", "statut_public_prive", "adresse_1", "adresse_2", "code_postal", "code_commune", "nom_commune", "siren_siret", "etat", "latitude", "longitude", "precision_localisation", "date_maj_ligne", "code_nature", "libelle_nature"];
+  const keys = ["identifiant_de_l_etablissement", "nom_etablissement", "type_etablissement", "statut_public_prive", "adresse_1", "adresse_2", "code_postal", "code_commune", "nom_commune", "siren_siret", "etat", "latitude", "longitude", "precision_localisation", "date_maj_ligne", "code_nature", "libelle_nature", "telephone", "mail", "web"];
   const schoolRecords = education.map(record => Object.fromEntries(keys.map(key => [key, record[key] ?? null])));
   const finess = []; let finessSource;
   for (const name of (await readdir(new URL("identity-links/finess/", root))).filter(name => name.endsWith(".json"))) {
@@ -69,6 +70,7 @@ async function main() {
   if (encoded.some(([name, text]) => Buffer.byteLength(text) > (name === "manifest.json" ? 256 * 1024 : SITE_REGISTRY_BUDGET.maxShardBytes))) throw new Error("Registry shard exceeds browser budget");
   for (const name of await readdir(output)) if (name.endsWith(".json") && !files.has(name)) await rm(path.join(output, name));
   for (const [name, text] of encoded) await writeFile(path.join(output, name), text);
+  await buildLocator(pathToFileURL(path.resolve(output) + path.sep));
   console.log(JSON.stringify({ education: schoolRecords.length, finess: finess.length, communes: files.get("manifest.json").communes.length, files: files.size }));
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

@@ -1,6 +1,7 @@
+import { validateNamedSite, namedSiteCandidate } from "./named-site-directory.js";
 import { publicSiteWriteProofValid } from "./public-sites.js";
 import { extractLocationFromAddress, identifierParts, normalize } from "./search.js";
-import { IDENTITY_STATES, usableCoordinates } from "./identity-resolution.js";
+import { IDENTITY_STATES, usableCoordinates, parseSiteAddress } from "./identity-resolution.js";
 import { POSITION_STATES } from "./establishment-position.js";
 
 const FIELD_LABELS = {
@@ -82,10 +83,19 @@ export function buildEnrichmentProposals(row, enterpriseCandidate = null, { iden
   if ([IDENTITY_STATES.INCOMPLETE, IDENTITY_STATES.NO_MATCH, IDENTITY_STATES.AMBIGUOUS].includes(identityStatus)) return [];
   if (enterpriseCandidate?.identityScope === "PUBLIC_SITE") {
     const point = enterpriseCandidate.position;
-    if (identityStatus !== IDENTITY_STATES.MATCH_VERIFIED || !publicSiteWriteProofValid(point)
-      || (numericEqual(row.Latitude, point.latitude) && numericEqual(row.Longitude, point.longitude))) return [];
+    if (![IDENTITY_STATES.MATCH_VERIFIED, IDENTITY_STATES.MATCH_PROBABLE].includes(identityStatus)) return [];
+    const siteProposals = [];
+    const record = enterpriseCandidate.siteEvidence;
+    if (validateNamedSite(record) && (namedSiteCandidate(record, row) || enterpriseCandidate.addressCorrectionSuggestion)) {
+      for (const [field, value] of [["NomCommercial", enterpriseCandidate.nomCommercial], ["Adresse", enterpriseCandidate.adresse],
+        ["Telephone", enterpriseCandidate.telephone], ["Courriel", enterpriseCandidate.courriel], ["SiteWeb", enterpriseCandidate.siteWeb]]) {
+        const item = proposal(field, row[field], value, record.publisherLabel, {selectedByDefault: identityStatus === IDENTITY_STATES.MATCH_VERIFIED && !hasValue(row[field])});
+        if (item) siteProposals.push(item);
+      }
+    }
+    if (!publicSiteWriteProofValid(point) || (numericEqual(row.Latitude, point.latitude) && numericEqual(row.Longitude, point.longitude))) return siteProposals;
     const current = usableCoordinates(row.Latitude, row.Longitude);
-    return [{ field: "Coordinates", fields: ["Latitude", "Longitude"], label: FIELD_LABELS.Coordinates,
+    return [...siteProposals, { field: "Coordinates", fields: ["Latitude", "Longitude"], label: FIELD_LABELS.Coordinates,
       current: current ? `${row.Latitude}, ${row.Longitude}` : "—", proposed: `${point.latitude}, ${point.longitude}`,
       source: `${point.source.label} — point du site public ; SIRET propre non établi`,
       requiresSiteId: point.siteId, currentRegistration: String(row.SirenSiret ?? "").trim(), publicSitePosition: point,
@@ -113,10 +123,17 @@ export function buildEnrichmentProposals(row, enterpriseCandidate = null, { iden
   }
 
   const addressSource = enterpriseCandidate;
-  if (addressSource) {
+  if (addressSource && !(parseSiteAddress(row.Adresse).number && !parseSiteAddress(addressSource.adresse).number)
+    && !(parseSiteAddress(row.Adresse).repetition && !parseSiteAddress(addressSource.adresse).repetition)) {
     add(proposal("Adresse", row.Adresse, addressSource.adresse, "Annuaire des Entreprises", {
       selectedByDefault: !hasValue(row.Adresse),
     }));
+  }
+
+  if (identityVerified) {
+    for (const [field, value] of [["Telephone", enterpriseCandidate?.telephone], ["Courriel", enterpriseCandidate?.courriel], ["SiteWeb", enterpriseCandidate?.siteWeb]]) {
+      add(proposal(field, row[field], value, "Contact publié pour ce lieu"));
+    }
   }
 
   const position = enterpriseCandidate?.position;

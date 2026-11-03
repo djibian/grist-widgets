@@ -1,3 +1,4 @@
+import { establishmentConfidence } from "./confidence.js";
 import { applyEnrichmentChanges, fetchFullSnapshot, findRowById, watchSelection, watchTable } from "./grist.js";
 import { geocodeAddress } from "./geocode.js";
 import { buildEnrichmentProposals, selectedChanges } from "./enrichment.js";
@@ -108,30 +109,31 @@ function candidateCard(candidate) {
   name.textContent = candidate.nomCommercial || candidate.raisonSociale || "Établissement";
   const legal = document.createElement("div");
   legal.className = "choice-detail";
-  const finessIds = [...new Set((candidate.identityLinks ?? []).filter(link => link.source === "finess" && link.verifiedOfficial).map(link => link.sourceRecordId))];
-  const uaiIds = candidate.uaiIds ?? [];
-  legal.textContent = candidate.identityScope === "PUBLIC_SITE" ? "Site public confirmé — SIRET propre au site non établi" : `${candidate.raisonSociale || "Identité juridique à revalider"} — SIRET ${candidate.siret}${finessIds.length ? ` — FINESS ${finessIds.join(", ")}` : ""}${uaiIds.length ? ` — UAI ${uaiIds.join(", ")}` : ""}`;
+  legal.textContent = candidate.identityScope === "PUBLIC_SITE" ? "Lieu identifié — numéro d’immatriculation propre non établi"
+    : [candidate.raisonSociale, candidate.siret ? `SIRET ${candidate.siret}` : ""].filter(Boolean).join(" — ");
   const address = document.createElement("div");
   address.className = "choice-detail";
   address.textContent = candidate.adresse;
-  content.append(name, legal, address);
+  const confidence = establishmentConfidence(state.decision, candidate);
+  const badge = document.createElement("div");
+  badge.className = `confidence-badge confidence-${confidence.tone}`;
+  badge.textContent = `Confiance ${confidence.score} / 100 — ${confidence.label}`;
+  badge.title = "Indice fondé sur les vérifications disponibles ; ce n’est pas une probabilité statistique.";
+  content.append(name, badge, legal, address);
 
   const position = document.createElement("div");
   position.className = "choice-detail";
   const point = candidate.position;
   const located = [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(point?.status);
-  const positionEvidence = point?.source?.geometry === "publisher-site-point" ? "point du lieu publié par la collectivité — précision métrique non documentée"
-    : point?.source?.geometry === "site-interior-point" ? "point intérieur de l’emprise du site — identifiant et adresse officiels concordants"
-    : point?.source?.geometry === "building-point" ? "point de bâtiment — adresse officielle, BDNB et emprise RNB"
-    : point?.status === POSITION_STATES.SITE_CONFIRMED ? "identifiants d’établissement explicites" : "nom public attesté + adresse de site concordante";
   position.textContent = located
-    ? `${point.latitude}, ${point.longitude} — Position ${point.status === POSITION_STATES.SITE_CONFIRMED ? "confirmée" : "corroborée"} : ${point.source.label}, ${positionEvidence}`
-    : `Position : ${point?.reason || "position précise non démontrée"}`;
+    ? `Latitude ${point.latitude} / Longitude ${point.longitude} — Position ${point.status === POSITION_STATES.SITE_CONFIRMED ? "confirmée" : "corroborée"}`
+    : point?.status === POSITION_STATES.CONFLICT ? "Position à vérifier : les informations disponibles se contredisent."
+    : "Position précise à vérifier ; aucune coordonnée proposée.";
   content.appendChild(position);
 
   const details = document.createElement("details");
   const summary = document.createElement("summary");
-  summary.textContent = "Sources et preuves";
+  summary.textContent = "Détails de vérification";
   details.appendChild(summary);
   const identity = document.createElement("div");
   identity.className = "choice-detail";
@@ -192,7 +194,10 @@ function renderEstablishment() {
   title.textContent = "Établissement proposé";
   const summary = document.createElement("div");
   summary.className = "help";
-  summary.textContent = `${decisionLabel(decision.status)} — ${decision.reason}`;
+  summary.textContent = decisionLabel(decision.status) + (decision.status === IDENTITY_STATES.AMBIGUOUS
+    ? " — Précisez l’adresse ou le contact pour départager les lieux."
+    : state.candidate?.addressCorrectionSuggestion ? " — Adresse différente : vérifiez qu’il s’agit bien de votre structure avant d’accepter la correction."
+    : decision.status === IDENTITY_STATES.INCOMPLETE ? " — Certaines vérifications n’ont pas abouti. Les informations reçues restent disponibles." : "");
   ui.candidate.append(title, summary);
   if (state.candidate) ui.candidate.appendChild(candidateCard(state.candidate));
   else for (const candidate of (decision.alternatives ?? []).slice(0, 2)) ui.candidate.appendChild(candidateCard(candidate));
@@ -204,7 +209,7 @@ function renderEstablishment() {
   }
   const details = document.createElement("details");
   const label = document.createElement("summary");
-  label.textContent = "Diagnostic des sources";
+  label.textContent = "Diagnostic technique";
   details.appendChild(label);
   for (const message of state.diagnostics) {
     const line = document.createElement("div"); line.className = "choice-detail"; line.textContent = message; details.appendChild(line);
@@ -288,7 +293,7 @@ function renderProposalPanel() {
     proposed.textContent = `Proposé : ${item.proposed}`;
     const source = document.createElement("div");
     source.className = "proposal-source";
-    source.textContent = item.source;
+    source.textContent = item.field === "Coordinates" ? "Position du lieu vérifiée" : "Valeur proposée pour cette structure";
     values.append(current, proposed, source);
     rowNode.append(checkbox, label, values);
     list.appendChild(rowNode);

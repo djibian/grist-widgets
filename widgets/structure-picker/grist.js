@@ -1,3 +1,4 @@
+import { namedSiteCandidate } from "./named-site-directory.js";
 import { publicSiteWriteProofValid, publicSiteCandidate } from "./public-sites.js";
 import { recordsFromTable } from "../../shared/grist/records.js";
 import { isFormulaColumn } from "../../shared/grist/metadata.js";
@@ -20,6 +21,15 @@ export const COLUMN_DEFS = [
   { name: "Courriel", title: "Courriel", type: "Text", optional: true },
   { name: "SiteWeb", title: "Site web", type: "Text", optional: true },
 ];
+
+const COLUMN_ALIASES = {
+  NomCommercial: ["Nom_usuel", "Nom_commercial"],
+  SirenSiret: ["Numero_d_immatriculation", "SIRET", "Siren_Siret"],
+  RaisonSociale: ["Raison_sociale"],
+  Courriel: ["Email", "E_mail"],
+  Telephone: ["Téléphone"],
+  SiteWeb: ["Site_web", "Site_internet"],
+};
 
 const REQUIRED_COLUMNS = ["NomCommercial", "Adresse", "SirenSiret"];
 const WRITE_FIELDS = new Set(COLUMN_DEFS.map(definition => definition.name));
@@ -47,7 +57,10 @@ function resolveMappings(mappings, availableColumns) {
     const mapped = mappings?.[logicalName];
     if (mapped && available.has(mapped)) resolved[logicalName] = mapped;
     else if (available.has(logicalName)) resolved[logicalName] = logicalName;
-    else resolved[logicalName] = null;
+    else {
+      const aliases = (COLUMN_ALIASES[logicalName] ?? []).filter(name => available.has(name));
+      resolved[logicalName] = aliases.length === 1 ? aliases[0] : null;
+    }
   }
   return resolved;
 }
@@ -267,13 +280,15 @@ export async function applyEnrichmentChanges(rowId, changes, mappings, { positio
     }
     const finalSiret = identifierParts(before.writableMappings.SirenSiret && changes.SirenSiret !== undefined ? changes.SirenSiret : currentRow.SirenSiret).siret;
     if (publicSitePosition) {
-      const proof = publicSitePosition.proof?.find(item => item.kind === "EXPLICIT_PUBLISHER_SITE_POINT");
+      const proof = publicSitePosition.proof?.find(item => ["EXPLICIT_PUBLISHER_SITE_POINT", "REVIEWED_NAMED_SITE"].includes(item.kind));
       let stored; try { stored = JSON.parse(changes.PositionProof); } catch { /* fail closed below */ }
+      const named = proof?.kind === "REVIEWED_NAMED_SITE" ? namedSiteCandidate(proof.record, currentRow) : null;
+      const namedValues = named ? {NomCommercial: named.nomCommercial, Adresse: named.adresse, Telephone: named.telephone, Courriel: named.courriel, SiteWeb: named.siteWeb} : {};
       if (!expectedRow || !publicSiteWriteProofValid(publicSitePosition) || !publicSiteWriteProofValid(stored)
         || stored.siteId !== publicSitePosition.siteId || String(currentRow.SirenSiret ?? "").trim()
-        || !publicSiteCandidate(proof?.record, proof?.publisher, currentRow)
+        || !(named || publicSiteCandidate(proof?.record, proof?.publisher, currentRow))
         || changes.Latitude !== publicSitePosition.latitude || changes.Longitude !== publicSitePosition.longitude
-        || Object.keys(changes).some(key => !["Latitude", "Longitude", "PositionSource", "PositionProof"].includes(key))) {
+        || Object.keys(changes).some(key => !["Latitude", "Longitude", "PositionSource", "PositionProof"].includes(key) && !(Object.prototype.hasOwnProperty.call(namedValues, key) && changes[key] === namedValues[key]))) {
         throw new Error("La position du site public exige sa preuve, la fiche analysée inchangée et aucune attribution d’un identifiant juridique.");
       }
     } else if (!positionSiret || finalSiret !== positionSiret) throw new Error("La position doit rester rattachée au SIRET du candidat retenu.");

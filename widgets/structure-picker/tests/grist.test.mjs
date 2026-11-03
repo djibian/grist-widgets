@@ -41,3 +41,12 @@ test("adding a raw Annuaire result cannot write its administrative coordinates a
   const snapshot = { writableMappings: { SirenSiret: "Id", Latitude: "Lat", Longitude: "Lon" } };
   assert.deepEqual(fieldsForCandidate({ siret: "12345678900011", latitude: 47, longitude: -1.8 }, snapshot), { Id: "12345678900011" });
 });
+
+test('unmapped optional site URLs use an unambiguous physical column alias', async t => {
+  const {fetchFullSnapshot}=await import('../grist.js');const previous=globalThis.grist;
+  globalThis.grist={selectedTable:{async getTableId(){return'Structures_de_stage';}},docApi:{async fetchTable(table){
+    if(table==='Structures_de_stage')return{id:[1],Nom_usuel:['École'],Adresse:['7 rue'],Numero_d_immatriculation:[''],Site_web:['https://example.org/'],Courriel:['contact@example.org']};
+    if(table==='_grist_Tables')return{id:[1],tableId:['Structures_de_stage']};return{};
+  }}};t.after(()=>{globalThis.grist=previous;});
+  const result=await fetchFullSnapshot({});assert.deepEqual(result.missing,[]);assert.equal(result.rows[0].SiteWeb,'https://example.org/');assert.equal(result.resolvedMappings.SiteWeb,'Site_web');
+});

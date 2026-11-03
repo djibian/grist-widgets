@@ -1,3 +1,4 @@
+import { siteContextEvidence } from "./site-context.js";
 import { addressEvidence, normalizeIdentity, targetNameVariants } from "./identity-resolution.js";
 import { normalizeIdentifier } from "./search.js";
 
@@ -43,7 +44,7 @@ export function matchPublishedIdentityLinks(records, row) {
   const matches = [];
   for (const raw of Array.isArray(records) ? records : []) {
     const link = normalizeRecord(raw);
-    if (!link || !nameMatches(row, link)) continue;
+    if (!link || !(nameMatches(row, link) || siteContextEvidence(row, {name: link.publicNames[0], publicNames: link.publicNames, adresse: link.adresse, commune: link.city}).matched)) continue;
     const address = addressEvidence(row?.Adresse, link.adresse);
     if (!address.compatible || address.conflict) continue;
     matches.push(link);
