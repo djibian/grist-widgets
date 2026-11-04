@@ -54,23 +54,13 @@ npm test
 - point de géocodage conservé comme indice, jamais promu automatiquement en position du site ;
 - le code postal et la commune sont dérivés en mémoire de l’adresse afin d’améliorer la recherche Annuaire.
 
-### Contacts publics — expérimental
+### Contacts publics — moteur actuel et archive
 
-La zone **Contacts publics** recherche facultativement Téléphone, Courriel et Site web à partir de cinq sources :
+Les étapes **01 · Examiner** et **02 · Vérifier** du mode **Compléter la sélection** proposent déjà le téléphone, le courriel et le site web avec les autres corrections de la fiche. Le parcours expérimental **03–04** a été retiré sans modifier le moteur courant.
 
-- **OpenStreetMap / Overpass** — interrogation directe, avec priorité au SIRET exact puis proximité + nom ;
-- **Service-Public.fr (DILA)** — interrogation directe de l’Annuaire de l’administration ;
-- **Wikidata** — interrogation directe par SIREN lorsque possible, sinon par nom ;
-- **All The Places** — index statique publié avec le widget ;
-- **Overture Places** — index statique publié avec le widget.
+Son implémentation, ses cinq sources et ses tests sont conservés dans la branche `archive/structure-picker-contacts-experiment-20261104` (commit `8a3744e8aa553ee6ed97bee5e0a1901f2b0d0db7`). Voir [ARCHIVED-CONTACTS.md](ARCHIVED-CONTACTS.md).
 
-ATP et Overture sont préparés hors navigateur puis découpés par code postal. Une recherche ne charge que les shards nécessaires à la structure sélectionnée.
-
-Les résultats passent tous par le même modèle canonique, la même déduplication et le même classement. Les provenances sont conservées, et les lignées connues entre sources ne sont pas comptées comme des preuves indépendantes.
-
-Cette fonction reste explicitement **expérimentale** tant que la qualité de ses correspondances n’a pas été suffisamment évaluée sur des structures réelles. Elle ne bloque jamais les fonctions stables Annuaire/IGN et n’écrit aucune donnée sans validation explicite.
-
-Voir `CONTACTS-EXPERIMENT.md` pour l’architecture et `CONTACTS-INDEX-PUBLICATION.md` pour la publication des index.
+Les index ATP et Overture et `contact-indexes.js` utilisés par la localisation active sont conservés sans modification. La publication de ces index reste décrite dans [CONTACTS-INDEX-PUBLICATION.md](CONTACTS-INDEX-PUBLICATION.md).
 
 ## Mappings Grist
 
@@ -95,7 +85,7 @@ Ces champs doivent pointer vers des colonnes de données modifiables.
 
 Latitude et Longitude alimentent la carte. Elles sont proposées ensemble uniquement lorsqu’un point de lieu est démontré pour le SIRET retenu, ou pour un site public explicitement attesté sans identité juridique présumée (voir ci-dessous). Mapper aussi Source de la position et Preuves de la position permet de conserver la provenance dans Grist ; elle reste consultable dans le bloc candidat pendant l’analyse.
 
-Téléphone, Courriel et Site web sont utilisés uniquement par la fonction expérimentale **Contacts publics** ; ils ne font pas partie de l’enrichissement stable effectué par **Analyser / compléter**.
+Téléphone, Courriel et Site web sont proposés dans **Analyser / compléter** lorsque l’identité de la structure et les sources consultées apportent des informations suffisamment justifiées.
 
 Il n’existe pas de mapping séparé `Adresse normalisée`, `Code postal` ou `Commune`.
 
@@ -191,7 +181,7 @@ Le nom usuel suit `Nom en casse de phrase — Commune`, avec conservation des ac
 
 L’adresse suit `numéro [bis/ter] type de voie Nom propre, code postal Commune`. Les abréviations courantes sont développées, les particules restent minuscules, les chiffres romains sont préservés. Les mentions BP/CS/CEDEX sont retirées de l’adresse physique ; une zone d’activité redondante est omise lorsqu’un numéro et une voie existent. Un numéro ou suffixe saisi plus précis n’est pas supprimé pour aligner une source incomplète. Les accents déjà corrects sont préservés.
 
-Le SIRET est présenté et écrit sous la forme `123 456 789 00012` ; un SIREN reste `123 456 789`. Les comparaisons d’identité utilisent uniquement les chiffres. Les téléphones français suivent `02.40.00.00.00`, y compris dans le volet contacts et lors de l’ajout d’une fiche.
+Le SIRET est présenté et écrit sous la forme `123 456 789 00012` ; un SIREN reste `123 456 789`. Les comparaisons d’identité utilisent uniquement les chiffres. Les téléphones français suivent `02.40.00.00.00`, notamment lors de l’ajout d’une fiche.
 
 Chaque différence de présentation devient une proposition. Les améliorations confirmées, même sur un champ déjà renseigné, sont cochées par défaut. Les changements d’identité probables restent manuels. Une position actuelle déjà démontrée n’est pas précochée pour être remplacée par une proposition plus faible. Seul le bouton d’application écrit dans Grist, après relecture de la fiche et contrôle des colonnes modifiables.
 
