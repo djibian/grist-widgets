@@ -91,6 +91,13 @@
               "e daniel thebaudeau rue francoise dolto 44680 sainte pazanne localiser sur une carte contact 02 40 02 68 31 contact",
               "el thebaudeau rue francoise dolto 44680 sainte pazanne localiser sur une carte contact 02 40 02 68 31 contacter par mail vis"
             ]
+          },
+          "siret": {
+            "value": "78607269400049",
+            "excerpts": [
+              "{\"results\":[{\"siren\":\"786072694\",\"siren_conserve\":null,\"nom_complet\":\"ASSOCIATION PAZ  A PAS\",\"nom_raison_sociale\":\"ASSOCIATION PAZ  A PAS\",\"sigle\":null,\"nombre_etablissements\":3,\"nombre_etablissements_ouverts\":1,\"siege\":{\"a_opco\":true,\"activite_principale\":\"88.99B\",\"activite_principale_naf25\":\"88.99H\",\"activite_principale_registre_metier\":null,\"annee_tranche_effectif_salarie\":\"2024\",\"adresse\":\"RUE FRANCOISE DOLTO 44680 SAINTE-PAZANNE\",\"caractere_employeur\":\"O\",\"cedex\":null,\"code_pays_etranger\":null,\"code_postal\":\"44680\",\"commune\":\"44186\",\"complement_adresse\":null,\"coordonnees\":\"47.096788254,-1.811723754\",\"date_creation\":\"2006-08-28\",\"date_debut_activite\":\"2008-01-01\",\"date_fermeture\":null,\"date_mise_a_jour\":null,\"date_mise_a_jour_insee\":\"2025-12-05T16:23:56\",\"departement\":\"44\",\"distribution_speciale\":null,\"epci\":\"200067346\",\"est_siege\":true,\"etat_administratif\":\"A\",\"geo_adresse\":null,\"geo_id\":null,\"indice_repetition\":null,\"latitude\":\"47.096788254\",\"libelle_cedex\":null,\"libelle_commune\":\"SAINTE-PAZANNE\",\"libelle_commune_etranger\":null,\"libelle_pays_etranger\":null,\"libelle_voie\":\"FRANCOISE DOLTO\",\"liste_enseignes\":null,\"liste_finess\":null,\"liste_id_bio\":null,\"liste_idcc\":[\"1518\"],\"liste_id_organisme_formation\":null,\"liste_rge\":null,\"liste_uai\":null,\"longitude\":\"-1.811723754\",\"nom_commercial\":null,\"numero_voie\":null,\"dernier_numero_voie\":null,\"region\":\"52\",\"siret\":\"78607269400049\",\"statut_diffusion_etablissement\":\"O\",\"tranche_effectif_salarie\":\"12\",\"type_voie\":\"RUE\"},\"activite_principale\":\"88.99B\",\"activite_principale_naf25\":\"88.99H\",\"categorie_entreprise\":\"PME\",\"caractere_employeur\":null,\"annee_categorie_entreprise\":\"2024\",\"date_creation\":\"1900-01-01\",\"date_fermeture\":null,\"date_mise_a_jour\":\"2026-11-03T08:55:12\",\"date_mise_a_jour_insee\":\"2025-12-06T06:21:14\",\"date_mise_a_jour_rne\":null,\"etat_administratif\":\"A\",\"nature_juridique\":\"9220\",\"section_activite_principale\":\"Q\",\"tranche_effectif_salarie\":\"12\",\"annee_tranche_effectif_salarie\":\"2024\",\"statut_diffusion\":\"O\",\"opposition_diffusion_commerciale\":null,\"matching_etablissements\":[{\"a_opco\":true,\"activite_principale\":\"88.99B\",\"activite_principale_naf25\":\"88.99H\",\"ancien_siege\":false,\"annee_tranche_effectif_salarie\":\"2024\",\"adresse\":\"RUE FRANCOISE DOLTO 44680 SAINTE-PAZANNE\",\"caractere_employeur\":\"O\",\"code_postal\":\"44680\",\"commune\":\"44186\",\"date_creation\":\"2006-08-28\",\"date_debut_activite\":\"2008-01-01\",\"date_fermeture\":null,\"epci\":\"200067346\",\"est_siege\":true,\"etat_administratif\":\"A\",\"geo_id\":null,\"latitude\":\"47.096788254\",\"libelle_commune\":\"SAINTE-PAZANNE\",\"liste_enseignes\":null,\"liste_finess\":null,\"liste_id_bio\":null,\"liste_idcc\":[\"1518\"],\"liste_id_organisme_formation\":null,\"liste_rge\":null,\"liste_uai\":null,\"longitude\":\"-1.811723754\",\"nom_commercial\":null,\"region\":\"52\",\"siret\":\"78607269400049\",\"statut_diffusion_etablissement\":\"O\",\"tranche_effectif_salarie\":\"12\"}]}],\"total_results\":1,\"page\":1,\"per_page\":25,\"total_pages\":1}"
+            ],
+            "sourceUrl": "https://recherche-entreprises.api.gouv.fr/search?q=78607269400049&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
           }
         }
       },
@@ -100,6 +107,14 @@
         "longitude": -1.8101599999999962,
         "nativeUrl": "https://www.openstreetmap.org/directions?engine=graphhopper_car&route=47.096%2C-1.8101599999999962#map=11/47.096/-1.8101599999999962",
         "precision": "Cible d’itinéraire publiée ; précision de site non documentée"
+      },
+      "siret": "78607269400049",
+      "registration": {
+        "url": "https://recherche-entreprises.api.gouv.fr/search?q=78607269400049&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+        "checkedAt": "2026-11-04T12:12:15.595Z",
+        "sha256": "6142be8292d3967fa06b35967fd6e90efbe524be054fae63f1c982fa55bc5501",
+        "legalName": "ASSOCIATION PAZ  A PAS",
+        "adresse": "RUE FRANCOISE DOLTO 44680 SAINTE-PAZANNE"
       }
     },
     {
@@ -194,6 +209,13 @@
             ]
           }
         }
+      },
+      "point": {
+        "kind": "operator-site-point",
+        "latitude": 47.1146032,
+        "longitude": -2.0863187,
+        "nativeHtml": "<section id=\"block_4e00615a09d269dee3e9b415d026a39b\" class=\" section section_quartier-block\" style=\"background-color:#f1f1f1\"          data-res=\"2201\"\n         data-lat=\"47.1146032\"\n         data-lng=\"-2.0863187\"\n         data-zoom=\"15\"\n         data-icon=\"https://www.residences-espaceetvie.fr/wp-content/uploads/2026/09/icon-vie-de-quartier-sable.webp\"\n         data-icon-alt=\"https://www.residences-espaceetvie.fr/wp-content/uploads/2026/09/icon-vie-de-quartier-prune.webp\"\n>",
+        "precision": "Point de la résidence publié par son exploitant ; précision métrique non documentée"
       }
     },
     {
@@ -325,8 +347,33 @@
               "sation Adresse Chemin Saint Joseph Arthon-en-retz 44320 Chaumes-en-Retz Accès : par la rue de Pornic, l’impasse face à la poste Heures d’ouverture Du lundi",
               " Adresse Chemin Saint Joseph Arthon-en-retz 44320 Chaumes-en-Retz Accès : par la rue de Pornic, l’impasse face à la poste Heures d’ouverture Du lundi au vendredi : 9"
             ]
+          },
+          "siret": {
+            "value": "78592725200011",
+            "excerpts": [
+              "<p style=\"text-align: justify;\"><span style=\"color: #e09900; font-size: medium;\"><b>Éditeur du Site : </b></span></p>\n<p style=\"text-align: justify;\"><span style=\"font-size: medium;\">Ehpad St Joseph</span><br /><span style=\"font-size: medium;\"> Numéro de SIRET : 78592725200011</span><br /><span style=\"font-size: medium;\"> Responsable editorial : V. Feriau</span><br /><span style=\"font-size: medium;\"> 4 rue de Pornic &#8211; 44320 Chaumes-en-Retz</span><br /><span style=\"font-size: medium;\"> Téléphone : 02 40 21 30 15 &#8211; Fax : 02 40 64 82 65</span><br /><span style=\"font-size: medium;\"> E-mail : info@ehpad-saint-joseph.net</span><br /><span style=\"font-size: medium;\"> Site Web :<span style=\"color: #0c71c3;\"> <a href=\"http://https//ehpad-saint-joseph.net\" rel=\"nofollow\" style=\"color: #0c71c3;\">https://ehpad-saint-joseph.net</a></span></span></p>\n<p style=\"text-align: justify;\"><span style=\"color: #e09900; font-size: medium;\"><b>"
+            ]
+          },
+          "registeredAddress": {
+            "value": "4 rue de Pornic 44320 Chaumes-en-Retz",
+            "excerpts": [
+              "<p style=\"text-align: justify;\"><span style=\"color: #e09900; font-size: medium;\"><b>Éditeur du Site : </b></span></p>\n<p style=\"text-align: justify;\"><span style=\"font-size: medium;\">Ehpad St Joseph</span><br /><span style=\"font-size: medium;\"> Numéro de SIRET : 78592725200011</span><br /><span style=\"font-size: medium;\"> Responsable editorial : V. Feriau</span><br /><span style=\"font-size: medium;\"> 4 rue de Pornic &#8211; 44320 Chaumes-en-Retz</span><br /><span style=\"font-size: medium;\"> Téléphone : 02 40 21 30 15 &#8211; Fax : 02 40 64 82 65</span><br /><span style=\"font-size: medium;\"> E-mail : info@ehpad-saint-joseph.net</span><br /><span style=\"font-size: medium;\"> Site Web :<span style=\"color: #0c71c3;\"> <a href=\"http://https//ehpad-saint-joseph.net\" rel=\"nofollow\" style=\"color: #0c71c3;\">https://ehpad-saint-joseph.net</a></span></span></p>\n<p style=\"text-align: justify;\"><span style=\"color: #e09900; font-size: medium;\"><b>"
+            ]
           }
         }
+      },
+      "siret": "78592725200011",
+      "registeredAddress": "4 rue de Pornic 44320 Chaumes-en-Retz",
+      "registration": {
+        "url": "https://ehpad-saint-joseph.net/mentions-legales/",
+        "checkedAt": "2026-11-04T13:46:20.878845+00:00",
+        "sha256": "4cadeed9b3298d7602ca8a9c3b1bce4a64e1815e3b9954749aac31cfa5c0c019"
+      },
+      "access": {
+        "street": "Rue de Pornic",
+        "nativeHtml": "<p><a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\"><strong>Adresse</strong></a><br />\n<a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\">Chemin Saint Joseph</a><br />\n<a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\">Arthon-en-retz</a><br />\n<a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\">44320 Chaumes-en-Retz</a><br />\n<strong>Accès</strong> : <a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\">par la rue de Pornic, l’impasse face à la poste</a></p>",
+        "url": "https://ehpad-saint-joseph.net/",
+        "sourceSha256": "e78796b83bd664303f4c04ef848d3cf18660f26f02f8cf2eb3175cb540a1bd19"
       }
     },
     {

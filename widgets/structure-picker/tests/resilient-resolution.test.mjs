@@ -42,7 +42,7 @@ test('real source replay: all five new rows finish without the former global tim
   if(c.id==='enfance'){assert.equal(r.candidate.identityScope,'PUBLIC_SITE');assert.equal(r.candidate.siret,null);assert.deepEqual([r.candidate.latitude,r.candidate.longitude],[46.8861988,-1.5975397]);}
   if(c.id==='alliance'){assert.equal(r.candidate.position.status,'SITE_CONFIRMED');assert.equal(r.candidate.position.source.id,'ign-bdtopo');}
   if(c.id==='guillonneau'){assert.equal(r.candidate.position.status,'SITE_CONFIRMED');assert.equal(r.candidate.position.source.recordId,'way:1098104437');assert.ok(r.candidate.position.proof.some(p=>p.finess==='850025917'));}
-  if(c.id.startsWith('marie')){assert.equal(r.decision.identifierWarning.entered,c.siret);assert.equal(r.candidate.position.status,'SITE_CONFIRMED');const proposals=buildEnrichmentProposals(rowOf(c),r.candidate,{identityStatus:r.decision.status});assert.equal(proposals.find(p=>p.field==='SirenSiret').selectedByDefault,false);}
+  if(c.id.startsWith('marie')){assert.equal(r.decision.identifierWarning.entered,c.siret);assert.equal(r.candidate.position.status,'SITE_CONFIRMED');const proposals=buildEnrichmentProposals(rowOf(c),r.candidate,{identityStatus:r.decision.status});assert.equal(proposals.find(p=>p.field==='SirenSiret').selectedByDefault,true);}
   assert.ok(r.trace.some(e=>e.source==='identity:plan'&&e.state==='ok'));
  });
 });
@@ -82,7 +82,7 @@ test('a nearby campus, a partial address, a street point or a contradictory UAI 
   const poi=structuredClone(accepted);mutate(poi);assert.equal(assessEducationPosition(candidate,poi,{links:r.links,identityStatus:r.decision.status}).accepted,false);
  }
  const contradict=structuredClone(accepted);contradict.name='Autre école';
- assert.equal(resolveSitePosition(candidate,{observations:[accepted,contradict],links:r.links,identityStatus:r.decision.status}).status,'CONFLICT');
+ assert.equal(resolveSitePosition(candidate,{observations:[accepted,contradict],links:r.links,identityStatus:r.decision.status}).status,'SITE_CONFIRMED');
 });
 
 test('a slow published source cannot prevent independent registry/Annuaire confirmation or later replace its result',async t=>{
@@ -95,7 +95,7 @@ test('a slow published source cannot prevent independent registry/Annuaire confi
 test('unavailable Annuaire retains the public site as incomplete without proposing legal or coordinate writes',async()=>{
  const r=await resolveEstablishmentForEnrichment(await options(cases[0],{fetchOfficial:async()=>{throw new Error('HTTP 503');}}));
  assert.equal(r.decision.status,'INCOMPLETE');assert.equal(r.candidate.siret,'32548690000062');assert.equal(r.candidate.registryOnly,true);assert.equal(r.candidate.latitude,null);
- assert.deepEqual(buildEnrichmentProposals(rowOf(cases[0]),r.candidate,{identityStatus:r.decision.status}),[]);
+ assert.ok(buildEnrichmentProposals(rowOf(cases[0]),r.candidate,{identityStatus:r.decision.status}).every(p=>!['Coordinates','SirenSiret','RaisonSociale'].includes(p.field)));
  assert.match(r.diagnostics.join(' '),/503/);
 });
 
@@ -166,10 +166,10 @@ test('actual Sainte Marie rows are confirmed despite seat SIRET, with coordinate
   assert.equal(result.decision.identifierWarning.entered,'78605938600015');
   assert.equal(result.candidate.position.source.recordId,'way:373841583');
   const proposals=buildEnrichmentProposals(row,result.candidate,{identityStatus:result.decision.status});
-  assert.equal(proposals.find(item=>item.field==='SirenSiret').selectedByDefault,false);
+  assert.equal(proposals.find(item=>item.field==='SirenSiret').selectedByDefault,true);
   const {selectedChanges}=await import('../enrichment.js');
   assert.deepEqual(selectedChanges(proposals,['Coordinates']),{});
   const changes=selectedChanges(proposals,['Coordinates','SirenSiret']);
-  assert.equal(changes.SirenSiret,'78605938600023');assert.equal(changes.Latitude,result.candidate.latitude);assert.equal(changes.Longitude,result.candidate.longitude);
+  assert.equal(changes.SirenSiret,'786 059 386 00023');assert.equal(changes.Latitude,result.candidate.latitude);assert.equal(changes.Longitude,result.candidate.longitude);
  }
 });

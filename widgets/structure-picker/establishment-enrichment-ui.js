@@ -1,10 +1,20 @@
+import { presentedCandidate, formatSiret } from "./presentation-conventions.js";
 import { establishmentConfidence } from "./confidence.js";
-import { applyEnrichmentChanges, fetchFullSnapshot, findRowById, watchSelection, watchTable } from "./grist.js";
+import {
+  applyEnrichmentChanges,
+  fetchFullSnapshot,
+  findRowById,
+  watchSelection,
+  watchTable,
+} from "./grist.js";
 import { geocodeAddress } from "./geocode.js";
 import { buildEnrichmentProposals, selectedChanges } from "./enrichment.js";
 import { fetchOfficialRequest } from "./enterprise-client.js";
 import { resolveStructureIdentity } from "./identity-orchestrator.js";
-import { ESTABLISHMENT_BUDGET, resolveEstablishmentForEnrichment } from "./establishment-service.js";
+import {
+  ESTABLISHMENT_BUDGET,
+  resolveEstablishmentForEnrichment,
+} from "./establishment-service.js";
 import { IDENTITY_STATES, decisionEvidence } from "./identity-resolution.js";
 import { findOsmIdentityPois } from "./osm-identity.js";
 import { POSITION_STATES } from "./establishment-position.js";
@@ -51,14 +61,21 @@ function emptyMessage(message) {
 }
 
 function selectedRow() {
-  if (!state.snapshot || !state.selectedRowId || state.selectedRowId === "new") return null;
+  if (!state.snapshot || !state.selectedRowId || state.selectedRowId === "new")
+    return null;
   return findRowById(state.snapshot, state.selectedRowId);
 }
 
 function canAnalyze() {
   const row = selectedRow();
-  return row && !(state.snapshot?.missing?.length || state.snapshot?.nonWritableRequired?.length)
-    && (row.NomCommercial || row.SirenSiret || row.Adresse);
+  return (
+    row &&
+    !(
+      state.snapshot?.missing?.length ||
+      state.snapshot?.nonWritableRequired?.length
+    ) &&
+    (row.NomCommercial || row.SirenSiret || row.Adresse)
+  );
 }
 
 function resetAnalysis() {
@@ -84,7 +101,8 @@ async function refreshSnapshot(mappings = state.mappings) {
     const snapshot = await fetchFullSnapshot(state.mappings);
     if (generation === state.snapshotGeneration) {
       state.snapshot = snapshot;
-      if (ui.enrichButton) ui.enrichButton.disabled = Boolean(state.controller) || !canAnalyze();
+      if (ui.enrichButton)
+        ui.enrichButton.disabled = Boolean(state.controller) || !canAnalyze();
       if (canAnalyze()) warmSitePositionManifest().catch(() => {});
     }
   } catch (error) {
@@ -101,34 +119,50 @@ function decisionLabel(status) {
 }
 
 function candidateCard(candidate) {
+  candidate = presentedCandidate(candidate, state.analyzedRow);
   const card = document.createElement("div");
   card.className = "choice-card establishment-card";
   const content = document.createElement("div");
   const name = document.createElement("div");
   name.className = "choice-name";
-  name.textContent = candidate.nomCommercial || candidate.raisonSociale || "Établissement";
+  name.textContent =
+    candidate.nomCommercial || candidate.raisonSociale || "Établissement";
   const legal = document.createElement("div");
   legal.className = "choice-detail";
-  legal.textContent = candidate.identityScope === "PUBLIC_SITE" ? "Lieu identifié — numéro d’immatriculation propre non établi"
-    : [candidate.raisonSociale, candidate.siret ? `SIRET ${candidate.siret}` : ""].filter(Boolean).join(" — ");
+  legal.textContent =
+    candidate.identityScope === "PUBLIC_SITE"
+      ? candidate.operator
+        ? `Gestionnaire : ${candidate.operator.raisonSociale} — SIRET ${formatSiret(candidate.operator.siret)}`
+        : "Lieu identifié — numéro d’immatriculation propre non établi"
+      : [
+          candidate.raisonSociale,
+          candidate.siret ? `SIRET ${formatSiret(candidate.siret)}` : "",
+        ]
+          .filter(Boolean)
+          .join(" — ");
   const address = document.createElement("div");
   address.className = "choice-detail";
   address.textContent = candidate.adresse;
   const confidence = establishmentConfidence(state.decision, candidate);
   const badge = document.createElement("div");
   badge.className = `confidence-badge confidence-${confidence.tone}`;
-  badge.textContent = `Confiance ${confidence.score} / 100 — ${confidence.label}`;
-  badge.title = "Indice fondé sur les vérifications disponibles ; ce n’est pas une probabilité statistique.";
+  badge.textContent = `Confiance ${confidence.score} / 100`;
+  badge.title =
+    "Indice fondé sur les vérifications disponibles ; ce n’est pas une probabilité statistique.";
   content.append(name, badge, legal, address);
 
   const position = document.createElement("div");
   position.className = "choice-detail";
   const point = candidate.position;
-  const located = [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(point?.status);
+  const located = [
+    POSITION_STATES.SITE_CONFIRMED,
+    POSITION_STATES.SITE_CORROBORATED,
+  ].includes(point?.status);
   position.textContent = located
     ? `Latitude ${point.latitude} / Longitude ${point.longitude} — Position ${point.status === POSITION_STATES.SITE_CONFIRMED ? "confirmée" : "corroborée"}`
-    : point?.status === POSITION_STATES.CONFLICT ? "Position à vérifier : les informations disponibles se contredisent."
-    : "Position précise à vérifier ; aucune coordonnée proposée.";
+    : point?.status === POSITION_STATES.CONFLICT
+      ? "Position à vérifier : les informations disponibles se contredisent."
+      : "Position précise à vérifier ; aucune coordonnée proposée.";
   content.appendChild(position);
 
   const details = document.createElement("details");
@@ -140,26 +174,65 @@ function candidateCard(candidate) {
   identity.textContent = `Identité : ${candidate.identityScope === "PUBLIC_SITE" ? candidate.identityProof.join(" · ") : decisionEvidence(state.decision, candidate).join(" · ")}`;
   details.appendChild(identity);
   const sources = [
-    ...(candidate.siret ? [{ label: "Annuaire des Entreprises", recordId: candidate.siret, url: `https://annuaire-entreprises.data.gouv.fr/etablissement/${candidate.siret}` }] : []),
-    ...(candidate.identityLinks ?? []).flatMap(link => [
-      { label: link.sourceLabel, recordId: link.sourceRecordId, url: link.sourceUrl, publishedAt: link.sourcePublishedAt, historical: link.historical },
-      ...(link.registryEvidence?.snapshotUrl ? [{ label: "Extraction officielle FINESS", recordId: link.sourceRecordId,
-        url: link.registryEvidence.snapshotUrl, publishedAt: link.sourcePublishedAt }] : []),
+    ...(candidate.siret
+      ? [
+          {
+            label: "Annuaire des Entreprises",
+            recordId: candidate.siret,
+            url: `https://annuaire-entreprises.data.gouv.fr/etablissement/${candidate.siret}`,
+          },
+        ]
+      : []),
+    ...(candidate.identityLinks ?? []).flatMap((link) => [
+      {
+        label: link.sourceLabel,
+        recordId: link.sourceRecordId,
+        url: link.sourceUrl,
+        publishedAt: link.sourcePublishedAt,
+        historical: link.historical,
+      },
+      ...(link.registryEvidence?.snapshotUrl
+        ? [
+            {
+              label: "Extraction officielle FINESS",
+              recordId: link.sourceRecordId,
+              url: link.registryEvidence.snapshotUrl,
+              publishedAt: link.sourcePublishedAt,
+            },
+          ]
+        : []),
     ]),
-    ...(point?.proof ?? []).map(item => item.source),
-    ...((point?.evidence ?? []).filter(item => item.accepted).map(item => item.observation.source)),
+    ...(point?.proof ?? []).map((item) => item.source),
+    ...(point?.evidence ?? [])
+      .filter((item) => item.accepted)
+      .map((item) => item.observation.source),
   ];
   const seen = new Set();
-  for (const source of sources) {
+  for (const source of sources.filter(Boolean)) {
     const key = `${source.url || ""}:${source.recordId || ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const line = document.createElement("div");
     line.className = "choice-detail";
-    const link = document.createElement(/^https?:\/\//.test(source.url || "") ? "a" : "span");
-    link.textContent = [source.label, source.recordId, source.version ? `version ${source.version}` : "", source.updatedAt,
-      source.upstream?.release || source.upstream?.runId, source.publishedAt || source.generatedAt, source.historical ? "référence historique revalidée" : ""].filter(Boolean).join(" — ");
-    if (/^https?:\/\//.test(source.url || "")) { link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer"; }
+    const link = document.createElement(
+      /^https?:\/\//.test(source.url || "") ? "a" : "span",
+    );
+    link.textContent = [
+      source.label,
+      source.recordId,
+      source.version ? `version ${source.version}` : "",
+      source.updatedAt,
+      source.upstream?.release || source.upstream?.runId,
+      source.publishedAt || source.generatedAt,
+      source.historical ? "référence historique revalidée" : "",
+    ]
+      .filter(Boolean)
+      .join(" — ");
+    if (/^https?:\/\//.test(source.url || "")) {
+      link.href = source.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    }
     line.appendChild(link);
     details.appendChild(line);
   }
@@ -169,16 +242,22 @@ function candidateCard(candidate) {
     line.textContent = proof.description;
     details.appendChild(line);
   }
-  if (point?.evidence?.some(item => item.kind === "discovery")) {
+  if (point?.evidence?.some((item) => item.kind === "discovery")) {
     const line = document.createElement("div");
     line.className = "choice-detail";
-    line.textContent = "Le géocodage IGN a servi à la découverte et ne constitue pas une preuve de position du site.";
+    line.textContent =
+      "Le géocodage IGN a servi à la découverte et ne constitue pas une preuve de position du site.";
     details.appendChild(line);
   }
-  if (point?.coverage?.some(item => ["error", "timeout", "not-indexed"].includes(item.status))) {
+  if (
+    point?.coverage?.some((item) =>
+      ["error", "timeout", "not-indexed"].includes(item.status),
+    )
+  ) {
     const line = document.createElement("div");
     line.className = "choice-detail";
-    line.textContent = "Certaines sources de position sont indisponibles ou ne couvrent pas ce code postal.";
+    line.textContent =
+      "Certaines sources de position sont indisponibles ou ne couvrent pas ce code postal.";
     details.appendChild(line);
   }
   content.appendChild(details);
@@ -194,13 +273,20 @@ function renderEstablishment() {
   title.textContent = "Établissement proposé";
   const summary = document.createElement("div");
   summary.className = "help";
-  summary.textContent = decisionLabel(decision.status) + (decision.status === IDENTITY_STATES.AMBIGUOUS
-    ? " — Précisez l’adresse ou le contact pour départager les lieux."
-    : state.candidate?.addressCorrectionSuggestion ? " — Adresse différente : vérifiez qu’il s’agit bien de votre structure avant d’accepter la correction."
-    : decision.status === IDENTITY_STATES.INCOMPLETE ? " — Certaines vérifications n’ont pas abouti. Les informations reçues restent disponibles." : "");
+  summary.textContent =
+    decisionLabel(decision.status) +
+    (decision.status === IDENTITY_STATES.AMBIGUOUS
+      ? " — Précisez l’adresse ou le contact pour départager les lieux."
+      : state.candidate?.addressCorrectionSuggestion
+        ? " — Adresse différente : vérifiez qu’il s’agit bien de votre structure avant d’accepter la correction."
+        : decision.status === IDENTITY_STATES.INCOMPLETE
+          ? " — Certaines vérifications n’ont pas abouti. Les informations reçues restent disponibles."
+          : "");
   ui.candidate.append(title, summary);
   if (state.candidate) ui.candidate.appendChild(candidateCard(state.candidate));
-  else for (const candidate of (decision.alternatives ?? []).slice(0, 2)) ui.candidate.appendChild(candidateCard(candidate));
+  else
+    for (const candidate of (decision.alternatives ?? []).slice(0, 2))
+      ui.candidate.appendChild(candidateCard(candidate));
   if (decision.identifierWarning) {
     const warning = document.createElement("div");
     warning.className = "help";
@@ -212,10 +298,14 @@ function renderEstablishment() {
   label.textContent = "Diagnostic technique";
   details.appendChild(label);
   for (const message of state.diagnostics) {
-    const line = document.createElement("div"); line.className = "choice-detail"; line.textContent = message; details.appendChild(line);
+    const line = document.createElement("div");
+    line.className = "choice-detail";
+    line.textContent = message;
+    details.appendChild(line);
   }
-  for (const event of state.trace.filter(item => item.state !== "start")) {
-    const line = document.createElement("div"); line.className = "choice-detail";
+  for (const event of state.trace.filter((item) => item.state !== "start")) {
+    const line = document.createElement("div");
+    line.className = "choice-detail";
     line.textContent = `${event.source} : ${event.state} — ${event.elapsedMs ?? 0} ms${event.budgetMs ? ` / budget ${event.budgetMs} ms` : ""}`;
     details.appendChild(line);
   }
@@ -225,28 +315,53 @@ function renderEstablishment() {
 function updateApplyButton() {
   const button = ui.proposalPanel?.querySelector("#identity-apply-proposals");
   if (!button) return;
-  const inputs = [...ui.proposalPanel.querySelectorAll("input[data-identity-proposal-field]")];
-  const siretSelected = inputs.some(input => input.dataset.identityProposalField === "SirenSiret" && input.checked && !input.disabled);
-  const coordinateInput = inputs.find(input => input.dataset.identityProposalField === "Coordinates");
-  const coordinateProposal = state.proposals.find(item => item.field === "Coordinates");
-  if (coordinateInput) coordinateInput.disabled = coordinateInput.dataset.writable !== "true"
-    || (coordinateProposal.requiresSiteId ? Boolean(coordinateProposal.currentRegistration) : !(siretSelected || coordinateProposal.currentSiret === coordinateProposal.requiresSiret));
-  button.disabled = !Object.keys(selectedChanges(state.proposals,
-    inputs.filter(input => input.checked && !input.disabled).map(input => input.dataset.identityProposalField),
-  )).length;
+  const inputs = [
+    ...ui.proposalPanel.querySelectorAll("input[data-identity-proposal-field]"),
+  ];
+  const siretSelected = inputs.some(
+    (input) =>
+      input.dataset.identityProposalField === "SirenSiret" &&
+      input.checked &&
+      !input.disabled,
+  );
+  const coordinateInput = inputs.find(
+    (input) => input.dataset.identityProposalField === "Coordinates",
+  );
+  const coordinateProposal = state.proposals.find(
+    (item) => item.field === "Coordinates",
+  );
+  if (coordinateInput)
+    coordinateInput.disabled =
+      coordinateInput.dataset.writable !== "true" ||
+      (coordinateProposal.requiresSiteId
+        ? Boolean(coordinateProposal.currentRegistration)
+        : !(
+            siretSelected ||
+            coordinateProposal.currentSiret === coordinateProposal.requiresSiret
+          ));
+  button.disabled = !Object.keys(
+    selectedChanges(
+      state.proposals,
+      inputs
+        .filter((input) => input.checked && !input.disabled)
+        .map((input) => input.dataset.identityProposalField),
+    ),
+  ).length;
 }
 
 function renderProposalPanel() {
   clearNode(ui.proposalPanel);
   const row = selectedRow();
   if (!row) return;
-  state.proposals = buildEnrichmentProposals(
-    row,
-    state.candidate,
-    { identityStatus: state.decision?.status ?? "" },
-  );
+  state.proposals = buildEnrichmentProposals(row, state.candidate, {
+    identityStatus: state.decision?.status ?? "",
+  });
   if (!state.proposals.length) {
-    ui.proposalPanel.append(emptyMessage("Aucune modification supplémentaire à proposer avec les preuves disponibles."));
+    ui.proposalPanel.append(
+      emptyMessage(
+        "Aucune modification supplémentaire à proposer avec les preuves disponibles.",
+      ),
+    );
     return;
   }
 
@@ -255,18 +370,24 @@ function renderProposalPanel() {
   ui.proposalPanel.appendChild(title);
   const help = document.createElement("div");
   help.className = "help";
-  help.textContent = state.decision?.status === IDENTITY_STATES.MATCH_PROBABLE
-    ? "L’identité est probable : les champs juridiques restent décochés par défaut."
-    : "Les champs vides confirmés sont cochés par défaut. Remplacer une valeur existante exige une validation explicite.";
+  help.textContent =
+    state.decision?.status === IDENTITY_STATES.MATCH_PROBABLE
+      ? "L’identité est probable : les champs juridiques restent décochés par défaut."
+      : "Les améliorations confirmées sont cochées par défaut. Décochez celles que vous ne souhaitez pas appliquer.";
   ui.proposalPanel.appendChild(help);
 
   const list = document.createElement("div");
   list.className = "proposal-list";
   for (const item of state.proposals) {
     const fields = item.fields ?? [item.field];
-    const mapped = fields.every(field => state.snapshot?.resolvedMappings?.[field]);
-    const writable = fields.every(field => state.snapshot?.writableMappings?.[field])
-      && (!item.requiresSiret || item.currentSiret === item.requiresSiret || state.snapshot?.writableMappings?.SirenSiret);
+    const mapped = fields.every(
+      (field) => state.snapshot?.resolvedMappings?.[field],
+    );
+    const writable =
+      fields.every((field) => state.snapshot?.writableMappings?.[field]) &&
+      (!item.requiresSiret ||
+        item.currentSiret === item.requiresSiret ||
+        state.snapshot?.writableMappings?.SirenSiret);
     const rowNode = document.createElement("label");
     rowNode.className = "proposal-row";
     const checkbox = document.createElement("input");
@@ -293,7 +414,10 @@ function renderProposalPanel() {
     proposed.textContent = `Proposé : ${item.proposed}`;
     const source = document.createElement("div");
     source.className = "proposal-source";
-    source.textContent = item.field === "Coordinates" ? "Position du lieu vérifiée" : "Valeur proposée pour cette structure";
+    source.textContent =
+      item.field === "Coordinates"
+        ? "Position du lieu vérifiée"
+        : "Valeur proposée pour cette structure";
     values.append(current, proposed, source);
     rowNode.append(checkbox, label, values);
     list.appendChild(rowNode);
@@ -317,8 +441,11 @@ async function applySelectedProposals() {
   const row = selectedRow();
   if (!row) return;
   const selectedFields = new Set(
-    [...ui.proposalPanel.querySelectorAll("input[data-identity-proposal-field]:checked:not(:disabled)")]
-      .map(input => input.dataset.identityProposalField),
+    [
+      ...ui.proposalPanel.querySelectorAll(
+        "input[data-identity-proposal-field]:checked:not(:disabled)",
+      ),
+    ].map((input) => input.dataset.identityProposalField),
   );
   const changes = selectedChanges(state.proposals, selectedFields);
   if (!Object.keys(changes).length) return;
@@ -327,16 +454,39 @@ async function applySelectedProposals() {
   if (button) button.disabled = true;
   setStatus("Mise à jour de la structure dans Grist…");
   try {
-    const result = await applyEnrichmentChanges(row.id, changes, state.mappings, {
-      positionSiret: state.candidate?.siret, publicSitePosition: state.candidate?.identityScope === "PUBLIC_SITE" ? state.candidate.position : null, expectedRow: state.analyzedRow,
-    });
+    const result = await applyEnrichmentChanges(
+      row.id,
+      changes,
+      state.mappings,
+      {
+        verifiedIdentity:
+          state.decision?.status === IDENTITY_STATES.MATCH_VERIFIED,
+        positionSiret: state.candidate?.siret,
+        publicSitePosition:
+          state.candidate?.identityScope === "PUBLIC_SITE"
+            ? state.candidate.position
+            : null,
+        expectedRow: state.analyzedRow,
+      },
+    );
     state.snapshot = result.snapshot;
-    const skippedMessage = result.skipped.length ? ` Champs ignorés : ${result.skipped.join(", ")}.` : "";
-    setStatus(`Structure mise à jour.${skippedMessage}`, "success");
+    const skippedMessage = result.skipped.length
+      ? ` Champs ignorés : ${result.skipped.join(", ")}.`
+      : "";
+    const duplicateMessage = result.duplicateRowId
+      ? ` Une fiche du même lieu existe aussi (ligne ${result.duplicateRowId}).`
+      : "";
+    setStatus(
+      `Structure mise à jour.${skippedMessage}${duplicateMessage}`,
+      "success",
+    );
     clearNode(ui.proposalPanel);
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Impossible de mettre à jour la structure.", "error");
+    setStatus(
+      error.message || "Impossible de mettre à jour la structure.",
+      "error",
+    );
     updateApplyButton();
   }
 }
@@ -349,7 +499,12 @@ async function runIdentityAnalysis() {
   const controller = new AbortController();
   state.controller = controller;
   const timeout = setTimeout(() => {
-    controller.abort(new DOMException("Le délai maximal de l’analyse a été atteint.", "TimeoutError"));
+    controller.abort(
+      new DOMException(
+        "Le délai maximal de l’analyse a été atteint.",
+        "TimeoutError",
+      ),
+    );
   }, ESTABLISHMENT_BUDGET.deadlineMs);
   ui.enrichButton.disabled = true;
   setStatus("Analyse de l’identité puis de la position du site…");
@@ -360,7 +515,11 @@ async function runIdentityAnalysis() {
       signal: controller.signal,
       geocode: geocodeAddress,
       fetchOfficial: fetchOfficialRequest,
-      resolveFallback: options => resolveStructureIdentity({ ...options, findPoiLinks: findOsmIdentityPois }),
+      resolveFallback: (options) =>
+        resolveStructureIdentity({
+          ...options,
+          findPoiLinks: findOsmIdentityPois,
+        }),
     });
     if (generation !== state.generation) return;
 
@@ -368,23 +527,43 @@ async function runIdentityAnalysis() {
     state.candidate = result.candidate;
     state.diagnostics = result.diagnostics ?? [];
     state.trace = result.trace ?? [];
-    state.analyzedRow = Object.fromEntries(["NomCommercial", "RaisonSociale", "Adresse", "SirenSiret", "Latitude", "Longitude"].map(field => [field, row[field]]));
+    state.analyzedRow = Object.fromEntries(
+      [
+        "NomCommercial",
+        "RaisonSociale",
+        "Adresse",
+        "SirenSiret",
+        "Latitude",
+        "Longitude",
+      ].map((field) => [field, row[field]]),
+    );
 
     renderEstablishment();
     renderProposalPanel();
 
     const diagnostics = (result.diagnostics ?? []).slice(0, 2);
-    const message = [result.decision?.reason, ...diagnostics].filter(Boolean).join(" ");
-    setStatus(message || "Analyse terminée.", result.decision?.status === IDENTITY_STATES.INCOMPLETE ? "error" : "");
+    const message = [result.decision?.reason, ...diagnostics]
+      .filter(Boolean)
+      .join(" ");
+    setStatus(
+      message || "Analyse terminée.",
+      result.decision?.status === IDENTITY_STATES.INCOMPLETE ? "error" : "",
+    );
   } catch (error) {
     if (generation !== state.generation) return;
-    if (controller.signal.reason?.name === "TimeoutError" || error?.name === "TimeoutError") {
+    if (
+      controller.signal.reason?.name === "TimeoutError" ||
+      error?.name === "TimeoutError"
+    ) {
       setStatus(controller.signal.reason?.message || error.message, "error");
       return;
     }
     if (error?.name === "AbortError") return;
     console.error(error);
-    setStatus(error.message || "Impossible d’analyser cette structure.", "error");
+    setStatus(
+      error.message || "Impossible d’analyser cette structure.",
+      "error",
+    );
   } finally {
     clearTimeout(timeout);
     if (generation === state.generation) {
@@ -394,12 +573,12 @@ async function runIdentityAnalysis() {
   }
 }
 
-ui.enrichButton?.addEventListener("click", event => {
+ui.enrichButton?.addEventListener("click", (event) => {
   event.preventDefault();
   runIdentityAnalysis();
 });
 
-watchTable(mappings => refreshSnapshot(mappings));
+watchTable((mappings) => refreshSnapshot(mappings));
 watchSelection((rowId, mappings) => {
   if (mappings && Object.keys(mappings).length) state.mappings = mappings;
   const changed = String(rowId) !== String(state.selectedRowId);

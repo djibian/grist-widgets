@@ -62,12 +62,12 @@ export function assessEducationPosition(candidate, poi, { links = [], identitySt
   const link = educationSiteLinks(candidate, links).find(item => poi.uaiIds?.includes(item.sourceRecordId));
   if (!link) return refuse("Aucun UAI du site n’est revalidé dans l’Annuaire.");
   if (poi.uaiIds.some(id => id !== link.sourceRecordId)) return { ...refuse("Le POI mélange plusieurs établissements UAI."), conflict: true };
-  if (!registryPublicNameMatch(link.registryRecord.name, poi.name, "education", "", link.registryRecord.siteType)) {
-    return { ...refuse("Le nom du POI contredit l’établissement scolaire revalidé."), conflict: true };
-  }
   const address = addressEvidence(candidate.adresse, poi.adresse);
   // A different implantation of the same UAI is not the requested site.
   if (poi.adresse && address.conflict) return refuse("Autre implantation de cet établissement : adresse distincte.");
+  if (!registryPublicNameMatch(link.registryRecord.name, poi.name, "education", "", link.registryRecord.siteType)) {
+    return { ...refuse("Le nom du POI contredit l’établissement scolaire revalidé."), conflict: Boolean(poi.adresse && address.complete) };
+  }
   const reference = link.registryRecord.discoveryPosition;
   const inside = reference?.precision === "Numéro de rue" && poi.shape
     && pointInsideSingleBuilding([reference.longitude, reference.latitude], poi.shape);

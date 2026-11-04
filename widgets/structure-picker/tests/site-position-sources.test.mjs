@@ -18,13 +18,14 @@ test("site lookup uses only published postcode shards, preserves provenance and 
     candidate: { codePostal: "44270" }, manifestUrl: "https://example.test/contact-indexes/indexed-departments.json",
     fetchImpl: async url => {
       calls.push(String(url));
-      if (calls.length === 1) return Response.json(manifest);
+      if (String(url).endsWith("indexed-departments.json")) return Response.json(manifest);
       if (String(url).includes("overture")) return Response.json(shard);
       return new Response("", { status: 404 });
     },
   });
-  assert.equal(calls.length, 3);
-  assert.ok(calls.slice(1).every(url => url.includes("/44/44270.json?v=")));
+  const remote=calls.filter(url=>url.startsWith("https://example.test/"));
+  assert.equal(remote.length,3);
+  assert.ok(remote.slice(1).every(url => url.includes("/44/44270.json?v=")));
   assert.equal(result.observations.length, 2);
   assert.equal(result.observations[1].source.recordId, original.records[1].recordId);
   assert.equal(result.observations[1].source.upstream.release, "2026-08-19.0");

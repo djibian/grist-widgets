@@ -173,7 +173,7 @@ test("Legé is a verified public site with its municipality-published coordinate
   assert.equal(c.identityScope, "PUBLIC_SITE");
   assert.equal(c.siret, null);
   assert.equal(c.siren, null);
-  assert.equal(c.raisonSociale, "");
+  assert.equal(c.raisonSociale, c.operator?.raisonSociale || "");
   assert.deepEqual([c.latitude, c.longitude], [46.8861988, -1.5975397]);
   assert.ok(officialSignal.aborted);
   assert.ok(publicSiteWriteProofValid(c.position));
@@ -182,7 +182,7 @@ test("Legé is a verified public site with its municipality-published coordinate
   });
   assert.deepEqual(
     proposals.map((p) => p.field),
-    ["Coordinates"],
+    ["NomCommercial", "Adresse", ...(c.operator?["RaisonSociale"]:[]), "Coordinates"],
   );
   const changes = selectedChanges(proposals, ["Coordinates"]);
   assert.equal(changes.Latitude, c.latitude);

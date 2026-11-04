@@ -117,3 +117,12 @@ test('a wrong entered number cannot delay the text/address result through a redu
  const result=await resolveStructureIdentity({row:{NomCommercial:'Garage Martin',Adresse:site.adresse,SirenSiret:'98765432100019'},fetchOfficial:async request=>{calls.push(request.kind);assert.equal(request.kind,'text');return official([site]);},geocode:async()=>{throw Error('unnecessary discovery');}});
  assert.equal(result.decision.status,'MATCH_VERIFIED');assert.equal(result.decision.candidate.siret,site.siret);assert.ok(result.decision.identifierWarning);assert.deepEqual(calls,['text']);
 });
+
+test('an existing legal name can discover the site when its public name is not indexed by the text service',async()=>{
+ const calls=[];
+ const r=await resolveStructureIdentity({row:{NomCommercial:'Garage Martin',RaisonSociale:'MARTIN AUTOMOBILES',Adresse:'12 rue des Champs 44270 Machecoul-Saint-Même'},geocode:async()=>{throw Error('A complete public name and site address need no geocode');},fetchOfficial:async request=>{
+  calls.push(request.query);
+  return official(request.query==='martin automobiles'?[candidate({nomCommercial:'Garage Martin',aliases:['Garage Martin'],nomUsuelDistinct:true,raisonSociale:'MARTIN AUTOMOBILES',siret:'12345678900011',adresse:'12 rue des Champs 44270 Machecoul-Saint-Même'})]:[]);
+ }});
+ assert.equal(r.decision.status,'MATCH_VERIFIED');assert.deepEqual(calls,['garage martin','martin automobiles']);
+});

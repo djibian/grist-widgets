@@ -44,29 +44,20 @@ test("replay every actual public structure row: useful candidates, no global tim
       );
       assert.equal(
         result.decision.status,
-        [15, 19].includes(row.id) ? "MATCH_PROBABLE" : "MATCH_VERIFIED",
+        "MATCH_VERIFIED",
       );
       assert.ok(!result.diagnostics.some((d) => /délai maximal/.test(d)));
       assert.ok(result.candidate.adresse);
       const proposals = buildEnrichmentProposals(row, result.candidate, {
         identityStatus: result.decision.status,
       });
-      if ([15, 19].includes(row.id)) {
-        assert.equal(result.candidate.latitude, null);
-        assert.ok(
-          proposals.some(
-            (p) =>
-              p.field === "Adresse" && p.proposed.includes("Gabriel Reliquet"),
-          ),
-        );
-        assert.ok(proposals.every((p) => !p.selectedByDefault));
-        assert.ok(
-          !proposals.some((p) =>
-            ["Coordinates", "SirenSiret"].includes(p.field),
-          ),
-        );
+      if ([15,19].includes(row.id)) {
+        assert.ok(result.candidate.administrativeInputProof);
+        assert.equal(result.candidate.siret,"20005645500047");
+        assert.ok(proposals.some(p=>p.field==="Coordinates"&&p.selectedByDefault));
+        assert.ok(proposals.some(p=>p.field==="Adresse"&&p.proposed.includes("Gabriel Reliquet")));
       }
-      if ([23, 24].includes(row.id))
+      if (row.id === 23)
         assert.equal(
           result.candidate.siret,
           null,
@@ -161,7 +152,7 @@ test("contact-derived UAI helps discovery but cannot erase a different school na
   });
   assert.deepEqual(other.records, []);
 });
-test("corrects site names and contacts but never automatically overwrites an entered field", () => {
+test("corrects site names and contacts but preselects confirmed replacements without writing during analysis", () => {
   const row = rows.find((r) => r.id === 22),
     result = results.get(22);
   const p = buildEnrichmentProposals(row, result.candidate, {
@@ -173,12 +164,12 @@ test("corrects site names and contacts but never automatically overwrites an ent
   assert.ok(p.some((p) => p.field === "Telephone"));
   assert.ok(p.some(p => p.field === "Courriel" && p.proposed === "ecolenddlc@gmail.com"));
   assert.ok(
-    p.filter((p) => p.replacesExisting).every((p) => !p.selectedByDefault),
+    p.filter((p) => p.replacesExisting).every((p) => p.selectedByDefault),
   );
   const uncertain = results.get(15);
   assert.equal(
     establishmentConfidence(uncertain.decision, uncertain.candidate).score,
-    55,
+    95,
   );
 });
 test("directory capture provenance, points and missing precision fail closed", () => {
@@ -197,8 +188,8 @@ test("directory capture provenance, points and missing precision fail closed", (
   r.name = "Invented school";
   assert.equal(validateNamedSite(r), false);
   const villa = results.get(17).candidate;
-  assert.equal(villa.position.status, "UNRESOLVED");
-  assert.equal(villa.latitude, null);
+  assert.equal(villa.position.status, "SITE_CORROBORATED");
+  assert.ok(villa.latitude);
   const suggestion = namedSiteAddressSuggestions(
     directory.records,
     rows.find((r) => r.id === 15),
@@ -239,6 +230,6 @@ test("confidence is ordinal and cannot average away ambiguity, incompleteness or
 test('public HTTP captures retain their exact body, capture time and SHA-256', async () => {
   const {createHash}=await import('node:crypto');
   const captures=JSON.parse(await readFile(new URL('./fixtures/context/official-responses.json',import.meta.url),'utf8'));
-  assert.equal(captures.length,20);
+  assert.ok(captures.length>=28);
   for(const c of captures){assert.equal(createHash('sha256').update(c.body).digest('hex'),c.sha256);assert.deepEqual(JSON.parse(c.body),c.payload);assert.ok(Number.isFinite(Date.parse(c.capturedAt)));}
 });

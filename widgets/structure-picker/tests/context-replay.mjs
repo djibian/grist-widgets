@@ -1,3 +1,7 @@
+import{findCertifiedEntrance}from"../certified-entrances.js";
+import {readOfficialSnapshot} from "../official-snapshots.js";
+import {resolveAdministrativeSite} from "../administrative-site.js";
+import{readNamedSites}from"../named-site-directory.js";
 import { readFile } from "node:fs/promises";
 import { findOfficialRegistrySites } from "../official-site-registry.js";
 import { resolveEstablishmentForEnrichment } from "../establishment-service.js";
@@ -41,6 +45,8 @@ export async function localTransport(input) {
         `tests/fixtures/${u.pathname.includes("overture") ? "overture" : "all-the-places"}-44270.json`,
       ),
     );
+  const postcode=u.pathname.match(/\/overture\/(44|85)\/(\d{5})\.json$/)?.[2];
+  if(postcode){try{return Response.json(await json(`tests/fixtures/context/postcodes/overture-${postcode}.json`));}catch{}}
   if (u.protocol === "file:") {
     try {
       return new Response(await readFile(u, "utf8"));
@@ -69,7 +75,7 @@ export function officialReplay(request) {
       : { results: [], total_results: 0, total_pages: 0, page: 1 });
   return {
     ...extractOfficialCandidates(payload, {
-      requestedSiret: request.requestedSiret,
+      requestedSiret: request.requestedSiret, allowSiegeFallback:request.allowSiegeFallback===true,
     }),
     cached: false,
   };
@@ -77,6 +83,9 @@ export function officialReplay(request) {
 export async function replay(row, extra = {}) {
   return resolveEstablishmentForEnrichment({
     row,
+    findEntrance:o=>findCertifiedEntrance({...o,fetchImpl:localTransport}),
+    fetchSnapshot: (request,options)=>readOfficialSnapshot(request,{...options,fetchImpl:localTransport}),
+    findAdministrativeSite: options => resolveAdministrativeSite({...options,readSites:o=>readNamedSites({...o,fetchImpl:localTransport})}),
     geocode: async () => [],
     fetchOfficial: async (request) => officialReplay(request),
     findRegistrySites: (options) =>

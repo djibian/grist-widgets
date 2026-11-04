@@ -25,7 +25,7 @@ test("enterprise lookup uses identifier first and keeps name separate from locat
   assert.deepEqual(enterpriseSearchContext({ SirenSiret: "", NomCommercial: "Garage Martin", Adresse: "12 rue X 44270 Machecoul" }), { query: "Garage Martin", codePostal: "44270" });
 });
 
-test("missing data is selected by default but address replacement is explicit", () => {
+test("confirmed improvements are selected by default for empty and existing fields", () => {
   const row = { NomCommercial: "Garage Martin", Adresse: "5 rte st meme 44270 machecoul", SirenSiret: "", RaisonSociale: "", Latitude: "", Longitude: "" };
   const enterprise = { nomCommercial: "GARAGE MARTIN", nomUsuelDistinct: true, raisonSociale: "MARTIN AUTO", siret: "12345678900011", adresse: "5 ROUTE ST MEME 44270 MACHECOUL", latitude: 47, longitude: -1.8 };
   enterprise.position = { status: "SITE_CORROBORATED", siret: enterprise.siret, latitude: 47, longitude: -1.8, source: { label: "Overture Places", recordId: "test", url: "https://example.test" }, proof: [] };
@@ -33,7 +33,7 @@ test("missing data is selected by default but address replacement is explicit", 
   assert.equal(byField.SirenSiret.selectedByDefault, true);
   assert.equal(byField.Coordinates.selectedByDefault, true);
   assert.deepEqual(byField.Coordinates.fields, ["Latitude", "Longitude"]);
-  assert.equal(byField.Adresse.selectedByDefault, false);
+  assert.equal(byField.Adresse.selectedByDefault, true);
   assert.equal(Object.prototype.hasOwnProperty.call(byField, "APE"), false);
 });
 
@@ -57,7 +57,7 @@ test("legal-name fallback never replaces an existing usual name", () => {
   const row = { NomCommercial: "Garage Martin", Adresse: "5 rue X", SirenSiret: "", RaisonSociale: "" };
   const enterprise = { nomCommercial: "MARTIN AUTOMOBILES SARL", nomUsuelDistinct: false, raisonSociale: "MARTIN AUTOMOBILES SARL", siret: "12345678900011" };
   const proposals = buildEnrichmentProposals(row, enterprise);
-  assert.equal(proposals.some(item => item.field === "NomCommercial"), false);
+  assert.equal(proposals.find(item => item.field === "NomCommercial").proposed, "Garage martin");
   assert.equal(proposals.some(item => item.field === "RaisonSociale"), true);
 });
 
@@ -88,7 +88,7 @@ test("coordinate pair and provenance cannot be selected without the matching SIR
   const changes = selectedChanges(proposals, ["Coordinates", "SirenSiret"]);
   assert.equal(changes.Latitude, 47);
   assert.equal(changes.Longitude, -1.8);
-  assert.equal(changes.SirenSiret, candidate.siret);
+  assert.equal(changes.SirenSiret, "123 456 789 00011");
   assert.equal(JSON.parse(changes.PositionProof).siret, candidate.siret);
   const existing = buildEnrichmentProposals({ SirenSiret: candidate.siret }, candidate);
   assert.equal(selectedChanges(existing, ["Coordinates"]).Latitude, 47);

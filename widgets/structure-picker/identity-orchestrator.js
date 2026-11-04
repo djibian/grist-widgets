@@ -4,7 +4,7 @@ import {
   buildOfficialTextSearchRequest,
   extractLocationFromAddress,
   identifierParts,
-  normalizeIdentifier,
+  normalizeIdentifier, normalize,
 } from "./search.js";
 import {
   IDENTITY_STATES,
@@ -233,6 +233,15 @@ export async function resolveStructureIdentity({
 
     if (isDecisive(decision) || deadline.timedOut) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
+    }
+
+    const legalHint=normalize(row.RaisonSociale);
+    if(legalHint.length>=3 && legalHint!==initialQuery && officialRequestCount<maxOfficialRequests){
+      const legal=await performOfficial(buildOfficialTextSearchRequest(legalHint,{codePostal:location.codePostal}),"annuaire:legal-hint",{required:false});
+      candidates=mergeCandidates(candidates,legal);
+      decision=decideIdentity({row,candidates,links,coverage:[...coverage.values()],location:anchor});
+      checkpoint(decision);
+      if(isDecisive(decision))return checkpoint(decision);
     }
 
     // With a public name, the entered identifier is corroboration only. It

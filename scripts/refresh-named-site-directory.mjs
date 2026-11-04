@@ -22,9 +22,9 @@ export function verifyPublishedFacts(record, html) {
   for (const phone of record.contacts?.phones ?? [])
     if (!html.replace(/\D/g, "").includes(phoneKey(phone)))
       throw Error(`${record.id}: contact phone is no longer supported`);
-  if (record.siret && !html.replace(/\D/g, "").includes(record.siret))
+  if (record.siret && !record.registration && !html.replace(/\D/g, "").includes(record.siret))
     throw Error(`${record.id}: site SIRET is no longer explicit`);
-  if (record.point && !html.includes(record.point.nativeUrl))
+  if (record.point && !html.includes(record.point.nativeHtml || record.point.nativeUrl))
     throw Error(`${record.id}: own map target changed`);
   const refreshed = {
     ...record,

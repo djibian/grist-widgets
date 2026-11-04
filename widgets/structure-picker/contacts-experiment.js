@@ -1,5 +1,9 @@
+import { formatPhone } from "./presentation-conventions.js";
 import { applyEnrichmentChanges, fetchFullSnapshot } from "./grist.js";
-import { availableContactSources, searchContactSources } from "./contact-search.js";
+import {
+  availableContactSources,
+  searchContactSources,
+} from "./contact-search.js";
 import { isExactSiretCandidate } from "./contact-model.js";
 import { selectContactSuggestions } from "./contact-presentation.js";
 import { identifierParts } from "./search.js";
@@ -39,7 +43,11 @@ function setStatus(message = "", type = "") {
 function mappedColumn(logicalName) {
   const explicit = currentMappings?.[logicalName];
   if (explicit) return explicit;
-  if (currentRecord && Object.prototype.hasOwnProperty.call(currentRecord, logicalName)) return logicalName;
+  if (
+    currentRecord &&
+    Object.prototype.hasOwnProperty.call(currentRecord, logicalName)
+  )
+    return logicalName;
   return "";
 }
 
@@ -62,7 +70,11 @@ function currentContext() {
   const rawLongitude = valueOf("Longitude");
   const latitude = Number(rawLatitude);
   const longitude = Number(rawLongitude);
-  const hasCoordinates = hasText(rawLatitude) && hasText(rawLongitude) && Number.isFinite(latitude) && Number.isFinite(longitude);
+  const hasCoordinates =
+    hasText(rawLatitude) &&
+    hasText(rawLongitude) &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude);
   return {
     siret: identifier.siret,
     name,
@@ -95,7 +107,9 @@ function renderCurrentContacts() {
 
 function refreshApplyButton() {
   if (!ui.applyButton) return;
-  ui.applyButton.disabled = !ui.results?.querySelector('input[data-contact-field]:checked:not(:disabled)');
+  ui.applyButton.disabled = !ui.results?.querySelector(
+    "input[data-contact-field]:checked:not(:disabled)",
+  );
 }
 
 function refreshAvailability() {
@@ -106,21 +120,28 @@ function refreshAvailability() {
   refreshApplyButton();
 
   const context = currentContext();
-  const sources = currentRecord && currentRecord.id !== "new" ? availableContactSources(context) : [];
+  const sources =
+    currentRecord && currentRecord.id !== "new"
+      ? availableContactSources(context)
+      : [];
   const available = sources.length > 0;
   if (ui.searchButton) ui.searchButton.disabled = !available;
 
   if (!currentRecord || currentRecord.id === "new") {
-    setStatus("Sélectionne une structure existante pour rechercher ses contacts publics.");
+    setStatus(
+      "Sélectionne une structure existante pour rechercher ses contacts publics.",
+    );
   } else if (!available) {
-    setStatus("Complète d’abord le SIRET ou les coordonnées de la structure avec l’analyse ci-dessus.");
+    setStatus(
+      "Complète d’abord le SIRET ou les coordonnées de la structure avec l’analyse ci-dessus.",
+    );
   } else {
     setStatus("Prêt à rechercher les contacts publics.");
   }
 }
 
 function fieldConfig(key) {
-  return FIELD_CONFIG.find(field => field.key === key);
+  return FIELD_CONFIG.find((field) => field.key === key);
 }
 
 function confidenceClass(confidence) {
@@ -130,7 +151,11 @@ function confidenceClass(confidence) {
 function renderProvenance(provenance = []) {
   const row = document.createElement("div");
   row.className = "contact-provenance";
-  const labels = [...new Set(provenance.map(source => source?.label || source?.id).filter(Boolean))];
+  const labels = [
+    ...new Set(
+      provenance.map((source) => source?.label || source?.id).filter(Boolean),
+    ),
+  ];
   for (const labelText of labels) {
     const badge = document.createElement("span");
     badge.className = "contact-provenance-badge";
@@ -142,12 +167,16 @@ function renderProvenance(provenance = []) {
 
 function renderSuggestions(suggestions) {
   clearNode(ui.results);
+  suggestions = suggestions.map((s) =>
+    s.key === "telephone" ? { ...s, value: formatPhone(s.value) } : s,
+  );
   currentSuggestions = suggestions;
 
   if (!suggestions.length) {
     const empty = document.createElement("div");
     empty.className = "contact-empty";
-    empty.textContent = "Aucun téléphone, courriel ou site web suffisamment fiable n’a été trouvé.";
+    empty.textContent =
+      "Aucun téléphone, courriel ou site web suffisamment fiable n’a été trouvé.";
     ui.results.appendChild(empty);
     refreshApplyButton();
     return;
@@ -166,7 +195,9 @@ function renderSuggestions(suggestions) {
     checkbox.dataset.contactKey = field.key;
     const writable = Boolean(writableMappings[field.logical]);
     checkbox.disabled = !writable;
-    checkbox.checked = Boolean(isExactSiretCandidate(suggestion.candidate) && !hasText(valueOf(field.logical)) && writable);
+    checkbox.checked = Boolean(
+      suggestion.confidence?.level === "very-reliable" && writable,
+    );
     checkbox.addEventListener("change", refreshApplyButton);
 
     const main = document.createElement("div");
@@ -176,17 +207,24 @@ function renderSuggestions(suggestions) {
     heading.className = "contact-result-heading";
     const label = document.createElement("div");
     label.className = "contact-result-label";
-    label.textContent = writable ? field.label : `${field.label} — non mappé ou non modifiable`;
+    label.textContent = writable
+      ? field.label
+      : `${field.label} — non mappé ou non modifiable`;
     const confidence = document.createElement("span");
     confidence.className = `contact-confidence ${confidenceClass(suggestion.confidence)}`;
-    confidence.textContent = suggestion.confidence.label;
+    confidence.textContent = `Confiance ${suggestion.confidence.level === "very-reliable" ? 95 : suggestion.confidence.level === "probable" ? 65 : 35} / 100`;
+    confidence.title = suggestion.confidence.label;
     heading.append(label, confidence);
 
     const value = document.createElement("div");
     value.className = "contact-result-value";
     value.textContent = suggestion.value;
 
-    main.append(heading, value, renderProvenance(suggestion.provenance));
+    const verification = document.createElement("details"),
+      summary = document.createElement("summary");
+    summary.textContent = "Vérifications";
+    verification.append(summary, renderProvenance(suggestion.provenance));
+    main.append(heading, value, verification);
     row.append(checkbox, main);
     ui.results.appendChild(row);
   }
@@ -196,26 +234,38 @@ function renderSuggestions(suggestions) {
 
 function selectedChanges() {
   const changes = {};
-  for (const checkbox of ui.results?.querySelectorAll('input[data-contact-field]:checked:not(:disabled)') ?? []) {
-    const suggestion = currentSuggestions.find(item => item.key === checkbox.dataset.contactKey);
+  for (const checkbox of ui.results?.querySelectorAll(
+    "input[data-contact-field]:checked:not(:disabled)",
+  ) ?? []) {
+    const suggestion = currentSuggestions.find(
+      (item) => item.key === checkbox.dataset.contactKey,
+    );
     if (suggestion) changes[checkbox.dataset.contactField] = suggestion.value;
   }
   return changes;
 }
 
 function finalSearchStatus(suggestions, states) {
-  const failures = states.filter(state => state.status === "error").length;
+  const failures = states.filter((state) => state.status === "error").length;
   if (suggestions.length) {
     return {
-      message: failures ? "Contacts suffisamment fiables trouvés. Certaines sources sont indisponibles." : "Contacts suffisamment fiables trouvés.",
+      message: failures
+        ? "Contacts suffisamment fiables trouvés. Certaines sources sont indisponibles."
+        : "Contacts suffisamment fiables trouvés.",
       type: "success",
     };
   }
   if (failures === states.length && states.length) {
-    return { message: "Les sources publiques disponibles sont temporairement indisponibles.", type: "error" };
+    return {
+      message:
+        "Les sources publiques disponibles sont temporairement indisponibles.",
+      type: "error",
+    };
   }
   return {
-    message: failures ? "Aucun contact suffisamment fiable trouvé. Certaines sources sont indisponibles." : "Aucun contact suffisamment fiable trouvé.",
+    message: failures
+      ? "Aucun contact suffisamment fiable trouvé. Certaines sources sont indisponibles."
+      : "Aucun contact suffisamment fiable trouvé.",
     type: "",
   };
 }
@@ -227,10 +277,16 @@ async function applySelectedContacts() {
   setStatus("Mise à jour des contacts dans Grist…");
   try {
     await applyEnrichmentChanges(currentRecord.id, changes, currentMappings);
-    setStatus("Contacts mis à jour. Vérifie les valeurs dans Grist.", "success");
+    setStatus(
+      "Contacts mis à jour. Vérifie les valeurs dans Grist.",
+      "success",
+    );
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Impossible de mettre à jour les contacts.", "error");
+    setStatus(
+      error.message || "Impossible de mettre à jour les contacts.",
+      "error",
+    );
   } finally {
     refreshApplyButton();
   }
@@ -257,7 +313,10 @@ async function searchContacts() {
     if (requestGeneration !== generation) return;
     writableMappings = snapshot.writableMappings ?? {};
 
-    const result = await searchContactSources(context, { signal: controller.signal, sources });
+    const result = await searchContactSources(context, {
+      signal: controller.signal,
+      sources,
+    });
     if (requestGeneration !== generation) return;
 
     const suggestions = selectContactSuggestions(result.candidates, context);
@@ -269,7 +328,9 @@ async function searchContacts() {
     console.error(error);
     setStatus(error.message || "Recherche de contacts indisponible.", "error");
   } finally {
-    if (requestGeneration === generation) ui.searchButton.disabled = !availableContactSources(currentContext()).length;
+    if (requestGeneration === generation)
+      ui.searchButton.disabled =
+        !availableContactSources(currentContext()).length;
   }
 }
 
@@ -284,7 +345,7 @@ grist.onRecord((record, mappings) => {
   refreshAvailability();
 });
 
-grist.onNewRecord(mappings => {
+grist.onNewRecord((mappings) => {
   generation += 1;
   controller?.abort();
   currentRecord = { id: "new" };

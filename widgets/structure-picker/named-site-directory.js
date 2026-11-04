@@ -2,6 +2,7 @@ import {
   addressEvidence,
   normalizeIdentity,
   usableCoordinates,
+  publishedAccessBinding,
 } from "./identity-resolution.js";
 import { siteContextEvidence } from "./site-context.js";
 export const NAMED_SITE_DIRECTORY_URL = new URL(
@@ -49,6 +50,28 @@ export function validateNamedSite(record) {
   // from a typed URL. A timestamp and page digest identify the captured version.
   return true;
 }
+export function namedSitePoint(record) {
+  const point = record?.point;
+  if (
+    point?.kind !== "operator-site-point" ||
+    record.publisherKind !== "operator"
+  )
+    return null;
+  const html = point.nativeHtml ?? "";
+  const lat = html.match(/data-lat="([\d.-]+)"/),
+    lng = html.match(/data-lng="([\d.-]+)"/);
+  if (
+    !/<section\b/.test(html) ||
+    !/section_quartier-block/.test(html) ||
+    !/data-res="\d+"/.test(html) ||
+    !lat ||
+    !lng ||
+    Number(lat[1]) !== point.latitude ||
+    Number(lng[1]) !== point.longitude
+  )
+    return null;
+  return usableCoordinates(point.latitude, point.longitude);
+}
 export function namedSiteCandidate(record, row, { suggestion = false } = {}) {
   if (!validateNamedSite(record)) return null;
   const context = siteContextEvidence(row, record);
@@ -59,11 +82,12 @@ export function namedSiteCandidate(record, row, { suggestion = false } = {}) {
   );
   const coords =
     !suggestion &&
-    point?.kind === "publisher-site-point" &&
-    route &&
-    Number(route[1]) === point.latitude &&
-    Number(route[2]) === point.longitude &&
-    usableCoordinates(point.latitude, point.longitude);
+    (namedSitePoint(record) ||
+      (point?.kind === "publisher-site-point" &&
+        route &&
+        Number(route[1]) === point.latitude &&
+        Number(route[2]) === point.longitude &&
+        usableCoordinates(point.latitude, point.longitude)));
   const proof = {
     kind: "REVIEWED_NAMED_SITE",
     record,
@@ -165,10 +189,24 @@ export function namedSiteIdentityLinks(
 ) {
   const links = [];
   for (const record of records) {
-    if (!validateNamedSite(record) || !siteContextEvidence(row, record).matched)
-      continue;
+    if (!validateNamedSite(record)) continue;
     for (const c of candidates) {
-      const a = addressEvidence(c.adresse, record.adresse);
+      const accessBinding = publishedAccessBinding(record, c);
+      if (
+        !siteContextEvidence(row, record).matched &&
+        !(
+          accessBinding &&
+          siteContextEvidence(row, {
+            ...record,
+            adresse: record.registeredAddress,
+          }).matched
+        )
+      )
+        continue;
+      const a = addressEvidence(
+        c.adresse,
+        accessBinding ? record.registeredAddress : record.adresse,
+      );
       const name =
         siteContextEvidence(
           {
@@ -184,16 +222,27 @@ export function namedSiteIdentityLinks(
             link.siret === c.siret &&
             link.verifiedOfficial &&
             link.registryRecord &&
-            (link.registryRecord.publicNames ?? [link.registryRecord.name]).some(name => siteContextEvidence(
-              { NomCommercial: name, Adresse: c.adresse }, record,
-            ).matched),
+            (
+              link.registryRecord.publicNames ?? [link.registryRecord.name]
+            ).some(
+              (name) =>
+                siteContextEvidence(
+                  { NomCommercial: name, Adresse: c.adresse },
+                  record,
+                ).matched,
+            ),
         );
       if (
         c.etatAdministratif !== "A" ||
         !a.compatible ||
         a.postal !== "same" ||
         a.commune !== "same" ||
-        !name
+        !(
+          name ||
+          (record.siret === c.siret &&
+            record.native.fields.siret &&
+            record.registration?.legalName === c.raisonSociale)
+        )
       )
         continue;
       // Exact public name + the full official site address, or an explicit SIRET
@@ -212,7 +261,8 @@ export function namedSiteIdentityLinks(
         sourceUrl: record.url,
         sourcePublishedAt: record.checkedAt,
         publicNames: [record.name],
-        adresse: record.adresse,
+        adresse: accessBinding ? record.registeredAddress : record.adresse,
+        accessBinding,
         siret: c.siret,
         verifiedOfficial: true,
         siteRecord: record,

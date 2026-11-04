@@ -1,3 +1,7 @@
+import{findCertifiedEntrance}from"../widgets/structure-picker/certified-entrances.js";
+import {readOfficialSnapshot} from "../widgets/structure-picker/official-snapshots.js";
+import {resolveAdministrativeSite} from "../widgets/structure-picker/administrative-site.js";
+import {readNamedSites} from "../widgets/structure-picker/named-site-directory.js";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolveEstablishmentForEnrichment } from "../widgets/structure-picker/establishment-service.js";
 import { fetchOfficialRequest } from "../widgets/structure-picker/enterprise-client.js";
@@ -51,6 +55,9 @@ for (const row of rows) {
   try {
     const result = await resolveEstablishmentForEnrichment({
       row,
+      findEntrance:o=>findCertifiedEntrance({...o,fetchImpl:transport}),
+      fetchSnapshot: (request,options)=>readOfficialSnapshot(request,{...options,fetchImpl:transport}),
+      findAdministrativeSite: options => resolveAdministrativeSite({...options,readSites:o=>readNamedSites({...o,fetchImpl:transport})}),
       geocode: async (address, options) => {
         const r = await transport(buildGeocodeUrl(address), {
           signal: options.signal,
