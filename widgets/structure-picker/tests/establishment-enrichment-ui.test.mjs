@@ -268,10 +268,10 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.ok(Date.now() - startedAt < 12000);
     assert.equal(requests.filter(item => item.url.hostname === "recherche-entreprises.api.gouv.fr").length, 1);
     assert.equal(requests.some(item => item.url.hostname.startsWith("overpass") || item.url.hostname === "data.geopf.fr"), false);
-    assert.match(uiText, /46\.99808, -1\.815576/);
+    assert.match(uiText, /46\.99808 \/ Longitude -1\.815576/);
     assert.doesNotMatch(uiText, /46\.996561/);
     assert.match(uiText, /Overture Places/);
-    assert.match(uiText, /nom public attesté/);
+    assert.match(uiText, /Nom public attesté/);
     assert.equal(nodes["establishment-candidate"].querySelectorAll(".establishment-card").length, 1);
     assert.equal(nodes["establishment-candidate"].querySelectorAll('input[type="radio"]').length, 0);
     assert.equal(requests.find(item => item.url.hostname === "recherche-entreprises.api.gouv.fr").url.searchParams.get("q"), "41091808000020");
@@ -298,17 +298,17 @@ test("Grist shows a single coherent site candidate and preserves the four identi
         assert.equal(new URLSearchParams(request.body).get("data").includes(`"${current.siret}"`), true);
       }
       if (index === 2) {
-        assert.match(nodes["establishment-candidate"].textContent, /46\.99756389, -1\.7365524/);
+        assert.match(nodes["establishment-candidate"].textContent, /46\.99756389 \/ Longitude -1\.7365524/);
         assert.doesNotMatch(nodes["establishment-candidate"].textContent, /VIVAL/);
       } else if (index === 1) {
-        assert.match(nodes["establishment-candidate"].textContent, /46\.9742242, -1\.9937342/);
-        assert.match(nodes["establishment-candidate"].textContent, /Position confirmée : OpenStreetMap/);
-        assert.match(nodes["establishment-candidate"].textContent, /SIRET 26850025300011 — FINESS 850002163/);
+        assert.match(nodes["establishment-candidate"].textContent, /46\.9742242 \/ Longitude -1\.9937342/);
+        assert.match(nodes["establishment-candidate"].textContent, /Position confirmée.*OpenStreetMap/);
+        assert.match(nodes["establishment-candidate"].textContent, /SIRET 26850025300011/);
         assert.match(nodes["establishment-candidate"].textContent, /node:9056350135 — version 4 — 2025-11-01/);
         assert.equal(requests.some(item => item.url.hostname.startsWith("overpass")), false);
       } else if (index === 3) {
-        assert.match(nodes["establishment-candidate"].textContent, /46\.868617815626294, -1\.942076105568997/);
-        assert.match(nodes["establishment-candidate"].textContent, /point de bâtiment — adresse officielle, BDNB et emprise RNB/);
+        assert.match(nodes["establishment-candidate"].textContent, /46\.868617815626294 \/ Longitude -1\.942076105568997/);
+        assert.match(nodes["establishment-candidate"].textContent, /Point publié du bâtiment RNB actif/);
         assert.match(nodes["establishment-candidate"].textContent, /6256NPD4SRW3/);
         assert.match(nodes["establishment-candidate"].textContent, /17\/20/);
         assert.doesNotMatch(nodes["establishment-candidate"].textContent, /43H9GCSB54PW|46\.868553/);
@@ -320,7 +320,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
           .find(item => item.dataset.identityProposalField === "SirenSiret");
         assert.ok(siret, "the sector proof confirms the sole EHPAD SIRET");
         assert.match(nodes["establishment-candidate"].textContent, /FINESS géographique 850002163/);
-        assert.equal(nodes["establishment-candidate"].querySelector(".choice-name").textContent, "EHPAD LA REYNERIE");
+        assert.equal(nodes["establishment-candidate"].querySelector(".choice-name").textContent, "Ehpad la reynerie — Bouin");
         assert.match(nodes["establishment-candidate"].textContent, /Agence du Numérique en Santé/);
         assert.match(nodes["establishment-candidate"].textContent, /2026-10-02/);
         assert.ok(nodes["establishment-candidate"].querySelectorAll("a").some(link =>
@@ -396,7 +396,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.equal(nodes["enrich-button"].disabled, false);
     assert.match(nodes["establishment-candidate"].textContent, /Identité confirmée/);
-    assert.match(nodes["establishment-candidate"].textContent, /Une preuve liée au site contredit son identité/);
+    assert.match(nodes["establishment-candidate"].textContent, /Position à vérifier : les informations disponibles se contredisent/);
     assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").some(input => input.dataset.identityProposalField === "Coordinates"), false);
     assert.equal(requests.some(item => item.url.hostname.startsWith("overpass")), false);
     mode = "normal";
@@ -415,7 +415,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.equal(signal.aborted, true);
     assert.equal(nodes["enrich-button"].disabled, false);
     assert.match(nodes["establishment-candidate"].textContent, /Identité confirmée/);
-    assert.match(nodes["establishment-candidate"].textContent, /Position précise du site non démontrée/);
+    assert.match(nodes["establishment-candidate"].textContent, /Position précise à vérifier/);
     mode = "normal";
   });
 
@@ -449,7 +449,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.equal(nodes["enrich-button"].disabled, false);
     assert.match(nodes["establishment-candidate"].textContent, /41091808000020/);
-    assert.match(nodes["establishment-candidate"].textContent, /46\.99808, -1\.815576/);
+    assert.match(nodes["establishment-candidate"].textContent, /46\.99808 \/ Longitude -1\.815576/);
     assert.equal(requests.some(item => item.url.hostname.startsWith("overpass")), false);
     mode = "normal";
   });
@@ -463,7 +463,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.match(nodes["establishment-candidate"].textContent, /Identité confirmée/);
     assert.match(nodes["establishment-candidate"].textContent, /88493583400033/);
-    assert.match(nodes["establishment-candidate"].textContent, /Position précise du site non démontrée/);
+    assert.match(nodes["establishment-candidate"].textContent, /Position précise à vérifier/);
     assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").some(input => input.dataset.identityProposalField === "Coordinates"), false);
     mode = "normal";
   });
@@ -481,7 +481,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.equal(signal.aborted, true);
     assert.equal(nodes["enrich-button"].disabled, false);
     assert.match(nodes["establishment-candidate"].textContent, /Identité confirmée.*88493583400033/);
-    assert.match(nodes["establishment-candidate"].textContent, /Position précise du site non démontrée/);
+    assert.match(nodes["establishment-candidate"].textContent, /Position précise à vérifier/);
     mode = "normal";
   });
 
@@ -515,7 +515,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.match(nodes["establishment-candidate"].textContent, /Identité confirmée/);
     assert.match(nodes["establishment-candidate"].textContent, /41091808000020/);
-    assert.match(nodes["establishment-candidate"].textContent, /Position précise du site non démontrée/);
+    assert.match(nodes["establishment-candidate"].textContent, /Position précise à vérifier/);
     assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").some(input => input.dataset.identityProposalField === "Coordinates"), false);
     mode = "normal";
   });
@@ -531,7 +531,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     const text = nodes["establishment-candidate"].textContent;
     assert.match(text, /89306104400028/);
-    assert.match(text, /46\.99756389, -1\.7365524/);
+    assert.match(text, /46\.99756389 \/ Longitude -1\.7365524/);
     releaseOldPosition();
     await settle();
     t.mock.timers.tick(10000);
@@ -610,7 +610,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.equal(writes.length, 1);
     const fields = writes[0][0][3];
-    assert.equal(fields.Numero_d_immatriculation, "41091808000020");
+    assert.equal(fields.Numero_d_immatriculation, "410 918 080 00020");
     assert.equal(fields.Latitude, 46.99808);
     assert.equal(fields.Longitude, -1.815576);
     assert.match(fields.PositionSource, /Overture Places/);
@@ -625,7 +625,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.equal(writes.length, 2);
     const fields = writes[1][0][3];
-    assert.equal(fields.Numero_d_immatriculation, "26850025300011");
+    assert.equal(fields.Numero_d_immatriculation, "268 500 253 00011");
     assert.equal(fields.Latitude, 46.9742242);
     assert.equal(fields.Longitude, -1.9937342);
     assert.match(fields.PositionSource, /OpenStreetMap \(node:9056350135\)/);
@@ -635,7 +635,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.equal(proof.source.version, 4);
     assert.equal(proof.source.updatedAt, "2025-11-01T15:45:18Z");
     assert.equal(proof.proof.find(item => item.kind === "EXPLICIT_GEOGRAPHIC_FINESS").finess, "850002163");
-    assert.equal(table.Numero_d_immatriculation[1], "26850025300011");
+    assert.equal(table.Numero_d_immatriculation[1], "268 500 253 00011");
     assert.equal(table.Latitude[1], 46.9742242);
   });
 
@@ -654,12 +654,12 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.equal(writes.length, 3);
     const fields = writes[2][0][3];
-    assert.equal(fields.Numero_d_immatriculation, "88493583400033");
+    assert.equal(fields.Numero_d_immatriculation, "884 935 834 00033");
     assert.equal(fields.Latitude, 46.868617815626294);
     assert.equal(fields.Longitude, -1.942076105568997);
     assert.match(fields.PositionSource, /6256NPD4SRW3/);
     const proof = JSON.parse(fields.PositionProof);
-    assert.equal(proof.siret, fields.Numero_d_immatriculation);
+    assert.equal(proof.siret, fields.Numero_d_immatriculation.replace(/\s/g, ""));
     assert.equal(proof.source.version, "202602a_1");
     assert.equal(proof.proof.find(item => item.kind === "UNIQUE_OFFICIAL_BUILDING").addressId, "85280_0250_00010_bis");
     assert.equal(proof.proof.find(item => item.kind === "RNB_BUILDING_FOOTPRINT").building.rnb_id, "6256NPD4SRW3");
@@ -675,16 +675,16 @@ test("Grist shows a single coherent site candidate and preserves the four identi
       const text = nodes["establishment-candidate"].textContent;
       assert.match(text, new RegExp(current.label));
       assert.doesNotMatch(nodes["enrich-status"].textContent, /délai maximal/);
-      assert.match(text, /Diagnostic des sources/);
+      assert.match(text, /Diagnostic technique/);
       if (current.siret) assert.ok(text.includes(current.siret));
       if (current.inputSiret) {
         assert.match(text, /Le numéro renseigné.*ne corrobore pas/);
         assert.match(text, /Position confirmée/);
         const inputs = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]");
-        assert.equal(inputs.find(input => input.dataset.identityProposalField === "SirenSiret").checked, false);
-        assert.equal(inputs.find(input => input.dataset.identityProposalField === "Coordinates").disabled, true);
+        assert.equal(inputs.find(input => input.dataset.identityProposalField === "SirenSiret").checked, true);
+        assert.equal(inputs.find(input => input.dataset.identityProposalField === "Coordinates").disabled, false);
       }
-      if (current.fixture === "enfance") { assert.match(text, /Site public confirmé/); assert.match(text, /SIRET propre au site non établi/); assert.match(text, /46\.8861988, -1\.5975397/); }
+      if (current.fixture === "enfance") { assert.match(text, /Lieu identifié/); assert.match(text, /numéro d’immatriculation propre non établi/); assert.match(text, /46\.8861988 \/ Longitude -1\.5975397/); }
       assert.equal(nodes["establishment-candidate"].querySelectorAll('input[type="radio"]').length, 0);
       assert.equal(writes.length, 3, "analysis alone never writes any field");
     });
@@ -695,7 +695,9 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     const inputs = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]");
     const siret = inputs.find(input => input.dataset.identityProposalField === "SirenSiret");
     const coordinates = inputs.find(input => input.dataset.identityProposalField === "Coordinates");
-    assert.equal(siret.checked, false); assert.equal(coordinates.disabled, true);
+    assert.equal(siret.checked, true); assert.equal(coordinates.disabled, false);
+    siret.checked = false; siret.dispatchEvent(new Event("change"));
+    assert.equal(coordinates.disabled,true);
     assert.equal(table.Numero_d_immatriculation[6], "78605938600015");
     siret.checked = true; siret.dispatchEvent(new Event("change"));
     assert.equal(coordinates.disabled, false);
@@ -703,8 +705,8 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.equal(writes.length, 4);
     const fields = writes[3][0][3];
-    assert.equal(fields.Numero_d_immatriculation, "78605938600023");
-    assert.equal(JSON.parse(fields.PositionProof).siret, fields.Numero_d_immatriculation);
+    assert.equal(fields.Numero_d_immatriculation, "786 059 386 00023");
+    assert.equal(JSON.parse(fields.PositionProof).siret, fields.Numero_d_immatriculation.replace(/\s/g, ""));
     assert.equal(JSON.parse(fields.PositionProof).source.recordId, "way:373841583");
     assert.ok(fields.Latitude && fields.Longitude);
   });
@@ -712,7 +714,7 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await select(8); click(); await settle();
     for (const ms of [1800,1500,1800]) { if (!nodes["enrich-button"].disabled) break; t.mock.timers.tick(ms); await settle(); }
     const inputs = nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]");
-    assert.deepEqual(inputs.map(input => input.dataset.identityProposalField), ["Coordinates"]);
+    assert.deepEqual(inputs.map(input => input.dataset.identityProposalField), ["NomCommercial", "Adresse", "Coordinates"]);
     assert.equal(inputs[0].disabled, false); assert.equal(inputs[0].checked, true);
     const { applyEnrichmentChanges } = await import("../grist.js");
     const { publicSiteCandidate } = await import("../public-sites.js");
@@ -734,4 +736,74 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     const proof = JSON.parse(fields.PositionProof);
     assert.equal(proof.identityScope, "PUBLIC_SITE"); assert.equal(proof.siret, null); assert.equal(proof.siteId, site.siteId);
   });
+});
+
+test("the real Grist listener exposes confidence and safe corrections for the 25-row context corpus", async t => {
+  const {rows: contextRows} = await import('./context-replay.mjs');
+  const sources=JSON.parse(await readFile(new URL('./fixtures/context/official-responses.json',import.meta.url),'utf8'));
+  const pomPayload=await readFile(new URL('./fixtures/pom-annuaire.json',import.meta.url),'utf8');
+  const assets = new Map();
+  for (const dir of ['identity-links','site-position-indexes']) {
+    for (const file of await readdir(new URL(`../${dir}/`,import.meta.url),{recursive:true})) {
+      if (file.endsWith('.json')) assets.set(`${dir}/${file}`,await readFile(new URL(`../${dir}/${file}`,import.meta.url),'utf8'));
+    }
+  }
+  const nodes=Object.fromEntries(['enrich-button','enrich-status','establishment-candidate','proposal-panel'].map(id=>[id,Object.assign(new Element(id==='enrich-button'?'button':'div'),{id})]));
+  const mappings=Object.fromEntries(['NomCommercial','Adresse','SirenSiret','RaisonSociale','Latitude','Longitude','Courriel','Telephone','SiteWeb','PositionSource','PositionProof'].map(f=>[f,f]));
+  const table=Object.fromEntries(['id',...Object.keys(mappings)].map(f=>[f,contextRows.map(r=>r[f]??'')]));
+  let onRecord;const writes=[];
+  const originalDocument=globalThis.document,originalGrist=globalThis.grist;
+  globalThis.document={getElementById:id=>nodes[id],createElement:tag=>new Element(tag)};
+  globalThis.grist={onRecords(){},onNewRecord(){},onRecord(cb){onRecord=cb;},selectedTable:{async getTableId(){return'Structures_de_stage';}},async setCursorPos(){},docApi:{
+    async fetchTable(id){if(id==='Structures_de_stage')return table;if(id==='_grist_Tables')return{id:[1],tableId:['Structures_de_stage']};return{};},
+    async applyUserActions(actions){writes.push(actions);for(const[,,id,fields]of actions)for(const[k,v]of Object.entries(fields))table[k][table.id.indexOf(id)]=v;}
+  }};
+  t.after(()=>{globalThis.document=originalDocument;globalThis.grist=originalGrist;resetOfficialClientForTests();resetRegistryCacheForTests();});
+  t.mock.timers.enable({apis:['setTimeout','Date'],now:Date.UTC(2026,10,5,0)});
+  t.mock.method(globalThis,'fetch',async(input,options={})=>{
+    const url=new URL(input),file=url.pathname.split('/structure-picker/').at(-1);
+    if(assets.has(file))return new Response(assets.get(file));
+    if(url.pathname.endsWith('indexed-departments.json'))return Response.json(manifest);
+    if(url.pathname.endsWith('/overture/44/44270.json'))return Response.json(overtureShard);
+    if(url.pathname.endsWith('/all-the-places/44/44270.json'))return Response.json(atpShard);
+    if(url.hostname==='recherche-entreprises.api.gouv.fr'){
+      const q=url.searchParams.get('q'),request={url:String(url),query:q,requestedSiret:/^\d{14}$/.test(q)?q:''};
+      // Replay the actual captured HTTP envelope, not a normalized fake candidate.
+      const exact=sources.find(s=>s.url===String(url))??sources.find(s=>new URL(s.url).searchParams.get('q')===q);
+      if(exact)return Response.json(exact.payload);
+      if(/pom|rainette|884935834/.test(q))return new Response(pomPayload);
+      const source=sources.find(s=>(s.payload.results??[]).some(c=>[c.siege,...(c.matching_etablissements??[])].some(e=>e?.siret===q)));
+      return Response.json(source?.payload??{results:[],total_results:0,total_pages:0,page:1});
+    }
+    if(url.hostname==='data.geopf.fr')return Response.json({features:[]});
+    if(url.hostname.startsWith('overpass'))return Response.json({elements:[]});
+    return new Response('',{status:404});
+  });
+  await import(`../establishment-enrichment-ui.js?context-corpus=${Date.now()}`);
+  async function analyze(id){
+    resetOfficialClientForTests();resetRegistryCacheForTests();onRecord({id},mappings);await settle();
+    nodes['enrich-button'].dispatchEvent(new Event('click'));
+    for(let i=0;i<100&&nodes['enrich-button'].disabled;i++){await settle();t.mock.timers.tick(250);}
+    await settle();
+    assert.equal(nodes['enrich-button'].disabled,false,`row ${id} exceeded the bounded analysis`);
+    assert.ok(nodes['establishment-candidate'].querySelector('.confidence-badge'),`row ${id}: ${nodes['enrich-status'].textContent}`);
+    assert.doesNotMatch(nodes['enrich-status'].textContent,/délai maximal|Impossible/);
+  }
+  for(const row of contextRows)await t.test(`Grist row ${row.id}`,async()=>{
+    await analyze(row.id);
+    const card=nodes['establishment-candidate'].querySelector('.establishment-card');assert.ok(card);
+    const visible=card.children[0].children.filter(n=>n.tagName!=='details').map(n=>n.textContent).join(' ');
+    assert.match(visible,/Confiance \d+ \/ 100/);
+    assert.doesNotMatch(visible,/Annuaire des Entreprises|OpenStreetMap|BDNB|UAI|FINESS/);
+    if([15,19].includes(row.id))assert.match(visible,/95 \/ 100/);
+  });
+  await analyze(17);
+  const address=nodes['proposal-panel'].querySelectorAll('input[data-identity-proposal-field]').find(i=>i.dataset.identityProposalField==='Adresse');
+  assert.ok(address);assert.equal(address.checked,true);address.checked=true;address.dispatchEvent(new Event('change'));
+  nodes['proposal-panel'].querySelector('#identity-apply-proposals').dispatchEvent(new Event('click'));await settle();await settle();
+  assert.equal(writes.length,1);assert.equal(writes[0][0][2],17);assert.match(writes[0][0][3].Adresse,/^6 rue des Ciseleurs/);assert.equal(table.SirenSiret[16],'');
+  table.Latitude[8]=0;table.Longitude[8]=0;
+  await analyze(9);
+  nodes['proposal-panel'].querySelector('#identity-apply-proposals').dispatchEvent(new Event('click'));await settle();await settle();
+  assert.equal(writes.length,2,nodes['enrich-status'].textContent);assert.equal(writes[1][0][2],9);assert.equal(writes[1][0][3].Latitude,46.8861988);assert.equal(table.SirenSiret[8],'');
 });

@@ -1,5 +1,6 @@
 import { addressEvidence, comparisonTokens, normalizeIdentity, registrySiteMatches } from "./identity-resolution.js";
 import { boundedSource } from "./bounded-source.js";
+import { siteContextEvidence } from "./site-context.js";
 import { extractLocationFromAddress } from "./search.js";
 
 export const SITE_REGISTRY_BASE = new URL("./identity-links/site-registry/", import.meta.url);
@@ -64,7 +65,18 @@ export async function findOfficialRegistrySites({ row, signal, fetchImpl = globa
     const towns = manifest.communes.filter(town => town.names.some(name => input.endsWith(` ${communeKey(name)}`))
       && (!location.codePostal || town.postcodes.includes(location.codePostal)));
     const scoped = towns.length ? towns : manifest.communes.filter(town => location.codePostal && town.postcodes.includes(location.codePostal));
-    const files = [...new Set(scoped.flatMap(town => town.files))];
+    let locatorRecords = [];
+    // A regional name/address/contact locator avoids guessing a town from an
+    // email domain and avoids loading every native registry shard.
+    if (manifest.communes.length && (!scoped.length || row.Courriel || row.Telephone || row.SiteWeb)) {
+      try {
+        const locatorUrl = new URL("locator.json", baseUrl); locatorUrl.searchParams.set("v", manifest.generatedAt);
+        const locator = await readRegistryJson(locatorUrl, { signal: sourceSignal, fetchImpl, maxBytes: 4 * 1024 * 1024 });
+        if (locator.schemaVersion !== 1 || !Array.isArray(locator.records) || locator.recordCount !== locator.records.length) throw new Error("Index de découverte incomplet.");
+        locatorRecords = locator.records.filter(record => siteContextEvidence(row, record).matched);
+      } catch (error) { if (!scoped.length) throw error; }
+    }
+    const files = [...new Set([...scoped.flatMap(town => town.files), ...locatorRecords.map(record => record.file)])];
     if (files.length > SITE_REGISTRY_BUDGET.maxFiles) return { records: [], complete: false, message: "Plusieurs communes ou trop de sources : préciser la commune." };
     const entries = (await Promise.all(files.map(async file => {
       if (!/^\d{5}\.\d+\.json$/.test(file)) throw new Error("Identifiant de fichier de référentiel invalide.");
@@ -73,7 +85,10 @@ export async function findOfficialRegistrySites({ row, signal, fetchImpl = globa
       if (payload.schemaVersion !== 1 || !Array.isArray(payload.records) || payload.recordCount !== payload.records.length) throw new Error("Extrait de référentiel tronqué.");
       return payload.records;
     }))).flat();
-    const records = entries.flatMap(entry => normalizeRegistryRecords(entry, manifest.source)).filter(record => registrySiteMatches(row, record));
+    const records = entries.flatMap(entry => normalizeRegistryRecords(entry, manifest.source)).map(record => ({
+      ...record, ...(() => { const locator=locatorRecords.find(item => item.kind===record.kind&&item.recordId===record.recordId);
+        return locator ? {contacts:locator.contacts,contactEvidence:locator.contactEvidence} : {}; })(),
+    })).filter(record => registrySiteMatches(row, record));
     if (!records.length && allowLive && location.codePostal && /\b(ecole|college|lycee)\b/.test(normalizeIdentity(row.NomCommercial))) {
       const url = new URL("https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-annuaire-education/records");
       url.search = new URLSearchParams({ where: `code_postal='${location.codePostal}' AND etat='OUVERT'`, limit: "100" });

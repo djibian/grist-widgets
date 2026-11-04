@@ -1,7 +1,21 @@
-import { publicSiteWriteProofValid, publicSiteCandidate } from "./public-sites.js";
+import { siteContextEvidence } from "./identity-resolution.js";
+import {
+  presentedCandidate,
+  formatPhone,
+  formatSiret,
+} from "./presentation-conventions.js";
+import { namedSiteCandidate } from "./named-site-directory.js";
+import {
+  publicSiteWriteProofValid,
+  publicSiteCandidate,
+} from "./public-sites.js";
 import { recordsFromTable } from "../../shared/grist/records.js";
 import { isFormulaColumn } from "../../shared/grist/metadata.js";
-import { candidateMatchesIdentifier, extractLocationFromAddress, identifierParts } from "./search.js";
+import {
+  candidateMatchesIdentifier,
+  extractLocationFromAddress,
+  identifierParts,
+} from "./search.js";
 import { POSITION_STATES } from "./establishment-position.js";
 import { usableCoordinates } from "./identity-resolution.js";
 
@@ -11,23 +25,53 @@ export const COLUMN_DEFS = [
   { name: "NomCommercial", title: "Nom usuel", type: "Text", optional: false },
   { name: "Adresse", title: "Adresse", type: "Text", optional: false },
   { name: "SirenSiret", title: "SIREN / SIRET", type: "Text", optional: false },
-  { name: "RaisonSociale", title: "Raison sociale", type: "Text", optional: true },
+  {
+    name: "RaisonSociale",
+    title: "Raison sociale",
+    type: "Text",
+    optional: true,
+  },
   { name: "Latitude", title: "Latitude", type: "Numeric", optional: true },
   { name: "Longitude", title: "Longitude", type: "Numeric", optional: true },
-  { name: "PositionSource", title: "Source de la position", type: "Text", optional: true },
-  { name: "PositionProof", title: "Preuves de la position", type: "Text", optional: true },
+  {
+    name: "PositionSource",
+    title: "Source de la position",
+    type: "Text",
+    optional: true,
+  },
+  {
+    name: "PositionProof",
+    title: "Preuves de la position",
+    type: "Text",
+    optional: true,
+  },
   { name: "Telephone", title: "Téléphone", type: "Text", optional: true },
   { name: "Courriel", title: "Courriel", type: "Text", optional: true },
   { name: "SiteWeb", title: "Site web", type: "Text", optional: true },
 ];
 
+const COLUMN_ALIASES = {
+  NomCommercial: ["Nom_usuel", "Nom_commercial"],
+  SirenSiret: ["Numero_d_immatriculation", "SIRET", "Siren_Siret"],
+  RaisonSociale: ["Raison_sociale"],
+  Courriel: ["Email", "E_mail"],
+  Telephone: ["Téléphone"],
+  SiteWeb: ["Site_web", "Site_internet"],
+};
+
 const REQUIRED_COLUMNS = ["NomCommercial", "Adresse", "SirenSiret"];
-const WRITE_FIELDS = new Set(COLUMN_DEFS.map(definition => definition.name));
-const LABELS = Object.fromEntries(COLUMN_DEFS.map(definition => [definition.name, definition.title]));
+const WRITE_FIELDS = new Set(COLUMN_DEFS.map((definition) => definition.name));
+const LABELS = Object.fromEntries(
+  COLUMN_DEFS.map((definition) => [definition.name, definition.title]),
+);
 let addQueue = Promise.resolve();
 
 export function initializeGrist() {
-  grist.ready({ requiredAccess: "full", allowSelectBy: true, columns: COLUMN_DEFS });
+  grist.ready({
+    requiredAccess: "full",
+    allowSelectBy: true,
+    columns: COLUMN_DEFS,
+  });
 }
 
 export function watchTable(callback) {
@@ -35,8 +79,10 @@ export function watchTable(callback) {
 }
 
 export function watchSelection(callback) {
-  grist.onRecord((record, mappings) => callback(record?.id ?? null, mappings ?? {}));
-  grist.onNewRecord(mappings => callback("new", mappings ?? {}));
+  grist.onRecord((record, mappings) =>
+    callback(record?.id ?? null, mappings ?? {}),
+  );
+  grist.onNewRecord((mappings) => callback("new", mappings ?? {}));
 }
 
 function resolveMappings(mappings, availableColumns) {
@@ -47,7 +93,12 @@ function resolveMappings(mappings, availableColumns) {
     const mapped = mappings?.[logicalName];
     if (mapped && available.has(mapped)) resolved[logicalName] = mapped;
     else if (available.has(logicalName)) resolved[logicalName] = logicalName;
-    else resolved[logicalName] = null;
+    else {
+      const aliases = (COLUMN_ALIASES[logicalName] ?? []).filter((name) =>
+        available.has(name),
+      );
+      resolved[logicalName] = aliases.length === 1 ? aliases[0] : null;
+    }
   }
   return resolved;
 }
@@ -72,12 +123,16 @@ function rowRecordsToLogicalRows(rowRecords, resolvedMappings) {
 async function fetchColumnMetadata(tableId) {
   const tables = await grist.docApi.fetchTable("_grist_Tables");
   const tableIds = Array.isArray(tables?.tableId) ? tables.tableId : [];
-  const tableIndex = tableIds.findIndex(value => String(value) === String(tableId));
+  const tableIndex = tableIds.findIndex(
+    (value) => String(value) === String(tableId),
+  );
   if (tableIndex < 0) return new Map();
   const tableRef = Array.isArray(tables?.id) ? tables.id[tableIndex] : null;
   if (tableRef === null || tableRef === undefined) return new Map();
 
-  const columns = recordsFromTable(await grist.docApi.fetchTable("_grist_Tables_column"));
+  const columns = recordsFromTable(
+    await grist.docApi.fetchTable("_grist_Tables_column"),
+  );
   const result = new Map();
   for (const column of columns) {
     if (column.parentId !== tableRef) continue;
@@ -96,14 +151,19 @@ async function fetchColumnMetadata(tableId) {
 export async function fetchFullSnapshot(mappings = {}) {
   const tableId = await grist.selectedTable.getTableId();
   const rawTable = await grist.docApi.fetchTable(tableId);
-  const resolvedMappings = resolveMappings(mappings, Object.keys(rawTable ?? {}));
+  const resolvedMappings = resolveMappings(
+    mappings,
+    Object.keys(rawTable ?? {}),
+  );
   const metadata = await fetchColumnMetadata(tableId);
-  const missing = REQUIRED_COLUMNS.filter(name => !resolvedMappings[name]);
-  const nonWritableRequired = REQUIRED_COLUMNS.filter(name => {
+  const missing = REQUIRED_COLUMNS.filter((name) => !resolvedMappings[name]);
+  const nonWritableRequired = REQUIRED_COLUMNS.filter((name) => {
     const columnId = resolvedMappings[name];
     return columnId && metadata.get(columnId)?.writable === false;
   });
-  const ignoredFormulaMappings = COLUMN_DEFS.map(definition => definition.name).filter(name => {
+  const ignoredFormulaMappings = COLUMN_DEFS.map(
+    (definition) => definition.name,
+  ).filter((name) => {
     if (REQUIRED_COLUMNS.includes(name)) return false;
     const columnId = resolvedMappings[name];
     return columnId && metadata.get(columnId)?.writable === false;
@@ -128,14 +188,19 @@ export async function fetchFullSnapshot(mappings = {}) {
 }
 
 function labelsFor(names) {
-  return names.map(name => LABELS[name] || name).join(", ");
+  return names.map((name) => LABELS[name] || name).join(", ");
 }
 
 export function configurationMessage(snapshot) {
   const messages = [];
-  if (snapshot?.missing?.length) messages.push(`Mappe les champs obligatoires : ${labelsFor(snapshot.missing)}.`);
+  if (snapshot?.missing?.length)
+    messages.push(
+      `Mappe les champs obligatoires : ${labelsFor(snapshot.missing)}.`,
+    );
   if (snapshot?.nonWritableRequired?.length) {
-    messages.push(`Ces champs obligatoires pointent vers des colonnes calculées et ne peuvent pas être modifiés : ${labelsFor(snapshot.nonWritableRequired)}. Choisis des colonnes de données.`);
+    messages.push(
+      `Ces champs obligatoires pointent vers des colonnes calculées et ne peuvent pas être modifiés : ${labelsFor(snapshot.nonWritableRequired)}. Choisis des colonnes de données.`,
+    );
   }
   return messages.join(" ");
 }
@@ -143,34 +208,63 @@ export function configurationMessage(snapshot) {
 export function configurationWarning(snapshot) {
   const messages = [];
   if (snapshot?.ignoredFormulaMappings?.length) {
-    messages.push(`Colonnes calculées ignorées lors des écritures : ${labelsFor(snapshot.ignoredFormulaMappings)}.`);
+    messages.push(
+      `Colonnes calculées ignorées lors des écritures : ${labelsFor(snapshot.ignoredFormulaMappings)}.`,
+    );
   }
-  if (!snapshot?.resolvedMappings?.Latitude || !snapshot?.resolvedMappings?.Longitude) {
-    messages.push("Mappe Latitude et Longitude pour alimenter automatiquement le widget carte.");
+  if (
+    !snapshot?.resolvedMappings?.Latitude ||
+    !snapshot?.resolvedMappings?.Longitude
+  ) {
+    messages.push(
+      "Mappe Latitude et Longitude pour alimenter automatiquement le widget carte.",
+    );
   }
   return messages.join(" ");
 }
 
 export function fieldsForCandidate(candidate, snapshot) {
+  candidate = presentedCandidate(candidate);
   const fields = {};
   const writableMappings = snapshot?.writableMappings ?? {};
   const put = (logicalName, value) => {
     const columnId = writableMappings[logicalName];
-    if (!columnId || value === undefined || value === null || value === "") return;
+    if (!columnId || value === undefined || value === null || value === "")
+      return;
     fields[columnId] = value;
   };
   put("NomCommercial", candidate.nomCommercial);
   put("Adresse", candidate.adresse);
-  put("SirenSiret", candidate.siret || candidate.siren);
+  put("SirenSiret", formatSiret(candidate.siret || candidate.siren));
   put("RaisonSociale", candidate.raisonSociale);
-  if (candidate.position?.siret === candidate.siret
-    && [POSITION_STATES.SITE_CONFIRMED, POSITION_STATES.SITE_CORROBORATED].includes(candidate.position?.status)
-    && usableCoordinates(candidate.position.latitude, candidate.position.longitude)
-    && writableMappings.Latitude && writableMappings.Longitude) {
+  if (
+    candidate.position?.siret === candidate.siret &&
+    [
+      POSITION_STATES.SITE_CONFIRMED,
+      POSITION_STATES.SITE_CORROBORATED,
+    ].includes(candidate.position?.status) &&
+    usableCoordinates(
+      candidate.position.latitude,
+      candidate.position.longitude,
+    ) &&
+    writableMappings.Latitude &&
+    writableMappings.Longitude
+  ) {
     put("Latitude", candidate.position.latitude);
     put("Longitude", candidate.position.longitude);
-    put("PositionSource", `${candidate.position.source.label} (${candidate.position.source.recordId}) ${candidate.position.source.url}`);
-    put("PositionProof", JSON.stringify({ siret: candidate.siret, status: candidate.position.status, source: candidate.position.source, proof: candidate.position.proof }));
+    put(
+      "PositionSource",
+      `${candidate.position.source.label} (${candidate.position.source.recordId}) ${candidate.position.source.url}`,
+    );
+    put(
+      "PositionProof",
+      JSON.stringify({
+        siret: candidate.siret,
+        status: candidate.position.status,
+        source: candidate.position.source,
+        proof: candidate.position.proof,
+      }),
+    );
   }
   put("Telephone", candidate.telephone);
   put("Courriel", candidate.courriel);
@@ -179,11 +273,16 @@ export function fieldsForCandidate(candidate, snapshot) {
 }
 
 export function findByCandidate(rows, candidate) {
-  return rows.find(row => candidateMatchesIdentifier(candidate, row.SirenSiret)) ?? null;
+  return (
+    rows.find((row) => candidateMatchesIdentifier(candidate, row.SirenSiret)) ??
+    null
+  );
 }
 
 export function findRowById(snapshot, rowId) {
-  return snapshot?.rows?.find(row => String(row.id) === String(rowId)) ?? null;
+  return (
+    snapshot?.rows?.find((row) => String(row.id) === String(rowId)) ?? null
+  );
 }
 
 export async function selectRow(rowId) {
@@ -203,13 +302,17 @@ function validateCandidate(candidate) {
   if (!String(candidate?.nomCommercial ?? "").trim()) missing.push("nom usuel");
   if (!String(candidate?.adresse ?? "").trim()) missing.push("adresse");
   if (!String(candidate?.siret ?? "").trim()) missing.push("SIRET");
-  if (missing.length) throw new Error(`Ce résultat externe est incomplet (${missing.join(", ")}) et ne peut pas être ajouté automatiquement.`);
+  if (missing.length)
+    throw new Error(
+      `Ce résultat externe est incomplet (${missing.join(", ")}) et ne peut pas être ajouté automatiquement.`,
+    );
 }
 
 async function addCandidateOnce(candidate, mappings) {
   validateCandidate(candidate);
   const before = await fetchFullSnapshot(mappings);
-  if (before.missing.length || before.nonWritableRequired.length) throw new Error(configurationMessage(before));
+  if (before.missing.length || before.nonWritableRequired.length)
+    throw new Error(configurationMessage(before));
 
   const preexisting = findByCandidate(before.rows, candidate);
   if (preexisting) {
@@ -217,26 +320,45 @@ async function addCandidateOnce(candidate, mappings) {
     return { status: "existing", row: preexisting, snapshot: before };
   }
 
-  const created = await grist.selectedTable.create({ fields: fieldsForCandidate(candidate, before) });
+  const created = await grist.selectedTable.create({
+    fields: fieldsForCandidate(candidate, before),
+  });
   const createdId = created?.id ?? created;
-  if (!createdId) throw new Error("Grist n'a pas retourné l'identifiant de la ligne créée.");
+  if (!createdId)
+    throw new Error("Grist n'a pas retourné l'identifiant de la ligne créée.");
 
   const afterCreate = await fetchFullSnapshot(mappings);
-  const sameIdentifier = afterCreate.rows.filter(row => candidateMatchesIdentifier(candidate, row.SirenSiret));
-  const other = sameIdentifier.find(row => row.id !== createdId);
+  const sameIdentifier = afterCreate.rows.filter((row) =>
+    candidateMatchesIdentifier(candidate, row.SirenSiret),
+  );
+  const other = sameIdentifier.find((row) => row.id !== createdId);
   if (other) {
     await removeCreatedRecord(afterCreate.tableId, createdId);
     const reconciled = await fetchFullSnapshot(mappings);
     await selectRow(other.id);
-    return { status: "existing", row: other, snapshot: reconciled, reconciled: true };
+    return {
+      status: "existing",
+      row: other,
+      snapshot: reconciled,
+      reconciled: true,
+    };
   }
 
   await selectRow(createdId);
-  return { status: "created", row: sameIdentifier.find(row => row.id === createdId) ?? { id: createdId }, snapshot: afterCreate };
+  return {
+    status: "created",
+    row: sameIdentifier.find((row) => row.id === createdId) ?? {
+      id: createdId,
+    },
+    snapshot: afterCreate,
+  };
 }
 
 export function addCandidateSafely(candidate, mappings) {
-  const operation = addQueue.then(() => addCandidateOnce(candidate, mappings), () => addCandidateOnce(candidate, mappings));
+  const operation = addQueue.then(
+    () => addCandidateOnce(candidate, mappings),
+    () => addCandidateOnce(candidate, mappings),
+  );
   addQueue = operation.catch(() => undefined);
   return operation;
 }
@@ -244,46 +366,176 @@ export function addCandidateSafely(candidate, mappings) {
 function identifierConflict(rows, rowId, value) {
   const proposed = identifierParts(value);
   if (!proposed.identifier) return null;
-  return rows.find(row => {
-    if (String(row.id) === String(rowId)) return false;
-    const existing = identifierParts(row.SirenSiret);
-    if (proposed.siret && existing.siret) return proposed.siret === existing.siret;
-    return Boolean(proposed.siren && existing.siren && proposed.siren === existing.siren);
-  }) ?? null;
+  return (
+    rows.find((row) => {
+      if (String(row.id) === String(rowId)) return false;
+      const existing = identifierParts(row.SirenSiret);
+      if (proposed.siret && existing.siret)
+        return proposed.siret === existing.siret;
+      return Boolean(
+        proposed.siren && existing.siren && proposed.siren === existing.siren,
+      );
+    }) ?? null
+  );
 }
 
-export async function applyEnrichmentChanges(rowId, changes, mappings, { positionSiret = "", publicSitePosition = null, expectedRow = null } = {}) {
-  if (!rowId || rowId === "new") throw new Error("Sélectionne d'abord une structure existante.");
+export async function applyEnrichmentChanges(
+  rowId,
+  changes,
+  mappings,
+  {
+    positionSiret = "",
+    publicSitePosition = null,
+    expectedRow = null,
+    verifiedIdentity = false,
+  } = {},
+) {
+  if (!rowId || rowId === "new")
+    throw new Error("Sélectionne d'abord une structure existante.");
   const before = await fetchFullSnapshot(mappings);
-  if (before.missing.length || before.nonWritableRequired.length) throw new Error(configurationMessage(before));
+  if (before.missing.length || before.nonWritableRequired.length)
+    throw new Error(configurationMessage(before));
   const currentRow = findRowById(before, rowId);
   if (!currentRow) throw new Error("La structure sélectionnée n'existe plus.");
-  if (expectedRow && Object.entries(expectedRow).some(([field, value]) => String(currentRow[field] ?? "") !== String(value ?? ""))) {
-    throw new Error("La fiche a changé depuis l’analyse. Relance l’analyse avant d’appliquer ce candidat.");
+  if (
+    expectedRow &&
+    Object.entries(expectedRow).some(
+      ([field, value]) =>
+        String(currentRow[field] ?? "") !== String(value ?? ""),
+    )
+  ) {
+    throw new Error(
+      "La fiche a changé depuis l’analyse. Relance l’analyse avant d’appliquer ce candidat.",
+    );
   }
   if ("Latitude" in (changes ?? {}) || "Longitude" in (changes ?? {})) {
-    if (!("Latitude" in changes && "Longitude" in changes) || !usableCoordinates(changes.Latitude, changes.Longitude) || !before.writableMappings.Latitude || !before.writableMappings.Longitude) {
-      throw new Error("La latitude et la longitude du site doivent être appliquées ensemble dans deux colonnes modifiables.");
+    if (
+      !("Latitude" in changes && "Longitude" in changes) ||
+      !usableCoordinates(changes.Latitude, changes.Longitude) ||
+      !before.writableMappings.Latitude ||
+      !before.writableMappings.Longitude
+    ) {
+      throw new Error(
+        "La latitude et la longitude du site doivent être appliquées ensemble dans deux colonnes modifiables.",
+      );
     }
-    const finalSiret = identifierParts(before.writableMappings.SirenSiret && changes.SirenSiret !== undefined ? changes.SirenSiret : currentRow.SirenSiret).siret;
+    const finalSiret = identifierParts(
+      before.writableMappings.SirenSiret && changes.SirenSiret !== undefined
+        ? changes.SirenSiret
+        : currentRow.SirenSiret,
+    ).siret;
     if (publicSitePosition) {
-      const proof = publicSitePosition.proof?.find(item => item.kind === "EXPLICIT_PUBLISHER_SITE_POINT");
-      let stored; try { stored = JSON.parse(changes.PositionProof); } catch { /* fail closed below */ }
-      if (!expectedRow || !publicSiteWriteProofValid(publicSitePosition) || !publicSiteWriteProofValid(stored)
-        || stored.siteId !== publicSitePosition.siteId || String(currentRow.SirenSiret ?? "").trim()
-        || !publicSiteCandidate(proof?.record, proof?.publisher, currentRow)
-        || changes.Latitude !== publicSitePosition.latitude || changes.Longitude !== publicSitePosition.longitude
-        || Object.keys(changes).some(key => !["Latitude", "Longitude", "PositionSource", "PositionProof"].includes(key))) {
-        throw new Error("La position du site public exige sa preuve, la fiche analysée inchangée et aucune attribution d’un identifiant juridique.");
+      const proof = publicSitePosition.proof?.find((item) =>
+        [
+          "EXPLICIT_PUBLISHER_SITE_POINT",
+          "REVIEWED_NAMED_SITE",
+          "NAMED_SITE_BUILDING",
+          "CERTIFIED_SITE_ENTRANCE",
+        ].includes(item.kind),
+      );
+      let stored;
+      try {
+        stored = JSON.parse(changes.PositionProof);
+      } catch {
+        /* fail closed below */
       }
-    } else if (!positionSiret || finalSiret !== positionSiret) throw new Error("La position doit rester rattachée au SIRET du candidat retenu.");
+      const named = [
+        "REVIEWED_NAMED_SITE",
+        "NAMED_SITE_BUILDING",
+        "CERTIFIED_SITE_ENTRANCE",
+      ].includes(proof?.kind)
+        ? presentedCandidate(
+            namedSiteCandidate(
+              proof.kind === "CERTIFIED_SITE_ENTRANCE"
+                ? proof.siteRecord
+                : proof.record,
+              currentRow,
+            ),
+            currentRow,
+          )
+        : null;
+      const municipal = !named
+        ? presentedCandidate(
+            publicSiteCandidate(proof?.record, proof?.publisher, currentRow),
+            currentRow,
+          )
+        : null;
+      const publicCandidate = named || municipal;
+      const namedValues = publicCandidate
+        ? {
+            NomCommercial: publicCandidate.nomCommercial,
+            Adresse: publicCandidate.adresse,
+            Telephone:
+              publicCandidate.telephone || formatPhone(currentRow.Telephone),
+            Courriel: publicCandidate.courriel,
+            SiteWeb: publicCandidate.siteWeb,
+            RaisonSociale: publicCandidate.raisonSociale,
+          }
+        : {};
+      if (
+        !expectedRow ||
+        !publicSiteWriteProofValid(publicSitePosition) ||
+        !publicSiteWriteProofValid(stored) ||
+        stored.siteId !== publicSitePosition.siteId ||
+        String(currentRow.SirenSiret ?? "").trim() ||
+        !(
+          named ||
+          publicSiteCandidate(proof?.record, proof?.publisher, currentRow)
+        ) ||
+        changes.Latitude !== publicSitePosition.latitude ||
+        changes.Longitude !== publicSitePosition.longitude ||
+        Object.keys(changes).some(
+          (key) =>
+            ![
+              "Latitude",
+              "Longitude",
+              "PositionSource",
+              "PositionProof",
+            ].includes(key) &&
+            !(
+              Object.prototype.hasOwnProperty.call(namedValues, key) &&
+              changes[key] === namedValues[key]
+            ),
+        )
+      ) {
+        throw new Error(
+          "La position du site public exige sa preuve, la fiche analysée inchangée et aucune attribution d’un identifiant juridique.",
+        );
+      }
+    } else if (!positionSiret || finalSiret !== positionSiret)
+      throw new Error(
+        "La position doit rester rattachée au SIRET du candidat retenu.",
+      );
   }
 
-  if (Object.prototype.hasOwnProperty.call(changes ?? {}, "SirenSiret")) {
+  let duplicateRowId = null;
+  if (
+    Object.prototype.hasOwnProperty.call(changes ?? {}, "SirenSiret") &&
+    identifierParts(changes.SirenSiret).identifier !==
+      identifierParts(currentRow.SirenSiret).identifier
+  ) {
     const conflict = identifierConflict(before.rows, rowId, changes.SirenSiret);
     if (conflict) {
-      await selectRow(conflict.id);
-      throw new Error("Ce SIREN/SIRET existe déjà dans une autre structure. La ligne existante a été sélectionnée.");
+      const sameSiret =
+        identifierParts(conflict.SirenSiret).siret === positionSiret &&
+        identifierParts(changes.SirenSiret).siret === positionSiret;
+      const target = {
+        ...currentRow,
+        NomCommercial: changes.NomCommercial ?? currentRow.NomCommercial,
+        Adresse: changes.Adresse ?? currentRow.Adresse,
+      };
+      const samePlace = siteContextEvidence(target, {
+        name: conflict.NomCommercial,
+        adresse: conflict.Adresse,
+        commune: extractLocationFromAddress(conflict.Adresse).commune,
+      }).matched;
+      if (!verifiedIdentity || !expectedRow || !sameSiret || !samePlace) {
+        await selectRow(conflict.id);
+        throw new Error(
+          "Ce SIREN/SIRET existe déjà dans une autre structure. La ligne existante a été sélectionnée.",
+        );
+      }
+      duplicateRowId = conflict.id;
     }
   }
 
@@ -299,11 +551,22 @@ export async function applyEnrichmentChanges(rowId, changes, mappings, { positio
     fields[columnId] = value;
   }
   if (!Object.keys(fields).length) {
-    throw new Error(skipped.length ? `Aucune modification applicable. Champs non modifiables ou non mappés : ${skipped.join(", ")}.` : "Aucune modification sélectionnée.");
+    throw new Error(
+      skipped.length
+        ? `Aucune modification applicable. Champs non modifiables ou non mappés : ${skipped.join(", ")}.`
+        : "Aucune modification sélectionnée.",
+    );
   }
 
-  await grist.docApi.applyUserActions([["UpdateRecord", before.tableId, rowId, fields]]);
+  await grist.docApi.applyUserActions([
+    ["UpdateRecord", before.tableId, rowId, fields],
+  ]);
   const after = await fetchFullSnapshot(mappings);
   await selectRow(rowId);
-  return { snapshot: after, row: findRowById(after, rowId), skipped };
+  return {
+    snapshot: after,
+    row: findRowById(after, rowId),
+    skipped,
+    duplicateRowId,
+  };
 }

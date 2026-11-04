@@ -61,9 +61,12 @@ export function validateAddressBuildingRecord(record) {
   const relation = record?.relations?.[0];
   const rnb = record?.rnb;
   const refuse = reason => ({ accepted: false, reason });
+  const parcelBinding = record?.bindingMethod === "rnb-address-parcel"
+    && rnb?.addresses?.some(a => a.id === ban?.id)
+    && String(ban?.cad_parcelles ?? "").split("|").filter(Boolean).some(id => rnb?.plots?.some(p => p.id === id));
   if (!ban || !/^\d{5}_[A-Za-z0-9]+_\d{5}(?:_[A-Za-z]+)?$/.test(ban.id || "")
     || !["entrée", "bâtiment"].includes(ban.type_position)
-    || String(ban.certification_commune) !== "1" || ban.source_position !== "commune") return refuse("Adresse BAN non certifiée ou précision d’adresse insuffisante.");
+    || (String(ban.certification_commune) !== "1" && !parcelBinding) || ban.source_position !== "commune") return refuse("Adresse BAN non certifiée ou précision d’adresse insuffisante.");
   const adresse = banAddress(ban);
   if (!sameNumberedSiteAddress(adresse, adresse)) return refuse("Adresse complète de site requise.");
   if (record.relations?.length !== 1 || !relation || relation.cle_interop_adr !== ban.id
@@ -72,7 +75,7 @@ export function validateAddressBuildingRecord(record) {
     || group.cle_interop_adr_principale_ban !== ban.id
     || !sameNumberedSiteAddress(adresse, group.libelle_adr_principale_ban)
     || !sameNumberedSiteAddress(adresse, relation.libelle_adresse)
-    || group.contient_fictive_geom_groupe !== false || group.fiabilite_emprise_sol !== "BONNE"
+    || group.contient_fictive_geom_groupe !== false || (!["BONNE"].includes(group.fiabilite_emprise_sol) && !(parcelBinding && group.fiabilite_emprise_sol === "MOYENNE"))
     || group.fiabilite_cr_adr_niv_1 !== "données croisées à l'adresse fiables") return refuse("Le bâtiment principal ou la fiabilité foncière contredit l’adresse BAN.");
   if (record.constructions?.length !== 1 || !construction?.batiment_construction_id
     || construction.batiment_groupe_id !== group.batiment_groupe_id || construction.fictive_geom_cstr !== false

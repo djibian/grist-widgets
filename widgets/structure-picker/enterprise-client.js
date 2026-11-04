@@ -1,3 +1,4 @@
+import { readOfficialSnapshot } from "./official-snapshots.js";
 import {
   EXTERNAL_LIMIT,
   buildOfficialTextSearchRequest,
@@ -106,6 +107,8 @@ export async function fetchOfficialRequest(request, {
   onEvent,
 } = {}) {
   if (!request?.url) throw new Error("Requête Annuaire invalide.");
+  const snapshot = new URL(request.url).hostname === "recherche-entreprises.api.gouv.fr" ? await boundedSource("annuaire:snapshot", child => readOfficialSnapshot(request, {fetchImpl, signal:child}), {signal, timeoutMs:600}).catch(error => { if (signal?.aborted) throw error; return null; }) : null;
+  if (snapshot) return snapshot;
   const cached = readCache(request, cacheTtlMs);
   if (cached) {
     emitTrace(onEvent, { source: "annuaire:cache", state: "ok", url: request.url, elapsedMs: 0 });

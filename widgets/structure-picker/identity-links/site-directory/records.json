@@ -1,0 +1,1017 @@
+{
+  "schemaVersion": 1,
+  "recordCount": 24,
+  "records": [
+    {
+      "id": "retz-accueil",
+      "url": "https://retz-accueil.fr/mentions-legales",
+      "name": "Retz Accueil",
+      "adresse": "7 rue Sainte Catherine 44270 Machecoul",
+      "commune": "Machecoul",
+      "postcode": "44270",
+      "publisherKind": "operator",
+      "publisherLabel": "Retz Accueil",
+      "contacts": {
+        "phones": [
+          "02 40 54 20 38"
+        ],
+        "emails": [],
+        "websites": [
+          "https://retz-accueil.fr/"
+        ]
+      },
+      "siret": "48489700400020",
+      "checkedAt": "2026-11-03T20:09:41.514084+00:00",
+      "sourceSha256": "4f1e607630c467d70ac27855f26a6a60dca915922539757f336f75e578d1e3c1",
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Retz Accueil",
+            "excerpts": [
+              "mentions legales de l association retz accueil en loire atlantique l association back presentation projet as",
+              "mentions legales de l association retz accueil en loire atlantique l association back presentation projet associatif"
+            ]
+          },
+          "adresse": {
+            "value": "7 rue Sainte Catherine 44270 Machecoul",
+            "excerpts": [
+              "ntions legales association retz accueil 7 rue sainte catherine 44270 machecoul tel 02 40 54 20 38 association p",
+              "ions legales association retz accueil 7 rue sainte catherine 44270 machecoul tel 02 40 54 20 38 association prive",
+              " legales association retz accueil 7 rue sainte catherine 44270 machecoul tel 02 40 54 20 38 association privee a but",
+              "s association retz accueil 7 rue sainte catherine 44270 machecoul tel 02 40 54 20 38 association privee a but non lucra",
+              "ion retz accueil 7 rue sainte catherine 44270 machecoul tel 02 40 54 20 38 association privee a but non lucratif si",
+              "tz accueil 7 rue sainte catherine 44270 machecoul tel 02 40 54 20 38 association privee a but non lucratif siret 484 89"
+            ]
+          },
+          "siret": {
+            "value": "48489700400020",
+            "excerpts": [
+              "0 54 20 38 Association Privée à but non lucratif, Siret 484 897 004 00020, APE 8790B Crédits Création et hébergement : Société Microzone, par le biais de l"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "paz-a-pas",
+      "url": "https://parents.loire-atlantique.fr/44/paz-a-pas/parents_10597",
+      "name": "Paz à Pas",
+      "adresse": "Rue Françoise Dolto 44680 Sainte-Pazanne",
+      "commune": "Sainte-Pazanne",
+      "postcode": "44680",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Département de Loire-Atlantique et CAF",
+      "contacts": {
+        "phones": [
+          "02 40 02 68 31"
+        ],
+        "emails": [],
+        "websites": [
+          "https://pazapas.fr/"
+        ]
+      },
+      "checkedAt": "2026-11-03T20:09:41.523076+00:00",
+      "sourceSha256": "85ba55802517db6368a4b7240feb2e7acf8f3d94dff157246fd5b823a4a90148",
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Paz à Pas",
+            "excerpts": [
+              "paz a pas site questions de parents de la caf et du departement de loire ",
+              "paz a pas site questions de parents de la caf et du departement de loire",
+              "paz a pas site questions de parents de la caf et du departement de loire atlant"
+            ]
+          },
+          "adresse": {
+            "value": "Rue Françoise Dolto 44680 Sainte-Pazanne",
+            "excerpts": [
+              "e maison de l enfance daniel thebaudeau rue francoise dolto 44680 sainte pazanne localiser sur une carte contact ",
+              "ison de l enfance daniel thebaudeau rue francoise dolto 44680 sainte pazanne localiser sur une carte contact 02 40 02 6",
+              "enfance daniel thebaudeau rue francoise dolto 44680 sainte pazanne localiser sur une carte contact 02 40 02 68 31 c",
+              "e daniel thebaudeau rue francoise dolto 44680 sainte pazanne localiser sur une carte contact 02 40 02 68 31 contact",
+              "el thebaudeau rue francoise dolto 44680 sainte pazanne localiser sur une carte contact 02 40 02 68 31 contacter par mail vis"
+            ]
+          },
+          "siret": {
+            "value": "78607269400049",
+            "excerpts": [
+              "{\"results\":[{\"siren\":\"786072694\",\"siren_conserve\":null,\"nom_complet\":\"ASSOCIATION PAZ  A PAS\",\"nom_raison_sociale\":\"ASSOCIATION PAZ  A PAS\",\"sigle\":null,\"nombre_etablissements\":3,\"nombre_etablissements_ouverts\":1,\"siege\":{\"a_opco\":true,\"activite_principale\":\"88.99B\",\"activite_principale_naf25\":\"88.99H\",\"activite_principale_registre_metier\":null,\"annee_tranche_effectif_salarie\":\"2024\",\"adresse\":\"RUE FRANCOISE DOLTO 44680 SAINTE-PAZANNE\",\"caractere_employeur\":\"O\",\"cedex\":null,\"code_pays_etranger\":null,\"code_postal\":\"44680\",\"commune\":\"44186\",\"complement_adresse\":null,\"coordonnees\":\"47.096788254,-1.811723754\",\"date_creation\":\"2006-08-28\",\"date_debut_activite\":\"2008-01-01\",\"date_fermeture\":null,\"date_mise_a_jour\":null,\"date_mise_a_jour_insee\":\"2025-12-05T16:23:56\",\"departement\":\"44\",\"distribution_speciale\":null,\"epci\":\"200067346\",\"est_siege\":true,\"etat_administratif\":\"A\",\"geo_adresse\":null,\"geo_id\":null,\"indice_repetition\":null,\"latitude\":\"47.096788254\",\"libelle_cedex\":null,\"libelle_commune\":\"SAINTE-PAZANNE\",\"libelle_commune_etranger\":null,\"libelle_pays_etranger\":null,\"libelle_voie\":\"FRANCOISE DOLTO\",\"liste_enseignes\":null,\"liste_finess\":null,\"liste_id_bio\":null,\"liste_idcc\":[\"1518\"],\"liste_id_organisme_formation\":null,\"liste_rge\":null,\"liste_uai\":null,\"longitude\":\"-1.811723754\",\"nom_commercial\":null,\"numero_voie\":null,\"dernier_numero_voie\":null,\"region\":\"52\",\"siret\":\"78607269400049\",\"statut_diffusion_etablissement\":\"O\",\"tranche_effectif_salarie\":\"12\",\"type_voie\":\"RUE\"},\"activite_principale\":\"88.99B\",\"activite_principale_naf25\":\"88.99H\",\"categorie_entreprise\":\"PME\",\"caractere_employeur\":null,\"annee_categorie_entreprise\":\"2024\",\"date_creation\":\"1900-01-01\",\"date_fermeture\":null,\"date_mise_a_jour\":\"2026-11-03T08:55:12\",\"date_mise_a_jour_insee\":\"2025-12-06T06:21:14\",\"date_mise_a_jour_rne\":null,\"etat_administratif\":\"A\",\"nature_juridique\":\"9220\",\"section_activite_principale\":\"Q\",\"tranche_effectif_salarie\":\"12\",\"annee_tranche_effectif_salarie\":\"2024\",\"statut_diffusion\":\"O\",\"opposition_diffusion_commerciale\":null,\"matching_etablissements\":[{\"a_opco\":true,\"activite_principale\":\"88.99B\",\"activite_principale_naf25\":\"88.99H\",\"ancien_siege\":false,\"annee_tranche_effectif_salarie\":\"2024\",\"adresse\":\"RUE FRANCOISE DOLTO 44680 SAINTE-PAZANNE\",\"caractere_employeur\":\"O\",\"code_postal\":\"44680\",\"commune\":\"44186\",\"date_creation\":\"2006-08-28\",\"date_debut_activite\":\"2008-01-01\",\"date_fermeture\":null,\"epci\":\"200067346\",\"est_siege\":true,\"etat_administratif\":\"A\",\"geo_id\":null,\"latitude\":\"47.096788254\",\"libelle_commune\":\"SAINTE-PAZANNE\",\"liste_enseignes\":null,\"liste_finess\":null,\"liste_id_bio\":null,\"liste_idcc\":[\"1518\"],\"liste_id_organisme_formation\":null,\"liste_rge\":null,\"liste_uai\":null,\"longitude\":\"-1.811723754\",\"nom_commercial\":null,\"region\":\"52\",\"siret\":\"78607269400049\",\"statut_diffusion_etablissement\":\"O\",\"tranche_effectif_salarie\":\"12\"}]}],\"total_results\":1,\"page\":1,\"per_page\":25,\"total_pages\":1}"
+            ],
+            "sourceUrl": "https://recherche-entreprises.api.gouv.fr/search?q=78607269400049&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25"
+          }
+        }
+      },
+      "point": {
+        "kind": "address-target",
+        "latitude": 47.096,
+        "longitude": -1.8101599999999962,
+        "nativeUrl": "https://www.openstreetmap.org/directions?engine=graphhopper_car&route=47.096%2C-1.8101599999999962#map=11/47.096/-1.8101599999999962",
+        "precision": "Cible d’itinéraire publiée ; précision de site non documentée"
+      },
+      "siret": "78607269400049",
+      "registration": {
+        "url": "https://recherche-entreprises.api.gouv.fr/search?q=78607269400049&departement=44%2C85&etat_administratif=A&minimal=true&include=matching_etablissements%2Csiege&limite_matching_etablissements=100&page=1&per_page=25",
+        "checkedAt": "2026-11-04T12:12:15.595Z",
+        "sha256": "6142be8292d3967fa06b35967fd6e90efbe524be054fae63f1c982fa55bc5501",
+        "legalName": "ASSOCIATION PAZ  A PAS",
+        "adresse": "RUE FRANCOISE DOLTO 44680 SAINTE-PAZANNE"
+      }
+    },
+    {
+      "id": "roule-ta-bille",
+      "url": "https://parents.loire-atlantique.fr/44/roule-ta-bille/parents_19747",
+      "name": "Roule Ta Bille",
+      "adresse": "1 rue Paul Fort 44760 La Bernerie-en-Retz",
+      "commune": "La Bernerie-en-Retz",
+      "postcode": "44760",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Département de Loire-Atlantique et CAF",
+      "contacts": {
+        "phones": [
+          "02 40 82 75 31"
+        ],
+        "emails": [],
+        "websites": [
+          "https://rouletabille.net/"
+        ]
+      },
+      "checkedAt": "2026-11-03T20:09:41.529939+00:00",
+      "sourceSha256": "3790cdd9aa34df43a1a7637039e00c3d7ba6eb067bd8766ae9e134b2d8f88aa2",
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Roule Ta Bille",
+            "excerpts": [
+              "roule ta bille site questions de parents de la caf et du departement de loi",
+              "roule ta bille site questions de parents de la caf et du departement de loire ",
+              "roule ta bille site questions de parents de la caf et du departement de loire atlant"
+            ]
+          },
+          "adresse": {
+            "value": "1 rue Paul Fort 44760 La Bernerie-en-Retz",
+            "excerpts": [
+              "t parents enfance 0 a 6 ans enfance 7 a 11 ans ados jeunes adultes la vie des familles les familles face l agen",
+              "re des acteurs roule ta bille adresse 1 rue paul fort 44760 bernerie en retz la localiser sur une carte contact 0",
+              "es acteurs roule ta bille adresse 1 rue paul fort 44760 bernerie en retz la localiser sur une carte contact 02 40 ",
+              "teurs roule ta bille adresse 1 rue paul fort 44760 bernerie en retz la localiser sur une carte contact 02 40 82 75",
+              " roule ta bille adresse 1 rue paul fort 44760 bernerie en retz la localiser sur une carte contact 02 40 82 75 31 co",
+              "e ta bille site questions de parents de la caf et du departement de loire atlantique aller au contenu aller au m",
+              " ta bille adresse 1 rue paul fort 44760 bernerie en retz la localiser sur une carte contact 02 40 82 75 31 contacter par mail "
+            ]
+          }
+        }
+      },
+      "point": {
+        "kind": "address-target",
+        "latitude": 47.081136,
+        "longitude": -2.034341,
+        "nativeUrl": "https://www.openstreetmap.org/directions?engine=graphhopper_car&route=47.081136%2C-2.034341#map=11/47.081136/-2.034341",
+        "precision": "Cible d’itinéraire publiée ; précision de site non documentée"
+      }
+    },
+    {
+      "id": "espace-vie-pornic",
+      "url": "https://www.residences-espaceetvie.fr/residences/pornic-loire-atlantique-residences-seniors-44",
+      "name": "Espace et Vie Pornic",
+      "adresse": "2 rue Joshua Slocum 44210 Pornic",
+      "commune": "Pornic",
+      "postcode": "44210",
+      "publisherKind": "operator",
+      "publisherLabel": "Espace et Vie — résidence de Pornic",
+      "contacts": {
+        "phones": [
+          "02 51 74 33 00"
+        ],
+        "emails": [],
+        "websites": [
+          "https://www.residences-espaceetvie.fr/residences/pornic-loire-atlantique-residences-seniors-44"
+        ]
+      },
+      "checkedAt": "2026-11-03T20:09:41.564864+00:00",
+      "sourceSha256": "2110df85b229e22ae9320c1a3895214081aae7d7585ee2700d613d198ea7a97c",
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Espace et Vie Pornic",
+            "excerpts": [
+              "<title>Résidence seniors à Pornic - Loire-Atlantique (44) - Espace et Vie</title>"
+            ]
+          },
+          "adresse": {
+            "value": "2 rue Joshua Slocum 44210 Pornic",
+            "excerpts": [
+              "ence seniors pornic loire atlantique 44 2 rue joshua slocum 44210 pornic 02 51 74 33 00 appartements disponible",
+              "ce seniors pornic loire atlantique 44 2 rue joshua slocum 44210 pornic 02 51 74 33 00 appartements disponibles re",
+              "eniors pornic loire atlantique 44 2 rue joshua slocum 44210 pornic 02 51 74 33 00 appartements disponibles recevoir ",
+              "pornic loire atlantique 44 2 rue joshua slocum 44210 pornic 02 51 74 33 00 appartements disponibles recevoir la broc",
+              "loire atlantique 44 2 rue joshua slocum 44210 pornic 02 51 74 33 00 appartements disponibles recevoir la brochure e",
+              "residence seniors a pornic loire atlantique 44 espace et vie recevoir la brochure parrainer un p"
+            ]
+          }
+        }
+      },
+      "point": {
+        "kind": "operator-site-point",
+        "latitude": 47.1146032,
+        "longitude": -2.0863187,
+        "nativeHtml": "<section id=\"block_4e00615a09d269dee3e9b415d026a39b\" class=\" section section_quartier-block\" style=\"background-color:#f1f1f1\"          data-res=\"2201\"\n         data-lat=\"47.1146032\"\n         data-lng=\"-2.0863187\"\n         data-zoom=\"15\"\n         data-icon=\"https://www.residences-espaceetvie.fr/wp-content/uploads/2026/09/icon-vie-de-quartier-sable.webp\"\n         data-icon-alt=\"https://www.residences-espaceetvie.fr/wp-content/uploads/2026/09/icon-vie-de-quartier-prune.webp\"\n>",
+        "precision": "Point de la résidence publié par son exploitant ; précision métrique non documentée"
+      }
+    },
+    {
+      "id": "cousteau-machecoul",
+      "url": "https://www.machecoul-saint-meme.fr/vivre-ici/enfance-jeunesse/les-etablissements-scolaires/",
+      "name": "Groupe scolaire Jacques-Yves Cousteau",
+      "adresse": "1 boulevard Gabriel Reliquet 44270 Machecoul-Saint-Même",
+      "commune": "Machecoul-Saint-Même",
+      "postcode": "44270",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Ville de Machecoul-Saint-Même",
+      "contacts": {
+        "phones": [
+          "02 40 02 26 44"
+        ],
+        "emails": [
+          "ce.0440587z@ac-nantes.fr"
+        ],
+        "websites": [
+          "https://ecoleprimairejacquesyvescousteau-machecoulsaintmeme.e-primo.fr/"
+        ]
+      },
+      "checkedAt": "2026-11-03T20:11:13.870845+00:00",
+      "sourceSha256": "df31c3ff4c62c90ebb56e96397e841a53d9bdc82eaa9b6d5c47c63752c6a1728",
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Groupe scolaire Jacques-Yves Cousteau",
+            "excerpts": [
+              "Groupe scolaire Jacques-Yves Cousteau – public Accès maternelle : bd des Prises Accès primaire : 1 bd Gabriel Reliquet 02 40 02 26 44 ce.0440587z@ac-nantes.fr Site internet e-primo Pour les inscriptions, téléchargez les documents ci-dessous, complétez et joign"
+            ]
+          },
+          "adresse": {
+            "value": "1 boulevard Gabriel Reliquet 44270 Machecoul-Saint-Même",
+            "excerpts": [
+              "Accès primaire : 1 bd Gabriel Reliquet 02 40 02 26 44 ce.0440587z@ac-nantes.fr Site internet e-primo Pour les inscriptions, téléchargez les documents ci-dessous, complétez et joign",
+              "44270 Machecoul-Saint-Même"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "notre-dame-challans",
+      "url": "https://challans-ecolenotredame.fr/",
+      "name": "École primaire Notre Dame",
+      "adresse": "15 rue du Capitaine Debouté 85300 Challans",
+      "commune": "Challans",
+      "postcode": "85300",
+      "publisherKind": "operator",
+      "publisherLabel": "École Notre-Dame de Challans",
+      "contacts": {
+        "phones": [
+          "02 51 93 19 93"
+        ],
+        "emails": [
+          "direction@challans-ecolenotredame.fr"
+        ],
+        "websites": [
+          "https://challans-ecolenotredame.fr/"
+        ]
+      },
+      "checkedAt": "2026-11-03T20:18:18.227354+00:00",
+      "sourceSha256": "257d9a04fdb017cfd25b3dc856dee18600e28cf96a8ef7b8ed9258d816bb3824",
+      "native": {
+        "fields": {
+          "name": {
+            "value": "École primaire Notre Dame",
+            "excerpts": [
+              "olenotredame.fr Inscription Inscription Accueil L’école Projet d’Etablissement Equipe éducative Locaux/Equipements Infos pratiques Horaires et calendriers ",
+              "apply(e.matches);});}})(); Aller au contenu Ecole primaire Notre Dame 15, rue du Capitaine Debouté 85300 Challans Tel: 02 51 93 19 93 direction@challans-ecole",
+              "atches);});}})(); Aller au contenu Ecole primaire Notre Dame 15, rue du Capitaine Debouté 85300 Challans Tel: 02 51 93 19 93 direction@challans-ecolenotred",
+              ");});}})(); Aller au contenu Ecole primaire Notre Dame 15, rue du Capitaine Debouté 85300 Challans Tel: 02 51 93 19 93 direction@challans-ecolenotredame.f"
+            ]
+          },
+          "adresse": {
+            "value": "15 rue du Capitaine Debouté 85300 Challans",
+            "excerpts": [
+              "[sizes^=\"auto,\" i]){contain-intrinsic-size:3000px 1500px} /*# sourceURL=wp-img-auto-sizes-contain-inline-css */ :root{--ast-post-nav-space:0;--ast-conta",
+              "-top: 6px;margin-bottom: 6px;}.social-show-label-true .ast-builder-social-element {width: auto;padding: 0 0.4em;}[data-section^=\"section-fb-social-icons-",
+              "ifb-cta a,.ast-single-post .entry-content .uabb-module-content a,.ast-single-post .entry-content .uagb-post-grid a,.ast-single-post .entry-content .uagb",
+              "r au contenu Ecole primaire Notre Dame 15, rue du Capitaine Debouté 85300 Challans Tel: 02 51 93 19 93 direction@challans-ecolenotredame.fr Inscription Inscrip",
+              "nu Ecole primaire Notre Dame 15, rue du Capitaine Debouté 85300 Challans Tel: 02 51 93 19 93 direction@challans-ecolenotredame.fr Inscription Inscription Acc",
+              " primaire Notre Dame 15, rue du Capitaine Debouté 85300 Challans Tel: 02 51 93 19 93 direction@challans-ecolenotredame.fr Inscription Inscription Accueil L",
+              "ire Notre Dame 15, rue du Capitaine Debouté 85300 Challans Tel: 02 51 93 19 93 direction@challans-ecolenotredame.fr Inscription Inscription Accueil L’école Pr"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "saint-joseph-chaumes",
+      "url": "https://ehpad-saint-joseph.net/",
+      "name": "EHPAD Saint Joseph",
+      "adresse": "Chemin Saint Joseph 44320 Chaumes-en-Retz",
+      "commune": "Chaumes-en-Retz",
+      "postcode": "44320",
+      "publisherKind": "operator",
+      "publisherLabel": "EHPAD Saint-Joseph",
+      "contacts": {
+        "phones": [
+          "02 40 21 30 15"
+        ],
+        "emails": [
+          "direction@residence-st-joseph.fr"
+        ],
+        "websites": [
+          "https://ehpad-saint-joseph.net/"
+        ]
+      },
+      "checkedAt": "2026-11-03T20:18:18.240300+00:00",
+      "sourceSha256": "83ced9591ef1a6a2874b56f8a7b2d81deb695cb19548cf059b53dfbd619a9800",
+      "native": {
+        "fields": {
+          "name": {
+            "value": "EHPAD Saint Joseph",
+            "excerpts": [
+              "t:1px} document.documentElement.className = 'js'; Ehpad Saint Joseph | Résidence médicalisée à Chaumes en Retz let jqueryParams=[],jQuery=function(r){retur",
+              " document.documentElement.className = 'js'; Ehpad Saint Joseph | Résidence médicalisée à Chaumes en Retz let jqueryParams=[],jQuery=function(r){return jque",
+              "ent.documentElement.className = 'js'; Ehpad Saint Joseph | Résidence médicalisée à Chaumes en Retz let jqueryParams=[],jQuery=function(r){return jqueryParam"
+            ]
+          },
+          "adresse": {
+            "value": "Chemin Saint Joseph 44320 Chaumes-en-Retz",
+            "excerpts": [
+              " que la direction se tient à votre disposition.  Chemin Saint-Joseph Accès : par la rue de Pornic, l’impasse face à la poste  02 40 21 30 15  direction@r",
+              " document.documentElement.className = 'js'; Ehpad Saint Joseph | Résidence médicalisée à Chaumes en Retz let jqueryParams=[],jQuery=function(r){return jque",
+              "ent.documentElement.className = 'js'; Ehpad Saint Joseph | Résidence médicalisée à Chaumes en Retz let jqueryParams=[],jQuery=function(r){return jqueryParam",
+              "sation Adresse Chemin Saint Joseph Arthon-en-retz 44320 Chaumes-en-Retz Accès : par la rue de Pornic, l’impasse face à la poste Heures d’ouverture Du lundi",
+              " Adresse Chemin Saint Joseph Arthon-en-retz 44320 Chaumes-en-Retz Accès : par la rue de Pornic, l’impasse face à la poste Heures d’ouverture Du lundi au vendredi : 9"
+            ]
+          },
+          "siret": {
+            "value": "78592725200011",
+            "excerpts": [
+              "<p style=\"text-align: justify;\"><span style=\"color: #e09900; font-size: medium;\"><b>Éditeur du Site : </b></span></p>\n<p style=\"text-align: justify;\"><span style=\"font-size: medium;\">Ehpad St Joseph</span><br /><span style=\"font-size: medium;\"> Numéro de SIRET : 78592725200011</span><br /><span style=\"font-size: medium;\"> Responsable editorial : V. Feriau</span><br /><span style=\"font-size: medium;\"> 4 rue de Pornic &#8211; 44320 Chaumes-en-Retz</span><br /><span style=\"font-size: medium;\"> Téléphone : 02 40 21 30 15 &#8211; Fax : 02 40 64 82 65</span><br /><span style=\"font-size: medium;\"> E-mail : info@ehpad-saint-joseph.net</span><br /><span style=\"font-size: medium;\"> Site Web :<span style=\"color: #0c71c3;\"> <a href=\"http://https//ehpad-saint-joseph.net\" rel=\"nofollow\" style=\"color: #0c71c3;\">https://ehpad-saint-joseph.net</a></span></span></p>\n<p style=\"text-align: justify;\"><span style=\"color: #e09900; font-size: medium;\"><b>"
+            ]
+          },
+          "registeredAddress": {
+            "value": "4 rue de Pornic 44320 Chaumes-en-Retz",
+            "excerpts": [
+              "<p style=\"text-align: justify;\"><span style=\"color: #e09900; font-size: medium;\"><b>Éditeur du Site : </b></span></p>\n<p style=\"text-align: justify;\"><span style=\"font-size: medium;\">Ehpad St Joseph</span><br /><span style=\"font-size: medium;\"> Numéro de SIRET : 78592725200011</span><br /><span style=\"font-size: medium;\"> Responsable editorial : V. Feriau</span><br /><span style=\"font-size: medium;\"> 4 rue de Pornic &#8211; 44320 Chaumes-en-Retz</span><br /><span style=\"font-size: medium;\"> Téléphone : 02 40 21 30 15 &#8211; Fax : 02 40 64 82 65</span><br /><span style=\"font-size: medium;\"> E-mail : info@ehpad-saint-joseph.net</span><br /><span style=\"font-size: medium;\"> Site Web :<span style=\"color: #0c71c3;\"> <a href=\"http://https//ehpad-saint-joseph.net\" rel=\"nofollow\" style=\"color: #0c71c3;\">https://ehpad-saint-joseph.net</a></span></span></p>\n<p style=\"text-align: justify;\"><span style=\"color: #e09900; font-size: medium;\"><b>"
+            ]
+          }
+        }
+      },
+      "siret": "78592725200011",
+      "registeredAddress": "4 rue de Pornic 44320 Chaumes-en-Retz",
+      "registration": {
+        "url": "https://ehpad-saint-joseph.net/mentions-legales/",
+        "checkedAt": "2026-11-04T13:46:20.878845+00:00",
+        "sha256": "4cadeed9b3298d7602ca8a9c3b1bce4a64e1815e3b9954749aac31cfa5c0c019"
+      },
+      "access": {
+        "street": "Rue de Pornic",
+        "nativeHtml": "<p><a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\"><strong>Adresse</strong></a><br />\n<a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\">Chemin Saint Joseph</a><br />\n<a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\">Arthon-en-retz</a><br />\n<a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\">44320 Chaumes-en-Retz</a><br />\n<strong>Accès</strong> : <a href=\"https://goo.gl/maps/u9HenXWbS3PmgZrB7\">par la rue de Pornic, l’impasse face à la poste</a></p>",
+        "url": "https://ehpad-saint-joseph.net/",
+        "sourceSha256": "e78796b83bd664303f4c04ef848d3cf18660f26f02f8cf2eb3175cb540a1bd19"
+      }
+    },
+    {
+      "id": "childcare:79ebe95b34a3dc41342f",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "Le Nid des Papots",
+      "adresse": "1 rue des Petits Canards ZAC de la Romazière 85300 Challans",
+      "commune": "Challans",
+      "postcode": "85300",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [],
+        "emails": [],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Le Nid des Papots",
+            "excerpts": [
+              "<a href=\"https://petiteenfance.challansgois.fr/nos-multiaccueils/le-nid-des-papots/\">&gt; Le Nid des Papots</a>"
+            ]
+          },
+          "adresse": {
+            "value": "1 rue des Petits Canards ZAC de la Romazière 85300 Challans",
+            "excerpts": [
+              "1 rue des Petits Canards ZAC de la Romazière 85300 Challans"
+            ]
+          }
+        },
+        "siteHtml": "<h4><a href=\"https://petiteenfance.challansgois.fr/nos-multiaccueils/le-nid-des-papots/\">&gt; Le Nid des Papots</a></h4>\n<p>1 rue des Petits Canards<br />\nZAC de la Romazière<br />\n85300 <strong>Challans</strong><br />\n<strong>Ouvert du lundi au vendredi de 7h00 à 19h30</strong><br />\nLe site propose <strong>42</strong> places (30 places en accueil régulier, 10 places en accueil occasionnel et 2 places en accueil d’urgence).</p>"
+      }
+    },
+    {
+      "id": "childcare:6d9d63b5c44709f1a03f",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "Les P’tits loups",
+      "adresse": "8 rue du Petit Bois 85300 Challans",
+      "commune": "Challans",
+      "postcode": "85300",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [],
+        "emails": [],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Les P’tits loups",
+            "excerpts": [
+              "<a href=\"https://petiteenfance.challansgois.fr/nos-multiaccueils/les-ptits-loups/\">&gt; Les P’tits loups</a>"
+            ]
+          },
+          "adresse": {
+            "value": "8 rue du Petit Bois 85300 Challans",
+            "excerpts": [
+              "8 rue du Petit Bois 85300 Challans"
+            ]
+          }
+        },
+        "siteHtml": "<h4><a href=\"https://petiteenfance.challansgois.fr/nos-multiaccueils/les-ptits-loups/\">&gt; Les P’tits loups</a></h4>\n<p>8 rue du Petit Bois<br />\n85300 <strong>Challans</strong><br />\n<strong>Ouvert du lundi au vendredi de 8h00 à 18h00</strong><br />\nLe site propose <strong>20</strong> places (12 places en accueil régulier, 7 places en accueil occasionnel et 1 place en accueil d’urgence).</p>"
+      }
+    },
+    {
+      "id": "childcare:16898ebb96df64fb34f0",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "Le Petit Vert",
+      "adresse": "34 ter rue des Sables 85230 Beauvoir-sur-Mer",
+      "commune": "Beauvoir-sur-Mer",
+      "postcode": "85230",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "09 85 00 02 05"
+        ],
+        "emails": [
+          "lepetitvert85@hotmail.fr"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Le Petit Vert",
+            "excerpts": [
+              "&gt; Le Petit Vert"
+            ]
+          },
+          "adresse": {
+            "value": "34 ter rue des Sables 85230 Beauvoir-sur-Mer",
+            "excerpts": [
+              "34 ter rue des Sables 85230 Beauvoir-sur-Mer"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; Le Petit Vert</h4>\n<p>34 ter rue des Sables<br />\n85230 <strong>Beauvoir-sur-Mer<br />\nContact : 09 85 00 02 05</strong><br />\n<strong>Mail : <a href=\"mailto:lepetitvert85@hotmail.fr\">lepetitvert85@hotmail.fr</a></strong></p>"
+      }
+    },
+    {
+      "id": "childcare:380e5d0cf5b793f7a554",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "La Maison des Petits Maraichins",
+      "adresse": "30 rue Maréchal Joffre 85300 Challans",
+      "commune": "Challans",
+      "postcode": "85300",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "02 51 93 01 96"
+        ],
+        "emails": [
+          "challans@creche-expansion.com"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "La Maison des Petits Maraichins",
+            "excerpts": [
+              "&gt; La Maison des Petits Maraichins<strong><br />\n</strong>"
+            ]
+          },
+          "adresse": {
+            "value": "30 rue Maréchal Joffre 85300 Challans",
+            "excerpts": [
+              "30 rue Maréchal Joffre 85300 Challans"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; La Maison des Petits Maraichins<strong><br />\n</strong></h4>\n<p>30 rue Maréchal Joffre<br />\n85300 <strong>Challans<br />\nContact : 02 51 93 01 96</strong><br />\n<strong>Mail : <a href=\"mailto:challans@creche-expansion.com\">challans@creche-expansion.com</a><br />\nOuvert du lundi au vendredi de 7h30 à 19h30<br />\n</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:cb37fdfea77a2c7702c8",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "La Villa des Petits Garnachois",
+      "adresse": "6 rue des Ciseleurs ZA Voltière Sud 85710 La Garnache",
+      "commune": "La Garnache",
+      "postcode": "85710",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "02 51 54 56 94"
+        ],
+        "emails": [],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "La Villa des Petits Garnachois",
+            "excerpts": [
+              "&gt; La Villa des Petits Garnachois<strong><br />\n</strong>"
+            ]
+          },
+          "adresse": {
+            "value": "6 rue des Ciseleurs ZA Voltière Sud 85710 La Garnache",
+            "excerpts": [
+              "6 rue des Ciseleurs ZA Voltière Sud 85710 La Garnache"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; La Villa des Petits Garnachois<strong><br />\n</strong></h4>\n<p>6 rue des Ciseleurs<br />\nZA Voltière Sud<br />\n85710 <strong>La Garnache</strong><br />\n<strong>Contact : 02 51 54 56 94</strong><br />\n<strong>Ouvert du lundi au vendredi de 6h15 à 19h30</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:a6da3f9cb2fa6f984969",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "Pom'de rainette",
+      "adresse": "10b, rue Margotins 85300 Sallertaine",
+      "commune": "Sallertaine",
+      "postcode": "85300",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "06 32 46 62 04"
+        ],
+        "emails": [
+          "pomderainette85@gmail.com"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Pom'de rainette",
+            "excerpts": [
+              "&gt; Pom&rsquo;de rainette<strong><br />\n</strong>"
+            ]
+          },
+          "adresse": {
+            "value": "10b, rue Margotins 85300 Sallertaine",
+            "excerpts": [
+              "10b, rue Margotins 85300 Sallertaine"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; Pom&rsquo;de rainette<strong><br />\n</strong></h4>\n<p>10b, rue Margotins<br />\n85300 <strong>Sallertaine</strong><br />\n<strong>Contact : 06 32 46 62 04<br />\nMail : <a href=\"mailto:pomderainette85@gmail.com\" target=\"_blank\" rel=\"noopener\">pomderainette85@gmail.com</a></strong><br />\n<strong>Ouvert du lundi au vendredi de 7h30 à 19h</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:fdb80af5fd00f6e2bac1",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "Le Petit Bleu",
+      "adresse": "10 allée de la Josinette 85230 Saint-Gervais",
+      "commune": "Saint-Gervais",
+      "postcode": "85230",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "02 52 63 01 90"
+        ],
+        "emails": [
+          "lepetitvert85@hotmail.fr"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Le Petit Bleu",
+            "excerpts": [
+              "&gt; Le Petit Bleu<strong><br />\n</strong>"
+            ]
+          },
+          "adresse": {
+            "value": "10 allée de la Josinette 85230 Saint-Gervais",
+            "excerpts": [
+              "10 allée de la Josinette 85230 Saint-Gervais"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; Le Petit Bleu<strong><br />\n</strong></h4>\n<p>10 allée de la Josinette<br />\n85230 <strong>Saint-Gervais</strong><br />\n<strong>Contact : 02 52 63 01 90<br />\nMail : <a href=\"mailto:lepetitvert85@hotmail.fr\">lepetitvert85@hotmail.fr</a><br />\n</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:d1bb2935e0b0ea433b44",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "Picoti Picota",
+      "adresse": "2A impasse de la Caillaudière 85300 Sallertaine",
+      "commune": "Sallertaine",
+      "postcode": "85300",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "06 32 46 62 04"
+        ],
+        "emails": [
+          "contact@picoti-picota.fr"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Picoti Picota",
+            "excerpts": [
+              "&gt; Picoti Picota"
+            ]
+          },
+          "adresse": {
+            "value": "2A impasse de la Caillaudière 85300 Sallertaine",
+            "excerpts": [
+              "2A impasse de la Caillaudière 85300 Sallertaine"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; Picoti Picota</h4>\n<p>2A impasse de la Caillaudière<br />\n85300 <strong>Sallertaine<br />\nContact : 06 32 46 62 04<br />\nMail : <a href=\"mailto:contact@picoti-picota.fr\">contact@picoti-picota.fr</a><br />\n</strong><strong>Ouvert de 7h à 19h</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:c9543c920dd74a88750e",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "Les P'tits Pandas",
+      "adresse": "9 rue de l'eglise 85230 St Urbain",
+      "commune": "St Urbain",
+      "postcode": "85230",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "09 63 02 19 76"
+        ],
+        "emails": [
+          "microcrechelesptitspandas@gmail.com"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Les P'tits Pandas",
+            "excerpts": [
+              "&gt; Les P&rsquo;tits Pandas"
+            ]
+          },
+          "adresse": {
+            "value": "9 rue de l'eglise 85230 St Urbain",
+            "excerpts": [
+              "9 rue de l'eglise 85230 St Urbain"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; Les P&rsquo;tits Pandas</h4>\n<p>9 rue de l&rsquo;eglise<br />\n85230 <strong>St Urbain</strong><br />\n<strong>Contact : 09 63 02 19 76</strong><br />\n<strong>Mail : <a href=\"mailto:microcrechelesptitspandas@gmail.com\">microcrechelesptitspandas@gmail.com</a></strong><br />\n<strong>Ouvert du lundi au vendredi de 7h30 à 19h</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:6aa8239ee6415f66d985",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "MAM Arc-en-ciel",
+      "adresse": "85 bis boulevard Albert Schweitzer 85300 Challans",
+      "commune": "Challans",
+      "postcode": "85300",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "07 69 53 59 80"
+        ],
+        "emails": [
+          "mam.arcenciel.challans@gmail.com"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "MAM Arc-en-ciel",
+            "excerpts": [
+              "&gt; MAM Arc-en-ciel"
+            ]
+          },
+          "adresse": {
+            "value": "85 bis boulevard Albert Schweitzer 85300 Challans",
+            "excerpts": [
+              "85 bis boulevard Albert Schweitzer 85300 Challans"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; MAM Arc-en-ciel</h4>\n<p>85 bis boulevard Albert Schweitzer<br />\n85300 <strong>Challans </strong><br />\n<strong>Contact : 07 69 53 59 80<br />\nMail : <a href=\"mailto:mam.arcenciel.challans@gmail.com\">mam.arcenciel.challans@gmail.com</a><br />\n</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:0af052d8091e093ad5f1",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "MAM'Hôme",
+      "adresse": "20 rue Ernestine Chasserieau 85300 Froidfond",
+      "commune": "Froidfond",
+      "postcode": "85300",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "02 28 17 64 85"
+        ],
+        "emails": [
+          "mamhome85@gmail.com"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "MAM'Hôme",
+            "excerpts": [
+              "&gt; MAM&rsquo;Hôme"
+            ]
+          },
+          "adresse": {
+            "value": "20 rue Ernestine Chasserieau 85300 Froidfond",
+            "excerpts": [
+              "20 rue Ernestine Chasserieau 85300 Froidfond"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; MAM&rsquo;Hôme</h4>\n<p>20 rue Ernestine Chasserieau<br />\n85300 <strong>Froidfond<br />\nTél: 02 28 17 64 85</strong><br />\n<strong>Mail : <a href=\"mailto:mamhome85@gmail.com\">mamhome85@gmail.com</a></strong></p>"
+      }
+    },
+    {
+      "id": "childcare:abb623668e5687e61147",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "MAM Le Carrousel",
+      "adresse": "2A du Roc 85710 La Garnache",
+      "commune": "La Garnache",
+      "postcode": "85710",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "07 49 85 11 62"
+        ],
+        "emails": [
+          "mamlecarrousel@gmail.com"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "MAM Le Carrousel",
+            "excerpts": [
+              "&gt; MAM Le Carrousel"
+            ]
+          },
+          "adresse": {
+            "value": "2A du Roc 85710 La Garnache",
+            "excerpts": [
+              "2A du Roc 85710 La Garnache"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; MAM Le Carrousel</h4>\n<p>2A du Roc<br />\n85710 <strong>La Garnache<br />\n</strong><strong>Contact :</strong> <strong>07 49 85 11 62</strong><br />\n<strong>Mail : <a href=\"mailto:mamlecarrousel@gmail.com\">mamlecarrousel@gmail.com</a></strong></p>"
+      }
+    },
+    {
+      "id": "childcare:b78f958169eb3b9fdd61",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "MAM Les Chrysalides",
+      "adresse": "5 rue du Grand-Marais 85710 Bois-de-Céné",
+      "commune": "Bois-de-Céné",
+      "postcode": "85710",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "07 75 74 01 00"
+        ],
+        "emails": [
+          "leschrysalides85@gmail.com"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "MAM Les Chrysalides",
+            "excerpts": [
+              "&gt; MAM Les Chrysalides"
+            ]
+          },
+          "adresse": {
+            "value": "5 rue du Grand-Marais 85710 Bois-de-Céné",
+            "excerpts": [
+              "5 rue du Grand-Marais 85710 Bois-de-Céné"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; MAM Les Chrysalides</h4>\n<p>5 rue du Grand-Marais<br />\n85710 <strong>Bois-de-Céné  </strong><br />\n<strong>Contact : 07 75 74 01 00</strong><br />\n<strong>Mail : <a href=\"mailto:leschrysalides85@gmail.com\">leschrysalides85@gmail.com</a></strong><br />\n<strong>Ouvert du lundi au vendredi de 7h30 à 18h30</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:f1ae69f79d26f1bb448a",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "MAM Les P’tits Petons",
+      "adresse": "6 rue de la Minoterie 85670 Saint-Christophe-du-Ligneron",
+      "commune": "Saint-Christophe-du-Ligneron",
+      "postcode": "85670",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "06 20 25 68 48"
+        ],
+        "emails": [
+          "charbonneau.natacha@neuf.fr"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "MAM Les P’tits Petons",
+            "excerpts": [
+              "&gt; MAM Les P’tits Petons"
+            ]
+          },
+          "adresse": {
+            "value": "6 rue de la Minoterie 85670 Saint-Christophe-du-Ligneron",
+            "excerpts": [
+              "6 rue de la Minoterie 85670 Saint-Christophe-du-Ligneron"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; MAM Les P’tits Petons</h4>\n<p>6 rue de la Minoterie<br />\n85670 <strong>Saint-Christophe-du-Ligneron </strong><br />\n<strong>Contact : 06 20 25 68 48<br />\nMail : <a href=\"mailto:charbonneau.natacha@neuf.fr\">charbonneau.natacha@neuf.fr</a><br />\n</strong><strong>Ouvert du lundi au vendredi</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:980679d42c4ff1a6c3dd",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "MAM Les P'tits Princes et Compagnies",
+      "adresse": "15 rue des Matinières 85300 Challans",
+      "commune": "Challans",
+      "postcode": "85300",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "06 50 27 72 49"
+        ],
+        "emails": [
+          "lespetitsprincesetcompagnie@gmail.com"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "MAM Les P'tits Princes et Compagnies",
+            "excerpts": [
+              "&gt; MAM Les P&rsquo;tits Princes et Compagnies"
+            ]
+          },
+          "adresse": {
+            "value": "15 rue des Matinières 85300 Challans",
+            "excerpts": [
+              "15 rue des Matinières 85300 Challans"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; MAM Les P&rsquo;tits Princes et Compagnies</h4>\n<p>15 rue des Matinières<br />\n<strong>85300 Challans  </strong><br />\n<strong>Contact : 06 50 27 72 49<br />\n</strong><strong>Mail : <a href=\"mailto:lespetitsprincesetcompagnie@gmail.com\">lespetitsprincesetcompagnie@gmail.com</a></strong><br />\n<strong>Ouvert du lundi au vendredi de 7h à 18h30</strong></p>"
+      }
+    },
+    {
+      "id": "childcare:876ec3e9967f335f2f33",
+      "url": "https://petiteenfance.challansgois.fr/trouver-un-accueil/",
+      "name": "MAM Patati Patata",
+      "adresse": "2, rue des Écoles 85230 Beauvoir-sur-Mer",
+      "commune": "Beauvoir-sur-Mer",
+      "postcode": "85230",
+      "publisherKind": "public-authority",
+      "publisherLabel": "Challans Gois Communauté — Petite enfance",
+      "checkedAt": "2026-11-03T20:18:44.552Z",
+      "sourceSha256": "b64008b9aa5a3bd51bf554f308915bbfccb287685af24dc77aff180e0426c084",
+      "contacts": {
+        "phones": [
+          "06 35 39 03 51"
+        ],
+        "emails": [
+          "mampatatipatata@yahoo.com"
+        ],
+        "websites": []
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "MAM Patati Patata",
+            "excerpts": [
+              "&gt; MAM Patati Patata"
+            ]
+          },
+          "adresse": {
+            "value": "2, rue des Écoles 85230 Beauvoir-sur-Mer",
+            "excerpts": [
+              "2, rue des Écoles 85230 Beauvoir-sur-Mer"
+            ]
+          }
+        },
+        "siteHtml": "<h4>&gt; MAM Patati Patata</h4>\n<p>2, rue des Écoles<br />\n85230 <strong>Beauvoir-sur-Mer </strong><br />\n<strong>Contact : 06 35 39 03 51<br />\n</strong><strong>Mail : <a href=\"mailto:mampatatipatata@yahoo.com\" target=\"_blank\" rel=\"noopener\">mampatatipatata@yahoo.com</a><br />\nOuvert du lundi au vendredi de 7h à 19h</strong></p>"
+      }
+    },
+    {
+      "id": "notre-dame-clarte",
+      "url": "https://notredamedelaclarte.fr/contacts/",
+      "name": "Ecole Notre Dame de la Clarté",
+      "adresse": "43 rue Félix Platel 44310 Saint-Philbert-de-Grand-Lieu",
+      "commune": "Saint-Philbert-de-Grand-Lieu",
+      "postcode": "44310",
+      "publisherKind": "operator",
+      "publisherLabel": "École Notre-Dame de la Clarté — contact officiel",
+      "checkedAt": "2026-11-03T20:27:37.586781+00:00",
+      "sourceSha256": "ad54b513253b61541de50c506a4d35974cdeed120b4d98339817bba16de07cf7",
+      "contacts": {
+        "phones": [
+          "02 40 78 70 18"
+        ],
+        "emails": [
+          "ecolenddlc@gmail.com"
+        ],
+        "websites": [
+          "https://notredamedelaclarte.fr/"
+        ]
+      },
+      "native": {
+        "fields": {
+          "name": {
+            "value": "Ecole Notre Dame de la Clarté",
+            "excerpts": [
+              "Ecole Notre Dame de la Clarté {\"@context\":\"https:\\/\\/schema.org\",\"@graph\":[{\"@type\":\"WebPage\",\"@id\":\"https:\\/\\"
+            ]
+          },
+          "adresse": {
+            "value": "43 rue Félix Platel 44310 Saint-Philbert-de-Grand-Lieu",
+            "excerpts": [
+              "cts Téléphone: 02 40 78 70 18 43 rue Félix Platel 44310 SAINT-PHILBERT-DE-GRAND-LIEU Email école : ecolenddlc@gmail.com Email APEL: apelclarte44310@gmail.com Ecole Notre Dame de la Clarté Facebook Liens rapides Equipe éducative Inscription s Connexion Archives janvier 2025 (1) dé"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -54,17 +54,21 @@ async function banRows(street, fetchImpl) {
   throw new Error("BAN pagination exceeds the snapshot budget");
 }
 
-export async function captureBuildingSnapshot({ streets, version, fetchImpl = fetch }) {
+export async function captureBuildingSnapshot({ streets, version, houseNumbers = {}, fetchImpl = fetch }) {
   if (!streets?.length || streets.some(code => !/^\d{5}_[A-Za-z0-9]+$/.test(code)) || !/^\d{6}[a-z]_\d+$/.test(version || "")) throw new Error("BAN street identifiers and the current BDNB schema version are required");
   const snapshot = { schemaVersion: 1, complete: true, source: {
     id: "bdnb-rnb", version, generatedAt: new Date().toISOString(), streets,
+    houseNumbers,
     banUrl: BAN + "?" + new URLSearchParams({ SERVICE: "WFS", VERSION: "2.0.0", REQUEST: "GetFeature", TYPENAME: "BAN.DATA.GOUV:ban", outputFormat: "application/json", CQL_FILTER: `id_fantoir IN (${streets.map(code => `'${code}'`).join(",")})` }),
     bdnbUrl: BDNB + "rel_batiment_groupe_adresse", rnbUrl: RNB,
     license: "Licence Ouverte 2.0",
   }, ban: [], relations: [], groups: [], constructions: [], buildings: [] };
   const schema = `api_open_${version}`;
   for (const street of streets) {
-    const ban = await banRows(street, fetchImpl);
+    const allBan = await banRows(street, fetchImpl);
+    const wanted = houseNumbers[street];
+    if (wanted && (!Array.isArray(wanted) || wanted.some(n => !/^\d+$/.test(String(n))))) throw new Error("Invalid house-number scope");
+    const ban = wanted ? allBan.filter(feature => wanted.map(String).includes(String(feature.properties.numero))) : allBan;
     if (ban.some(feature => feature.properties?.id_fantoir !== street)) throw new Error("BAN ignored the requested street filter");
     const relations = [];
     // Exact primary-key lookups avoid broad LIKE scans and collation-dependent
@@ -143,7 +147,8 @@ export function buildAddressBuildingShards(snapshot) {
     const constructions = snapshot.constructions.filter(construction => construction.batiment_groupe_id === group?.batiment_groupe_id);
     const rnb = buildings.get(constructions[0]?.rnb_id);
     const record = { ban, relations, group, constructions, rnb };
-    const checked = validateAddressBuildingRecord(record);
+    let checked = validateAddressBuildingRecord(record);
+    if (!checked.accepted) { record.bindingMethod = "rnb-address-parcel"; checked = validateAddressBuildingRecord(record); }
     if (!checked.accepted) continue;
     const filename = buildingShardPath(checked.adresse);
     if (!shards.has(filename)) shards.set(filename, { schemaVersion: 1, path: filename, complete: true, source: snapshot.source, recordCount: 0, records: [] });

@@ -11,7 +11,7 @@ test("contact UI uses a dedicated left-search right-results workflow", () => {
   assert.match(html, /03 · Rechercher[\s\S]*id="contact-search"[\s\S]*04 · Vérifier[\s\S]*id="contact-results"/);
   assert.match(html, /id="contact-apply"/);
   assert.doesNotMatch(html, /id="contact-sources"/);
-  assert.match(html, /Un seul meilleur résultat par champ/);
+  assert.match(html, /Compare la valeur actuelle et la proposition/);
   assert.match(html, /src="contacts-experiment\.js\?v=1\.2\.0"/);
 });
 

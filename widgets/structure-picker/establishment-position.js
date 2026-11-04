@@ -61,6 +61,8 @@ function trustedNames(candidate, links) {
       } });
     }
   }
+  if ((links ?? []).some(link => link.siret === candidate.siret && link.verifiedOfficial && link.siteRecord))
+    names.push({name:candidate.raisonSociale,source:officialSource(candidate)});
   return names;
 }
 
@@ -99,8 +101,10 @@ export function assessSitePosition(candidate, poi, { links = [], requestedAddres
     && (!type.socialFacility || type.socialFacility === "nursing_home")
     && (!type.healthcare || type.healthcare === "nursing_home")
     && (!type.amenity || ["social_facility", "nursing_home"].includes(type.amenity));
-  if (expectedCategory === "500" && !nursingHome) {
-    return refuse("Le type du POI ne désigne pas un établissement d’hébergement EHPAD.", explicitlyLinked || nameAddressLinked);
+  const hasType = Object.values(type).some(Boolean);
+  const explicitNursingName = namedFiness && /\behpad\b/.test(normalizeIdentity(poi.name)) && nameAddressLinked;
+  if (expectedCategory === "500" && !nursingHome && !(explicitNursingName && !hasType)) {
+    return refuse("Le type du POI ne désigne pas un établissement d’hébergement EHPAD.", hasType && (explicitlyLinked || nameAddressLinked));
   }
 
   // Only the place's own name participates. A shared operator/brand on a

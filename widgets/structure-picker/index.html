@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../../shared/ui/base.css">
   <link rel="stylesheet" href="../../shared/ui/components.css">
   <link rel="stylesheet" href="../../shared/ui/structure.css">
-  <link rel="stylesheet" href="style.css?v=1.4.0">
+  <link rel="stylesheet" href="style.css?v=1.5.0">
   <link rel="stylesheet" href="contacts-layout.css?v=1.0.0">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 </head>
@@ -49,9 +49,9 @@
         </section>
 
         <aside class="gw-decision-panel search-decision">
-          <div class="gw-step-heading"><span class="gw-step-heading__index">02 · Vérifier / ajouter</span><h2 id="external-title" class="gw-step-heading__title">Nouvelles structures</h2><p class="gw-step-heading__help">Résultats actifs de l’Annuaire des Entreprises pour le 44 et le 85.</p></div>
+          <div class="gw-step-heading"><span class="gw-step-heading__index">02 · Vérifier / ajouter</span><h2 id="external-title" class="gw-step-heading__title">Nouvelles structures</h2><p class="gw-step-heading__help">Établissements trouvés en Loire-Atlantique et en Vendée.</p></div>
           <div id="external-status" class="substatus" role="status" aria-live="polite"></div>
-          <div class="section-heading compact-heading"><span class="decision-source">Annuaire des Entreprises</span><span id="external-count" class="count"></span></div>
+          <div class="section-heading compact-heading"><span class="decision-source">Établissements proposés</span><span id="external-count" class="count"></span></div>
           <div id="external-results" class="results external-results"></div>
           <div class="tab-footer"><button id="manual-create" class="button button-secondary gw-button gw-button--secondary" type="button" disabled>Structure introuvable ? Créer manuellement</button></div>
         </aside>
@@ -80,12 +80,12 @@
             <div class="gw-step-heading">
               <span class="gw-step-heading__index">03 · Rechercher</span>
               <h2 id="contact-experiment-title" class="gw-step-heading__title">Contacts publics <span class="experimental-tag gw-badge gw-badge--experimental">Expérimental</span></h2>
-              <p class="gw-step-heading__help">Croise les sources publiques pour rechercher les contacts de la structure sélectionnée.</p>
+              <p class="gw-step-heading__help">Retrouve le téléphone, le courriel et le site web de la structure sélectionnée.</p>
             </div>
             <div id="contact-current"></div>
             <div id="contact-status" class="substatus contact-status" role="status" aria-live="polite"></div>
             <div class="gw-action-dock contact-action-dock">
-              <div class="gw-action-dock__text"><strong>Recherche multi-source</strong><small>Les propositions de qualité insuffisante ne sont pas affichées.</small></div>
+              <div class="gw-action-dock__text"><strong>Compléter les contacts</strong><small>Les propositions de qualité insuffisante ne sont pas affichées.</small></div>
               <button id="contact-search" class="button button-secondary gw-button gw-button--secondary" type="button" disabled>Rechercher les contacts</button>
             </div>
           </section>
@@ -94,7 +94,7 @@
             <div class="gw-step-heading">
               <span class="gw-step-heading__index">04 · Vérifier</span>
               <h2 class="gw-step-heading__title">Contacts proposés</h2>
-              <p class="gw-step-heading__help">Un seul meilleur résultat par champ, avec son niveau de confiance et ses sources.</p>
+              <p class="gw-step-heading__help">Compare la valeur actuelle et la proposition avant de l’appliquer.</p>
             </div>
             <div id="contact-results" class="contact-results"></div>
             <div class="contact-apply-bar"><button id="contact-apply" class="button button-primary gw-button gw-button--primary" type="button" disabled>Appliquer les contacts cochés</button></div>
