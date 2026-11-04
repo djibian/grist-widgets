@@ -4,7 +4,6 @@ import test from "node:test";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../style.css", import.meta.url), "utf8");
-const contactsCss = await readFile(new URL("../contacts-layout.css", import.meta.url), "utf8");
 const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const structureCss = await readFile(new URL("../../../shared/ui/structure.css", import.meta.url), "utf8");
 
@@ -14,8 +13,6 @@ const requiredIds = [
   "local-count", "external-count", "enrich-button", "selected-summary",
   "enrich-status", "establishment-candidate", "proposal-panel",
   "tab-search", "tab-enrich", "enrich-badge", "panel-search", "panel-enrich",
-  "contact-experiment", "contact-search", "contact-current", "contact-status",
-  "contact-results", "contact-apply",
 ];
 
 test("charge le socle Grist Studio complet avant les feuilles locales", () => {
@@ -24,8 +21,7 @@ test("charge le socle Grist Studio complet avant les feuilles locales", () => {
   const components = html.indexOf("../../shared/ui/components.css");
   const structure = html.indexOf("../../shared/ui/structure.css");
   const local = html.indexOf("style.css?v=");
-  const contacts = html.indexOf("contacts-layout.css?v=");
-  assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local && local < contacts);
+  assert.ok(tokens >= 0 && tokens < base && base < components && components < structure && structure < local);
   assert.doesNotMatch(html, /studio\.css/);
 });
 
@@ -59,15 +55,11 @@ test("compose l'enrichissement avec davantage de largeur pour la vérification",
   assert.match(html, /id="proposal-panel"/);
 });
 
-test("compose Contacts publics dans une seconde grille équilibrée recherche puis résultats", () => {
-  assert.match(html, /id="contact-experiment"[\s\S]*class="gw-work-grid gw-work-grid--balanced contact-work-grid"/);
-  assert.match(html, /03 · Rechercher[\s\S]*id="contact-search"/);
-  assert.match(html, /04 · Vérifier[\s\S]*id="contact-results"[\s\S]*id="contact-apply"/);
-  assert.doesNotMatch(html, /id="contact-sources"/);
-  assert.match(contactsCss, /\.contact-result-row/);
-  assert.match(contactsCss, /\.contact-confidence\.exact/);
-  assert.match(contactsCss, /\.contact-confidence\.probable/);
-  assert.doesNotMatch(contactsCss, /contact-source-state/);
+test("seules les étapes 01–02 restent dans Compléter la sélection", () => {
+  assert.doesNotMatch(html, /03 · Rechercher|04 · Vérifier/);
+  assert.doesNotMatch(html, /contact-experiment|contact-search|contact-current|contact-status|contact-results|contact-apply/);
+  assert.doesNotMatch(html, /contacts-layout\.css|contacts-experiment\.js/);
+  assert.match(html, /id="selected-summary"[\s\S]*id="enrich-button"[\s\S]*id="proposal-panel"/);
 });
 
 test("utilise un cadre fluide et des variantes qui se replient selon la largeur du widget", () => {
@@ -103,14 +95,6 @@ test("la terminologie visible utilise Nom usuel", () => {
 test("APE NAF n'est plus présenté par l'interface", () => {
   assert.doesNotMatch(app, /APE \/ NAF/);
   assert.doesNotMatch(app, /addMeta\([^\n]*"APE"/);
-});
-
-test("conserve explicitement l’expérimentation Contacts publics", () => {
-  assert.match(html, /Contacts publics/);
-  assert.match(html, /Expérimental/);
-  assert.match(html, /src="contacts-experiment\.js(?:\?[^\"]*)?"/);
-  assert.match(contactsCss, /\.contact-experiment/);
-  assert.match(contactsCss, /\.contact-provenance-badge/);
 });
 
 test("applique la composition Grist Studio sans supprimer les composants métier", () => {
