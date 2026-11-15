@@ -577,6 +577,29 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.equal(nodes["enrich-button"].disabled, false);
     assert.doesNotMatch(nodes["enrich-status"].textContent, /délai maximal/);
   });
+  await t.test("real progress can be interrupted without applying an unverified identity or accepting late replies", async () => {
+    await select(0);
+    mode = "pending-verification";
+    click();
+    await settle();
+    assert.match(nodes["establishment-candidate"].textContent, /Recherche en cours/);
+    assert.match(nodes["establishment-candidate"].textContent, /Activité réelle des sources/);
+    const stop = nodes["establishment-candidate"].querySelector(".button-secondary");
+    assert.ok(stop, "a running source must expose the interrupt action");
+    stop.dispatchEvent(new Event("click"));
+    await settle();
+    assert.equal(nodes["enrich-button"].disabled, false);
+    assert.match(nodes["enrich-status"].textContent, /Recherche interrompue/);
+    assert.match(nodes["establishment-candidate"].textContent, /pistes conservées/);
+    const interruptedText = nodes["establishment-candidate"].textContent;
+    t.mock.timers.tick(2000);
+    await settle();
+    assert.equal(nodes["establishment-candidate"].textContent, interruptedText);
+    assert.equal(writes.length, 0);
+    assert.equal(nodes["proposal-panel"].querySelectorAll("input[data-identity-proposal-field]").length, 0);
+    mode = "normal";
+  });
+
   await t.test("a concurrent edit in Grist invalidates the analysed candidate before any coordinates are written", async () => {
     await select(0);
     click();
