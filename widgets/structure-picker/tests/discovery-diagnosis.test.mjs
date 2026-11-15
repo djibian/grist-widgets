@@ -205,6 +205,24 @@ test("commune beats a full address when both distinguish the same manager sites"
   assert.equal(result.question?.field, "commune", "asking for a commune is easier than a full site address");
 });
 
+test("public aliases reveal genuine homonyms even when legal names differ", () => {
+  const a = { ...site({ name: "SARL Groupe Nord" }), aliases: ["Les Petits Loups"] };
+  const b = { ...site({ name: "ASSOCIATION Centre Est", city: "Angers", code: "49000", nic: "00020" }),
+    aliases: ["Les Petits Loups"] };
+  const result = diagnoseDiscovery({ reference: { NomCommercial: "Les Petits Loups", Adresse: "" },
+    progress: progress(a, b), searching: true });
+  assert.equal(result.question?.kind, "homonyms");
+  assert.equal(result.question?.options.length, 2);
+});
+
+test("irrelevant results do not produce false location options", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const unrelated = site({ name: "Atelier de Chaudronnerie", operator: "Industrie Martin" });
+  const diagnosis = diagnoseDiscovery({ reference: row, progress: progress(unrelated), searching: true });
+  assert.equal(diagnosis.question?.field, "commune");
+  assert.equal(diagnosis.question?.options.length, 0, "do not offer a town based on an unrelated company");
+});
+
 test("an address chosen among homonyms avoids unrelated follow-up questions", () => {
   const a = site({ city: "Nantes", code: "44000" });
   const b = site({ city: "Angers", code: "49000", nic: "00020", street: "24 rue des Roses" });
