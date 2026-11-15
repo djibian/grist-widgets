@@ -342,3 +342,86 @@ test("orchestrator discovers non-siege site via legal name and rejects foreign s
     "typed SIRET plus legal-name hint must not certify contradictory site address");
   assert.equal(row.SirenSiret, "11223344500029");
 });
+
+test("a corrected address moves discovery without certifying a changed site", async () => {
+  const row = {
+    NomCommercial: "Atelier du Verger",
+    Adresse: "7 chemin des Sources 44000 Nantes",
+    Latitude: 47.24, Longitude: -1.55, SirenSiret: "",
+  };
+  const corrected = "9 rue des Lilas 49000 Angers";
+  const guidance = emptyDiscoveryGuidance();
+  const sites = [candidate({
+    nomCommercial: "Atelier du Verger", aliases: ["Atelier du Verger"],
+    nomUsuelDistinct: true, raisonSociale: "ATELIER DU VERGER",
+    siren: "123450001", siret: "12345000100024", adresse: corrected,
+    codePostal: "49000", commune: "Angers",
+  })];
+  const geocoded = [];
+  const requests = [];
+  let supplied = false;
+  const result = await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 5, maxPaginationPages: 0,
+    geocode: async address => {
+      geocoded.push(address);
+      return [{ latitude: 47.47, longitude: -0.55, adresse: corrected }];
+    },
+    fetchOfficial: async request => {
+      requests.push(request);
+      return official(request.kind === "nearby" ? sites : []);
+    },
+    onProgress: () => {
+      if (supplied) return;
+      supplied = true;
+      assert.equal(correctDiscoveryGuidance(guidance, { siret: "12345000100024" }, "address", corrected), true);
+    },
+  });
+  assert.deepEqual(geocoded, [corrected], "the initial checkpoint must redirect the subsequent geocode");
+  assert.ok(requests.some(request => request.kind === "nearby" &&
+    request.latitude === 47.47 && request.longitude === -0.55));
+  assert.equal(result.candidates.some(site => site.siret === "12345000100024"), true);
+  assert.equal(result.selectedGeocode, null, "teacher guidance is not exported as verified coordinates");
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED,
+    "a candidate at a human-corrected address must not override the original contrary address");
+  assert.equal(row.Adresse, "7 chemin des Sources 44000 Nantes");
+});
+
+test("an address corrected during expansion triggers another real geocode and nearby lookup", async () => {
+  const original = "5 avenue du Port 44000 Nantes";
+  const corrected = "8 place du Marché 49000 Angers";
+  const guidance = emptyDiscoveryGuidance();
+  const geocoded = [];
+  const nearbyLocations = [];
+  let redirected = false;
+  const found = candidate({
+    nomCommercial: "Maison de la Source", aliases: ["Maison de la Source"],
+    nomUsuelDistinct: true, raisonSociale: "MAISON DE LA SOURCE",
+    siren: "987650001", siret: "98765000100022", adresse: corrected,
+    codePostal: "49000", commune: "Angers",
+  });
+  const result = await resolveStructureIdentity({
+    row: { NomCommercial: "Maison de la Source", Adresse: original, SirenSiret: "" },
+    guidance, deepening: true, maxOfficialRequests: 6, maxPaginationPages: 0,
+    geocode: async address => {
+      geocoded.push(address);
+      return [{ latitude: address === corrected ? 47.47 : 47.22, longitude: -0.55 }];
+    },
+    fetchOfficial: async request => {
+      if (request.kind !== "nearby") return official([]);
+      nearbyLocations.push(request.latitude);
+      return official(request.latitude === 47.47 ? [found] : []);
+    },
+    onProgress: () => {
+      if (!redirected && nearbyLocations.length === 1) {
+        redirected = true;
+        correctDiscoveryGuidance(guidance, { siret: found.siret }, "address", corrected);
+      }
+    },
+  });
+  assert.equal(redirected, true);
+  assert.deepEqual(geocoded, [original, corrected]);
+  assert.deepEqual(nearbyLocations, [47.22, 47.47]);
+  assert.equal(result.candidates.some(site => site.siret === found.siret), true);
+  assert.equal(result.selectedGeocode, null);
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+});
