@@ -249,3 +249,30 @@ test("corrected search hints broaden discovery without becoming site identity ev
   assert.equal(row.NomCommercial, "École du Verger");
   assert.equal(row.Adresse, "4 rue du Jardin 44000 Nantes");
 });
+
+test("a novel site may be found by address alone but the unrelated legal operator is not automatically verified", async () => {
+  const row = {
+    NomCommercial: "Maison des Saules", Adresse: "17 rue des Moissons 44000 Nantes",
+    SirenSiret: "", Latitude: "", Longitude: "",
+  };
+  const other = candidate({
+    nomCommercial: "Société anonyme XYZ", raisonSociale: "XYZ Développement",
+    siren: "111222333", siret: "11122233300044",
+    adresse: "17 rue des Moissons 44000 Nantes", codePostal: "44000", commune: "Nantes",
+  });
+  const queries = [];
+  const result = await resolveStructureIdentity({
+    row, deepening: true, maxOfficialRequests: 12, maxPaginationPages: 0,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      queries.push(request);
+      return official(request.kind === "text" && request.query === "17 rue des moissons" &&
+        request.codePostal === "44000" ? [other] : []);
+    },
+  });
+  assert.ok(queries.some(request => request.kind === "text" &&
+    request.query === "17 rue des moissons" && request.codePostal === "44000"));
+  assert.ok(result.candidates.some(item => item.siret === other.siret), "address discovery must preserve the candidate");
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED, "address-only match cannot prove the site's SIRET");
+  assert.equal(new Set(queries.map(request => request.url)).size, queries.length, "no duplicated URL");
+});
