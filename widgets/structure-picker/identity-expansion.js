@@ -53,6 +53,14 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
     normalize(row?.RaisonSociale ?? ""),
   ].map(name => normalize(name)).filter(name => name.length >= 3))];
 
+  // A teacher-confirmed commune is an independent search clue. Never force
+  // the old postal code onto it: the old address may describe another site.
+  const selectedCommune = normalize(hint("commune"));
+  if (selectedCommune.length >= 3) {
+    for (const name of names)
+      add(buildOfficialTextSearchRequest(name + " " + selectedCommune), "name-commune-hint");
+  }
+
   // First explore alternate names at the supplied postal code. Then loosen
   // that constraint without changing the departments configured in Grist.
   for (const name of names) {
@@ -74,12 +82,6 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
   for (const address of addressOptions) {
     if (address.street)
       add(buildOfficialTextSearchRequest(address.street), "address-department");
-  }
-  // Commune-only hints aid discovery, not official site attribution.
-  const commune = hint("commune");
-  if (commune && !location.codePostal) {
-    for (const name of names)
-      add(buildOfficialTextSearchRequest(name + " " + commune), "name-commune-hint");
   }
   return queries;
 }
