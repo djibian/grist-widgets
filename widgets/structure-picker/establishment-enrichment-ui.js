@@ -57,6 +57,7 @@ const state = {
   trace: [],
   progress: null,
   progressKey: null,
+  visibleHintCount: 5,
   guidance: emptyDiscoveryGuidance(),
   isDeepening: false,
   guidedRestart: false,
@@ -110,6 +111,7 @@ function resetAnalysis() {
   state.trace = [];
   state.progress = null;
   state.progressKey = null;
+  state.visibleHintCount = 5;
   state.guidance = emptyDiscoveryGuidance();
   state.isDeepening = false;
   state.guidedRestart = false;
@@ -406,7 +408,7 @@ function appendGuidanceSummary(container) {
 }
 
 function appendDiscoveryHints(container) {
-  const leads = discoveryHints(state.progress, 5);
+  const leads = discoveryHints(state.progress, state.visibleHintCount);
   if (!leads.length) return;
   const label = document.createElement("div");
   label.className = "help";
@@ -424,6 +426,19 @@ function appendDiscoveryHints(container) {
     line.appendChild(description);
     appendGuidanceControls(line, lead.candidate);
     container.appendChild(line);
+  }
+  const remaining = (state.progress?.candidates?.length ?? 0) - leads.length;
+  if (remaining > 0) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "button button-secondary discovery-more";
+    more.textContent = "Afficher " + Math.min(5, remaining) + " autres pistes (" + remaining + " restantes)";
+    more.addEventListener("click", () => {
+      state.visibleHintCount = Math.min(250, state.visibleHintCount + 5);
+      if (state.decision) renderEstablishment();
+      else renderDiscoveryProgress();
+    });
+    container.appendChild(more);
   }
 }
 
@@ -721,7 +736,9 @@ async function runIdentityAnalysis({ deepening = false } = {}) {
   const key = [row.id, row.NomCommercial, row.Adresse, row.SirenSiret].join("|");
   const retained = state.progressKey === key ? state.progress : null;
   const retainedGuidance = state.progressKey === key ? state.guidance : null;
+  const retainedVisibleCount = state.progressKey === key ? state.visibleHintCount : 5;
   resetAnalysis();
+  state.visibleHintCount = retainedVisibleCount;
   state.guidance = retainedGuidance ?? emptyDiscoveryGuidance();
   state.isDeepening = deepening;
   const generation = ++state.generation;
