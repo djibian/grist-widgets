@@ -61,9 +61,10 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
   const chosenName = chosen(guidance, "name") || reference.NomCommercial || reference.RaisonSociale || "";
   // A source can return semantically unrelated businesses. Do not ask teachers
   // to arbitrate arbitrary search results as though these were homonyms.
+  const plausibleNames = candidate => [placeName(candidate), candidate?.raisonSociale,
+    ...(Array.isArray(candidate?.aliases) ? candidate.aliases : [])];
   let plausible = raw.filter(lead =>
-    !chosenName || fuzzyTextScore(chosenName, placeName(lead.candidate)) >= 0.68 ||
-    fuzzyTextScore(chosenName, lead.candidate?.raisonSociale) >= 0.68);
+    !chosenName || plausibleNames(lead.candidate).some(name => fuzzyTextScore(chosenName, name) >= 0.68));
   // Human choices narrow which uncertainty is useful to ask about, without
   // deleting any official observation or changing the independent verifier.
   // A corrected address has priority over an older, possibly false commune.
@@ -83,7 +84,9 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
     if (matching.length) plausible = matching;
     else locationMismatch = true;
   }
-  const leads = plausible.length ? plausible : raw;
+  // Unrelated businesses must not be suggested as choices for a missing
+  // location. A teacher may still supply a new commune in free text.
+  const leads = plausible;
   const hasCandidates = raw.length > 0;
   const sourceConflicts = raw.filter(lead => {
     const observations = lead.candidate?.observations ?? [];
