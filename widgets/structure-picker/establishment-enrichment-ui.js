@@ -19,6 +19,13 @@ import { IDENTITY_STATES, decisionEvidence } from "./identity-resolution.js";
 import { findOsmIdentityPois } from "./osm-identity.js";
 import { POSITION_STATES } from "./establishment-position.js";
 import { warmSitePositionManifest } from "./site-position-sources.js";
+import {
+  emptyDiscoveryProgress,
+  mergeDiscoveryProgress,
+  recordDiscoverySourceEvent,
+  discoveryHints,
+  discoverySourceLabel,
+} from "./discovery-progress.js";
 
 const ui = {
   enrichButton: document.getElementById("enrich-button"),
@@ -40,6 +47,8 @@ const state = {
   proposals: [],
   diagnostics: [],
   trace: [],
+  progress: null,
+  progressKey: null,
 };
 
 function clearNode(node) {
@@ -88,7 +97,12 @@ function resetAnalysis() {
   state.proposals = [];
   state.diagnostics = [];
   state.trace = [];
-  if (ui.enrichButton) ui.enrichButton.disabled = true;
+  state.progress = null;
+  state.progressKey = null;
+  if (ui.enrichButton) {
+    ui.enrichButton.disabled = true;
+    ui.enrichButton.textContent = "Analyser / compléter";
+  }
   clearNode(ui.candidate);
   clearNode(ui.proposalPanel);
   setStatus("");
@@ -265,6 +279,62 @@ function candidateCard(candidate) {
   return card;
 }
 
+
+function appendDiscoveryHints(container) {
+  const leads = discoveryHints(state.progress, 5);
+  if (!leads.length) return;
+  const label = document.createElement("div");
+  label.className = "help";
+  label.textContent = "Pistes recueillies (5 maximum affichées). Aucune identité ni aucun SIRET de site ne sont vérifiés par cette liste.";
+  container.appendChild(label);
+  for (const lead of leads) {
+    const line = document.createElement("div");
+    line.className = "choice-detail";
+    line.textContent = [
+      lead.name,
+      lead.address,
+      lead.siret ? "SIRET indiqué : " + lead.siret + " (à vérifier)" : "",
+    ].filter(Boolean).join(" — ");
+    container.appendChild(line);
+  }
+}
+
+function renderDiscoveryProgress({ stopped = false } = {}) {
+  if (!state.progress) return;
+  clearNode(ui.candidate);
+  const heading = document.createElement("h3");
+  heading.textContent = stopped ? "Recherche interrompue — pistes conservées" : "Recherche en cours — premiers résultats";
+  ui.candidate.appendChild(heading);
+  appendDiscoveryHints(ui.candidate);
+
+  const activity = state.progress.activity ?? [];
+  if (activity.length) {
+    const details = document.createElement("details");
+    const title = document.createElement("summary");
+    title.textContent = "Activité réelle des sources (" + activity.length + ")";
+    details.appendChild(title);
+    for (const entry of activity) {
+      const line = document.createElement("div");
+      line.className = "choice-detail";
+      line.textContent = entry.source + " : " + discoverySourceLabel(entry.state) +
+        (entry.elapsedMs === null ? "" : " — " + entry.elapsedMs + " ms");
+      details.appendChild(line);
+    }
+    ui.candidate.appendChild(details);
+  }
+  if (!stopped && state.controller && !state.controller.signal.aborted) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button-secondary";
+    button.textContent = "Interrompre la recherche";
+    button.addEventListener("click", () => {
+      if (state.controller && !state.controller.signal.aborted)
+        state.controller.abort(new DOMException("Interruption demandée", "AbortError"));
+    });
+    ui.candidate.appendChild(button);
+  }
+}
+
 function renderEstablishment() {
   clearNode(ui.candidate);
   const decision = state.decision;
@@ -284,9 +354,12 @@ function renderEstablishment() {
           : "");
   ui.candidate.append(title, summary);
   if (state.candidate) ui.candidate.appendChild(candidateCard(state.candidate));
-  else
-    for (const candidate of (decision.alternatives ?? []).slice(0, 2))
+  else {
+    const alternatives = (decision.alternatives ?? []).slice(0, 5);
+    for (const candidate of alternatives)
       ui.candidate.appendChild(candidateCard(candidate));
+    if (!alternatives.length) appendDiscoveryHints(ui.candidate);
+  }
   if (decision.identifierWarning) {
     const warning = document.createElement("div");
     warning.className = "help";
@@ -494,10 +567,14 @@ async function applySelectedProposals() {
 async function runIdentityAnalysis() {
   const row = selectedRow();
   if (!row || !canAnalyze() || state.controller) return;
+  const key = [row.id, row.NomCommercial, row.Adresse, row.SirenSiret].join("|");
+  const retained = state.progressKey === key ? state.progress : null;
   resetAnalysis();
   const generation = ++state.generation;
   const controller = new AbortController();
   state.controller = controller;
+  state.progressKey = key;
+  state.progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), retained);
   const timeout = setTimeout(() => {
     controller.abort(
       new DOMException(
@@ -508,6 +585,7 @@ async function runIdentityAnalysis() {
   }, ESTABLISHMENT_BUDGET.deadlineMs);
   ui.enrichButton.disabled = true;
   setStatus("Analyse de l’identité puis de la position du site…");
+  renderDiscoveryProgress();
 
   try {
     const result = await resolveEstablishmentForEnrichment({
@@ -515,6 +593,16 @@ async function runIdentityAnalysis() {
       signal: controller.signal,
       geocode: geocodeAddress,
       fetchOfficial: fetchOfficialRequest,
+      onProgress: (checkpoint) => {
+        if (generation !== state.generation || controller.signal.aborted) return;
+        state.progress = mergeDiscoveryProgress(state.progress, checkpoint);
+        renderDiscoveryProgress();
+      },
+      onEvent: (event) => {
+        if (generation !== state.generation || controller.signal.aborted) return;
+        state.progress = recordDiscoverySourceEvent(state.progress, event);
+        renderDiscoveryProgress();
+      },
       resolveFallback: (options) =>
         resolveStructureIdentity({
           ...options,
@@ -556,9 +644,15 @@ async function runIdentityAnalysis() {
       error?.name === "TimeoutError"
     ) {
       setStatus(controller.signal.reason?.message || error.message, "error");
+      renderDiscoveryProgress({ stopped: true });
       return;
     }
-    if (error?.name === "AbortError") return;
+    if (error?.name === "AbortError") {
+      setStatus("Recherche interrompue. Les pistes restent visibles ; relancez pour approfondir.");
+      renderDiscoveryProgress({ stopped: true });
+      if (ui.enrichButton) ui.enrichButton.textContent = "Relancer / approfondir";
+      return;
+    }
     console.error(error);
     setStatus(
       error.message || "Impossible d’analyser cette structure.",
