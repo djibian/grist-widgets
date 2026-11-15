@@ -168,3 +168,12 @@ test("two successive corrections preserve hypotheses while creating different lo
   assert.equal(guidance.selected.length, 2);
   assert.equal(b.adresse, "14 rue des Pins 49000 Angers", "official observation is not rewritten");
 });
+
+test("conflicting source observations are not mislabeled as a wrong user address", () => {
+  const a = site(), b = site({ street: "41 rue des Écoles", code: "49000", city: "Angers" });
+  const unstable = { ...a, observations: [a, b] };
+  const row = { NomCommercial: "Les Petits Loups", Adresse: a.adresse, SirenSiret: "" };
+  const diagnosis = diagnoseDiscovery({ reference: row, progress: progress(unstable) });
+  assert.equal(diagnosis.blocker, "conflicting-sources");
+  assert.equal(diagnosis.question, null, "only independent source validation can resolve contradictory evidence");
+});
