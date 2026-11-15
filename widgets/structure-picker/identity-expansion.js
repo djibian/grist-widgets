@@ -47,10 +47,11 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
   }
 
   // A teacher may recognise a *manager*, not the geographic internship site.
-  // The Annuaire's verified candidate SIREN is then a discovery route to its
-  // other establishments. Require an actual candidate and an exact, unedited
-  // choice of its published legal name; a typed correction is not such a link.
-  // Neither the choice nor any resulting SIREN is a proof of the site's SIRET.
+  // The Annuaire direct SIREN endpoint returns the legal unit but NOT the
+  // matching establishments (its geographic filters are silently ignored).
+  // Search the published legal name as TEXT instead; this is the endpoint that
+  // returns matching establishments. Require a real, unedited official candidate
+  // before using its name, and never promote any sibling to verified site identity.
   for (const selection of selected) {
     if (selection.field !== "operator" || selection.corrected ||
         guidance?.rejected?.includes(selection.key)) continue;
@@ -60,8 +61,14 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
         normalize(selection.value) === normalize(candidate?.raisonSociale);
     });
     const siren = normalizeIdentifier(manager?.siren);
-    if (siren.length === 9)
-      add(buildOfficialIdentifierSearchRequest(siren), "operator-establishments");
+    const legalName = normalize(manager?.raisonSociale);
+    if (siren.length !== 9 || legalName.length < 3) continue;
+    // Target the probable site postcode, not the manager's headquarters.
+    if (location.codePostal)
+      add(buildOfficialTextSearchRequest(legalName, { codePostal: location.codePostal }), "operator-establishments");
+    // If the postcode was wrong or the site is elsewhere in the configured
+    // departments, retain an independent unscoped-by-postcode opportunity.
+    add(buildOfficialTextSearchRequest(legalName), "operator-establishments");
   }
 
   const names = [...new Set([
