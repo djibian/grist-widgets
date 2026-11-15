@@ -133,3 +133,18 @@ test("corrected human search hints change rank without changing the source row o
   assert.equal(corrected.verifiedOfficial, undefined);
   assert.equal(discoveryHints(progress, 5, { reference, guidance, excluded: [discoveryHintKey(corrected)] }).length, 1);
 });
+
+
+test("late relevant site survives a full 250-hint bounded reservoir", () => {
+  const reference = { NomCommercial: "Pépinière des Ombelles", Adresse: "8 rue des Myosotis 44000 Nantes" };
+  const early = Array.from({ length: MAX_DISCOVERY_HINTS }, (_, i) => hint(i + 1));
+  let progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), { candidates: early }, { reference });
+  const late = { nomCommercial: "Pépinière des Ombelles", adresse: "8 rue des Myosotis 44000 Nantes",
+    siret: "31313131300022" };
+  progress = mergeDiscoveryProgress(progress, { candidates: [late] }, { reference });
+  assert.equal(progress.candidates.length, MAX_DISCOVERY_HINTS);
+  assert.equal(progress.totalHintsSeen, MAX_DISCOVERY_HINTS + 1);
+  assert.equal(discoveryHints(progress, 5, { reference })[0].candidate, late);
+  assert.ok(progress.candidates.includes(late), "late matching evidence must not be discarded merely by arrival");
+  assert.equal(discoveryHints(progress, 250).length, MAX_DISCOVERY_HINTS);
+});
