@@ -8,9 +8,12 @@ import { identitySearchName, targetNameVariants } from "./identity-resolution.js
 
 // Discovery requests are hypotheses, never confirmation of the establishment.
 // The existing identity decision remains the sole validator.
-export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries = 12 } = {}) {
+export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries = 12, guidance = null } = {}) {
   const used = new Set(alreadyRequested.filter(Boolean));
-  const location = extractLocationFromAddress(row?.Adresse);
+  const selected = guidance?.selected ?? [];
+  const hint = field => selected.find(entry => entry.field === field)?.value ?? "";
+  const selectedAddress = hint("address");
+  const location = extractLocationFromAddress(selectedAddress || row?.Adresse);
   const queries = [];
   const add = (request, reason) => {
     if (!request?.url || used.has(request.url) || queries.length >= maxQueries) return;
@@ -20,11 +23,14 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
 
   // An entered identifier is searched *independently* from the name.
   // Its results are not treated as corroboration without site evidence.
-  if (String(row?.SirenSiret ?? "").trim()) {
-    add(buildOfficialIdentifierSearchRequest(row.SirenSiret), "identifier-hint");
+  for (const identifier of [hint("siret"), row?.SirenSiret]) {
+    if (String(identifier ?? "").trim())
+      add(buildOfficialIdentifierSearchRequest(identifier), "identifier-hint");
   }
 
   const names = [...new Set([
+    hint("name"),
+    hint("operator"),
     identitySearchName(row),
     ...targetNameVariants(row),
     normalize(row?.RaisonSociale ?? ""),
@@ -38,6 +44,12 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
   }
   for (const name of names) {
     add(buildOfficialTextSearchRequest(name), "name-department");
+  }
+  // Commune-only hints aid discovery, not official site attribution.
+  const commune = hint("commune");
+  if (commune && !location.codePostal) {
+    for (const name of names)
+      add(buildOfficialTextSearchRequest(name + " " + commune), "name-commune-hint");
   }
   return queries;
 }
