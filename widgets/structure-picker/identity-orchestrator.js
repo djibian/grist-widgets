@@ -246,13 +246,23 @@ export async function resolveStructureIdentity({
   };
 
   try {
-    const location = extractLocationFromAddress(row.Adresse);
-    const initialQuery = identitySearchName(row);
-    const initialRequest = initialQuery
-      ? buildOfficialTextSearchRequest(initialQuery, { codePostal: location.codePostal })
-      : identifiers.identifier ? buildOfficialIdentifierSearchRequest(identifiers.identifier) : null;
+    // A new teacher clue changes the FIRST lookup, not only the final
+    // expansion phase. Original row data remains untouched for decideIdentity.
+    const selectedHint = field => guidance?.selected?.find(item => item.field === field)?.value || "";
+    const guidedAddress = selectedHint("address");
+    const guidedCommune = normalize(selectedHint("commune"));
+    const location = extractLocationFromAddress(guidedAddress || row.Adresse);
+    const initialQuery = normalize(selectedHint("name") || selectedHint("operator") || identitySearchName(row));
+    const focusedQuery = guidedCommune && initialQuery
+      ? initialQuery + " " + guidedCommune : initialQuery;
+    // A corrected/confirmed commune can contradict the old site's postcode.
+    const focusedPostalCode = guidedCommune && !guidedAddress ? "" : location.codePostal;
+    const initialIdentifier = selectedHint("siret") || identifiers.identifier;
+    const initialRequest = focusedQuery
+      ? buildOfficialTextSearchRequest(focusedQuery, { codePostal: focusedPostalCode })
+      : initialIdentifier ? buildOfficialIdentifierSearchRequest(initialIdentifier) : null;
     const initialOfficial = initialRequest ? await performOfficial(initialRequest,
-      initialQuery ? "annuaire:text" : "annuaire:identifier-hint", { paginate: Boolean(initialQuery), required: true }) : [];
+      focusedQuery ? "annuaire:text" : "annuaire:identifier-hint", { paginate: Boolean(focusedQuery), required: true }) : [];
     candidates = mergeCandidates(candidates, initialOfficial);
 
     let anchor = locationAnchor(row, null);
@@ -265,7 +275,7 @@ export async function resolveStructureIdentity({
 
     const legalHint=normalize(row.RaisonSociale);
     if(legalHint.length>=3 && legalHint!==initialQuery && officialRequestCount<maxOfficialRequests){
-      const legal=await performOfficial(buildOfficialTextSearchRequest(legalHint,{codePostal:location.codePostal}),"annuaire:legal-hint",{required:false});
+      const legal=await performOfficial(buildOfficialTextSearchRequest(legalHint,{codePostal:focusedPostalCode}),"annuaire:legal-hint",{required:false});
       candidates=mergeCandidates(candidates,legal);
       decision=decideIdentity({row,candidates,links,coverage:[...coverage.values()],location:anchor});
       checkpoint(decision);
