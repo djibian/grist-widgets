@@ -148,6 +148,7 @@ export async function resolveStructureIdentity({
   let officialRequestCount = 0;
   let paginationPages = 0;
   let candidates = [];
+  let identifierLegalNames = [];
   let links = [];
   let geocodeCandidates = [];
   let selectedGeocode = null;
@@ -167,6 +168,14 @@ export async function resolveStructureIdentity({
         { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.requestMs, onEvent });
       let items = first?.items ?? [];
       let combined = first?.coverage ?? { complete: true };
+      if (request.kind === "siren" || request.kind === "siret") {
+        const siren = identifierParts(request.identifier).siren;
+        const published = (combined.identifierLegalNames ?? [])
+          .filter(item => normalizeIdentifier(item?.siren) === siren && normalize(item?.legalName).length >= 3);
+        identifierLegalNames = [...new Map(
+          [...identifierLegalNames, ...published].map(item => [item.siren + ":" + normalize(item.legalName), item]),
+        ).values()].slice(0, 8);
+      }
       let pageRequest = request;
       while (paginate && combined?.hasNextPage && paginationPages < maxPaginationPages &&
         officialRequestCount < maxOfficialRequests && !deadline.signal.aborted) {
@@ -333,12 +342,18 @@ export async function resolveStructureIdentity({
           maxQueries: 1,
           guidance,
           discoveredCandidates: candidates,
+          identifierLegalNames,
         })[0];
         if (!entry) break;
         expansionIndex += 1;
         const expanded = await performOfficial(entry.request, `annuaire:expand:${expansionIndex}:${entry.reason}`,
           { required: false, paginate: true });
-        candidates = mergeCandidates(candidates, expanded);
+        // A name search can return other enterprises with the same name.
+        // This bridge may discover sites ONLY of the exact looked-up SIREN.
+        const newCandidates = entry.boundSiren
+          ? expanded.filter(item => normalizeIdentifier(item?.siren) === entry.boundSiren)
+          : expanded;
+        candidates = mergeCandidates(candidates, newCandidates);
         decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
         checkpoint(decision);
         if (decision.status === IDENTITY_STATES.MATCH_VERIFIED) break;
