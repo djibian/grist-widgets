@@ -23,7 +23,7 @@ export function addressSearchPhrase(value) {
 
 // Discovery requests are hypotheses, never confirmation of the establishment.
 // The existing identity decision remains the sole validator.
-export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries = 12, guidance = null, discoveredCandidates = [] } = {}) {
+export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries = 12, guidance = null, discoveredCandidates = [], identifierLegalNames = [] } = {}) {
   const used = new Set(alreadyRequested.filter(Boolean));
   const selected = guidance?.selected ?? [];
   const hint = field => selected.find(entry => entry.field === field)?.value ?? "";
@@ -33,10 +33,10 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
     .map(value => String(value ?? "").trim()).filter(Boolean))]
     .map(value => ({ ...extractLocationFromAddress(value), street: addressSearchPhrase(value) }));
   const queries = [];
-  const add = (request, reason) => {
+  const add = (request, reason, boundSiren = "") => {
     if (!request?.url || used.has(request.url) || queries.length >= maxQueries) return;
     used.add(request.url);
-    queries.push({ request, reason });
+    queries.push({ request, reason, ...(boundSiren ? { boundSiren } : {}) });
   };
 
   // An entered identifier is searched *independently* from the name.
@@ -44,6 +44,20 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
   for (const identifier of [hint("siret"), row?.SirenSiret]) {
     if (String(identifier ?? "").trim())
       add(buildOfficialIdentifierSearchRequest(identifier), "identifier-hint");
+  }
+
+  // A direct SIREN/SIRET lookup identifies a legal unit, not the site.
+  // Use its published name for new text searches, never as a site proof.
+  const enteredSirens = new Set([hint("siret"), row?.SirenSiret]
+    .map(value => normalizeIdentifier(value).slice(0, 9)).filter(value => value.length === 9));
+  for (const unit of identifierLegalNames) {
+    const siren = normalizeIdentifier(unit?.siren);
+    const legalName = normalize(unit?.legalName);
+    if (!enteredSirens.has(siren) || siren.length !== 9 || legalName.length < 3) continue;
+    if (location.codePostal)
+      add(buildOfficialTextSearchRequest(legalName, { codePostal: location.codePostal }),
+        "identifier-legal-name", siren);
+    add(buildOfficialTextSearchRequest(legalName), "identifier-legal-name", siren);
   }
 
   // A teacher may recognise a *manager*, not the geographic internship site.
