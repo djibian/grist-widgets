@@ -67,3 +67,15 @@ test("source states come only from real events and respect their terminal state"
   assert.equal(discoverySourceLabel(progress.activity[0].state), "délai dépassé");
   assert.equal(discoverySourceLabel(progress.activity[1].state), "terminée");
 });
+
+
+test("each discovery hint retains a stable key and raw candidate for reversible guidance", () => {
+  const candidate = hint(71, { siret: "123 456 789 00012" });
+  const progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), { candidates: [candidate, hint(72)] });
+  const leads = discoveryHints(progress, 5);
+  assert.equal(leads[0].key, "siret:12345678900012");
+  assert.equal(leads[0].siret, "12345678900012");
+  assert.equal(leads[0].candidate.nomCommercial, candidate.nomCommercial);
+  assert.equal(discoveryHints(progress, 5, { excluded: [leads[0].key] })[0].key, leads[1].key);
+  assert.equal(progress.candidates.length, 2);
+});
