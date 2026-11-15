@@ -755,7 +755,7 @@ async function runIdentityAnalysis({ deepening = false } = {}) {
   let settled = false;
   state.controller = controller;
   state.progressKey = key;
-  state.progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), retained);
+  state.progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), retained, { reference: row, guidance: state.guidance });
   const timeout = setTimeout(() => {
     controller.abort(
       new DOMException(
@@ -778,7 +778,7 @@ async function runIdentityAnalysis({ deepening = false } = {}) {
       fetchOfficial: fetchOfficialRequest,
       onProgress: (checkpoint) => {
         if (settled || generation !== state.generation || controller.signal.aborted) return;
-        state.progress = mergeDiscoveryProgress(state.progress, checkpoint);
+        state.progress = mergeDiscoveryProgress(state.progress, checkpoint, { reference: row, guidance: state.guidance });
         renderDiscoveryProgress();
       },
       onEvent: (event) => {
