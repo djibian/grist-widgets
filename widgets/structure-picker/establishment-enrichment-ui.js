@@ -569,6 +569,7 @@ async function runIdentityAnalysis() {
   if (!row || !canAnalyze() || state.controller) return;
   const key = [row.id, row.NomCommercial, row.Adresse, row.SirenSiret].join("|");
   const retained = state.progressKey === key ? state.progress : null;
+  const deepening = Boolean(retained) && state.decision?.status !== IDENTITY_STATES.MATCH_VERIFIED;
   resetAnalysis();
   const generation = ++state.generation;
   const controller = new AbortController();
@@ -583,15 +584,16 @@ async function runIdentityAnalysis() {
         "TimeoutError",
       ),
     );
-  }, ESTABLISHMENT_BUDGET.deadlineMs);
+  }, deepening ? 46000 : ESTABLISHMENT_BUDGET.deadlineMs);
   ui.enrichButton.disabled = true;
-  setStatus("Analyse de l’identité puis de la position du site…");
+  setStatus(deepening ? "Recherche approfondie en cours : variantes de noms et identifiants…" : "Analyse de l’identité puis de la position du site…");
   renderDiscoveryProgress();
 
   try {
     const result = await resolveEstablishmentForEnrichment({
       row,
       signal: controller.signal,
+      deepening,
       geocode: geocodeAddress,
       fetchOfficial: fetchOfficialRequest,
       onProgress: (checkpoint) => {
@@ -630,6 +632,8 @@ async function runIdentityAnalysis() {
 
     renderEstablishment();
     renderProposalPanel();
+    if (ui.enrichButton && result.decision?.status !== IDENTITY_STATES.MATCH_VERIFIED)
+      ui.enrichButton.textContent = "Approfondir les recherches";
 
     const diagnostics = (result.diagnostics ?? []).slice(0, 2);
     const message = [result.decision?.reason, ...diagnostics]
