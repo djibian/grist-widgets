@@ -322,6 +322,14 @@ function renderDiscoveryProgress({ stopped = false } = {}) {
     }
     ui.candidate.appendChild(details);
   }
+  if (stopped) {
+    const deepen = document.createElement("button");
+    deepen.type = "button";
+    deepen.className = "button button-secondary";
+    deepen.textContent = "Approfondir la recherche";
+    deepen.addEventListener("click", () => runIdentityAnalysis({ deepening: true }));
+    ui.candidate.appendChild(deepen);
+  }
   if (!stopped && state.controller && !state.controller.signal.aborted) {
     const button = document.createElement("button");
     button.type = "button";
@@ -359,6 +367,14 @@ function renderEstablishment() {
     for (const candidate of alternatives)
       ui.candidate.appendChild(candidateCard(candidate));
     if (!alternatives.length) appendDiscoveryHints(ui.candidate);
+  }
+  if (decision.status !== IDENTITY_STATES.MATCH_VERIFIED) {
+    const deepen = document.createElement("button");
+    deepen.type = "button";
+    deepen.className = "button button-secondary";
+    deepen.textContent = "Approfondir la recherche";
+    deepen.addEventListener("click", () => runIdentityAnalysis({ deepening: true }));
+    ui.candidate.appendChild(deepen);
   }
   if (decision.identifierWarning) {
     const warning = document.createElement("div");
@@ -564,12 +580,11 @@ async function applySelectedProposals() {
   }
 }
 
-async function runIdentityAnalysis() {
+async function runIdentityAnalysis({ deepening = false } = {}) {
   const row = selectedRow();
   if (!row || !canAnalyze() || state.controller) return;
   const key = [row.id, row.NomCommercial, row.Adresse, row.SirenSiret].join("|");
   const retained = state.progressKey === key ? state.progress : null;
-  const deepening = Boolean(retained) && state.decision?.status !== IDENTITY_STATES.MATCH_VERIFIED;
   resetAnalysis();
   const generation = ++state.generation;
   const controller = new AbortController();
@@ -632,8 +647,6 @@ async function runIdentityAnalysis() {
 
     renderEstablishment();
     renderProposalPanel();
-    if (ui.enrichButton && result.decision?.status !== IDENTITY_STATES.MATCH_VERIFIED)
-      ui.enrichButton.textContent = "Approfondir les recherches";
 
     const diagnostics = (result.diagnostics ?? []).slice(0, 2);
     const message = [result.decision?.reason, ...diagnostics]
@@ -657,7 +670,7 @@ async function runIdentityAnalysis() {
     if (error?.name === "AbortError") {
       setStatus("Recherche interrompue. Les pistes restent visibles ; relancez pour approfondir.");
       renderDiscoveryProgress({ stopped: true });
-      if (ui.enrichButton) ui.enrichButton.textContent = "Relancer / approfondir";
+      if (ui.enrichButton) ui.enrichButton.textContent = "Analyser / compléter";
       return;
     }
     console.error(error);
