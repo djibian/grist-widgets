@@ -425,3 +425,46 @@ test("an address corrected during expansion triggers another real geocode and ne
   assert.equal(result.selectedGeocode, null);
   assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
 });
+
+test("an answered question redirects the very FIRST Annuaire lookup to corrected name and commune", async () => {
+  const row = { NomCommercial: "Ancienne enseigne", Adresse: "4 rue des Pins 44000 Nantes", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const hint = candidate({ nomCommercial: "Nouvelle Maison", adresse: "2 avenue des Fleurs 49000 Angers",
+    siren: "234567890", siret: "23456789000019" });
+  assert.ok(correctDiscoveryGuidance(guidance, hint, "name", "Nouvelle Maison"));
+  assert.ok(correctDiscoveryGuidance(guidance, hint, "commune", "Angers"));
+  const requests = [];
+  await resolveStructureIdentity({
+    row, guidance, deepening: true, geocode: async () => [],
+    maxOfficialRequests: 8, maxPaginationPages: 0,
+    fetchOfficial: async request => { requests.push(request); return official([]); },
+  });
+  assert.equal(requests[0].kind, "text");
+  assert.equal(requests[0].query, "nouvelle maison angers");
+  assert.equal(requests[0].codePostal, "", "obsolete postcode does not constrain corrected commune");
+  assert.equal(row.NomCommercial, "Ancienne enseigne");
+  assert.equal(row.Adresse, "4 rue des Pins 44000 Nantes");
+});
+
+test("a corrected address changes initial postcode and geocode but cannot certify the location", async () => {
+  const row = { NomCommercial: "Maison des Saules", Adresse: "3 rue des Chênes 44000 Nantes", SirenSiret: "" };
+  const newAddress = "17 quai de Loire 49000 Angers";
+  const guidance = emptyDiscoveryGuidance();
+  assert.ok(correctDiscoveryGuidance(guidance,
+    candidate({ nomCommercial: "Maison des Saules", adresse: newAddress, siret: "11223344500018" }),
+    "address", newAddress));
+  const requests = [], geocoded = [];
+  const result = await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 8, maxPaginationPages: 0,
+    geocode: async address => {
+      geocoded.push(address); return [{ latitude: 47.47, longitude: -0.55 }];
+    },
+    fetchOfficial: async request => { requests.push(request); return official([]); },
+  });
+  assert.equal(requests[0].kind, "text");
+  assert.equal(requests[0].codePostal, "49000");
+  assert.ok(geocoded.includes(newAddress));
+  assert.ok(requests.some(req => req.kind === "nearby"));
+  assert.equal(result.selectedGeocode, null, "human-corrected geocode remains a search clue only");
+  assert.equal(row.Adresse, "3 rue des Chênes 44000 Nantes");
+});
