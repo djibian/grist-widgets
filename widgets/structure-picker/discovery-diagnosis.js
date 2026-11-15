@@ -62,6 +62,25 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
   const plausible = raw.filter(lead =>
     !chosenName || fuzzyTextScore(chosenName, placeName(lead.candidate)) >= 0.68 ||
     fuzzyTextScore(chosenName, lead.candidate?.raisonSociale) >= 0.68);
+  // Human choices narrow which uncertainty is useful to ask about, without
+  // deleting any official observation or changing the independent verifier.
+  // A corrected address has priority over an older, possibly false commune.
+  // If nothing matches a chosen clue, do not pretend a remaining site matches.
+  const selectedAddress = chosen(guidance, "address");
+  const selectedCommune = chosen(guidance, "commune");
+  let locationMismatch = false;
+  for (const [value, getValue, threshold] of [
+    [selectedAddress, c => c?.adresse, 0.82],
+    [selectedCommune, municipality, 1],
+  ]) {
+    if (!value || !plausible.length) continue;
+    const matching = plausible.filter(lead =>
+      threshold === 1
+        ? normalize(getValue(lead.candidate)) === normalize(value)
+        : fuzzyTextScore(getValue(lead.candidate), value) >= threshold);
+    if (matching.length) plausible = matching;
+    else locationMismatch = true;
+  }
   const leads = plausible.length ? plausible : raw;
   const hasCandidates = raw.length > 0;
   const sourceConflicts = raw.filter(lead => {
@@ -169,9 +188,18 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
       why: "Des sources décrivent différemment le même établissement. Vérification indépendante nécessaire.",
       candidateCount: raw.length, failedSourceCount: failedSources.length };
   }
+  if (locationMismatch) {
+    return { blocker: "guided-location-unconfirmed", question: null,
+      why: searching
+        ? "Aucune piste ne correspond encore au lieu indiqué. La recherche continue avec votre précision."
+        : "Aucune piste trouvée ne correspond au lieu indiqué. Vous pouvez corriger votre précision ou approfondir la recherche.",
+      candidateCount: raw.length, failedSourceCount: failedSources.length };
+  }
   const possible = suggestions.filter(item => !ANSWERED.has(item.field) ||
     !chosen(guidance, item.field)).filter(item =>
-      !(guidance?.skippedQuestions ?? []).includes(item.id));
+      !(guidance?.skippedQuestions ?? []).includes(item.id) &&
+      (!(guidance?.skippedFields ?? []).includes(item.field) ||
+        item.kind === "address-contradiction"));
   possible.sort((a, b) => b.rank - a.rank || a.id.localeCompare(b.id));
   const next = possible[0] || null;
   const blocker = next?.kind === "homonyms" || next?.kind === "operator-sites"
@@ -190,6 +218,13 @@ export function skipDiscoveryQuestion(guidance, questionId) {
   const skipped = guidance.skippedQuestions ?? [];
   if (skipped.includes(questionId)) return false;
   guidance.skippedQuestions = [...skipped, questionId].slice(-40);
+  // "Je ne sais pas" concerns the information, not the exact combination of
+  // offered choices. Do not ask for the same field under a different heading.
+  // A genuinely new address contradiction remains eligible for verification.
+  const field = questionId.split("|")[1];
+  if (ANSWERED.has(field)) {
+    guidance.skippedFields = [...new Set([...(guidance.skippedFields ?? []), field])];
+  }
   guidance.version = (guidance.version ?? 0) + 1;
   return true;
 }
