@@ -62,7 +62,8 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
     });
     const siren = normalizeIdentifier(manager?.siren);
     const legalName = normalize(manager?.raisonSociale);
-    if (siren.length !== 9 || legalName.length < 3) continue;
+    if (siren.length !== 9 || normalizeIdentifier(manager?.siret).slice(0, 9) !== siren ||
+        legalName.length < 3) continue;
     // Target the probable site postcode, not the manager's headquarters.
     if (location.codePostal)
       add(buildOfficialTextSearchRequest(legalName, { codePostal: location.codePostal }), "operator-establishments");
