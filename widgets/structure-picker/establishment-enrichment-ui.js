@@ -327,7 +327,7 @@ function appendGuidanceControls(container, candidate) {
     button.className = "button button-secondary";
     button.textContent = (selected ? "✓ " : "") + label;
     button.title = "Utiliser cette information pour chercher ; ne prouve pas l’identité du site.";
-    button.setAttribute("aria-pressed", String(selected));
+    button.ariaPressed = String(selected);
     button.addEventListener("click", () => {
       if (!chooseDiscoveryGuidance(state.guidance, candidate, field)) return;
       redirectDiscovery();
@@ -339,7 +339,7 @@ function appendGuidanceControls(container, candidate) {
   reject.type = "button";
   reject.className = "button button-secondary";
   reject.textContent = rejected ? "Réexaminer" : "Écarter";
-  reject.setAttribute("aria-pressed", String(rejected));
+  reject.ariaPressed = String(rejected);
   reject.addEventListener("click", () => {
     if (!chooseDiscoveryGuidance(state.guidance, candidate, "", "reject")) return;
     redirectDiscovery();
