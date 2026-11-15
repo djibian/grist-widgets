@@ -185,6 +185,26 @@ test("conflicting source observations are not mislabeled as a wrong user address
   assert.equal(diagnosis.question, null, "only independent source validation can resolve contradictory evidence");
 });
 
+test("diagnosis includes the rare relevant site after the first twelve leads", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const leads = Array.from({ length: 18 }, (_, i) =>
+    site({ city: "Nantes", code: "44000", nic: String(i + 12).padStart(5, "0") }));
+  leads.push(site({ city: "Angers", code: "49000", nic: "00999" }));
+  const diagnosis = diagnoseDiscovery({ reference: row, progress: progress(...leads) });
+  assert.equal(diagnosis.question?.field, "commune");
+  assert.ok(diagnosis.question.options.some(o => o.label === "Angers"));
+});
+
+test("commune beats a full address when both distinguish the same manager sites", () => {
+  const a = site();
+  const b = site({ city: "Angers", code: "49000", nic: "00020" });
+  const guidance = emptyDiscoveryGuidance();
+  chooseDiscoveryGuidance(guidance, a, "operator");
+  const result = diagnoseDiscovery({ reference: { NomCommercial: "Les Petits Loups", Adresse: "" },
+    progress: progress(a, b), guidance });
+  assert.equal(result.question?.field, "commune", "asking for a commune is easier than a full site address");
+});
+
 test("an address chosen among homonyms avoids unrelated follow-up questions", () => {
   const a = site({ city: "Nantes", code: "44000" });
   const b = site({ city: "Angers", code: "49000", nic: "00020", street: "24 rue des Roses" });
