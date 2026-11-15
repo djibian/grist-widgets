@@ -26,6 +26,8 @@ test("successive checkpoints retain independently discovered candidates, without
   assert.equal(progress.totalHintsSeen, 51);
   assert.equal(progress.candidates[0].raisonSociale, "Exploitant différent");
   assert.equal(discoveryHints(progress).length, 5);
+  assert.equal(discoveryHints(progress, 50).length, 50, "teachers can reveal more than the original first 20");
+  assert.equal(discoveryHints(progress, 250).length, 51);
   assert.equal(discoveryHints(progress)[0].siret, first[0].siret);
   assert.equal("verifiedOfficial" in progress.candidates[0], false);
   assert.equal("status" in discoveryHints(progress)[0], false);
@@ -51,6 +53,7 @@ test("progress is bounded, without erasing the number of distinct hints seen", (
   });
   assert.equal(progress.candidates.length, MAX_DISCOVERY_HINTS);
   assert.equal(progress.totalHintsSeen, 300);
+  assert.equal(discoveryHints(progress, 300).length, MAX_DISCOVERY_HINTS);
 });
 
 test("source states come only from real events and respect their terminal state", () => {
