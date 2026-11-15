@@ -132,6 +132,7 @@ export async function resolveStructureIdentity({
   maxOfficialRequests = IDENTITY_BUDGET.maxOfficialRequests,
   maxPaginationPages = IDENTITY_BUDGET.maxPaginationPages,
   deepening = false,
+  guidance = null,
   onProgress,
   onEvent,
 } = {}) {
@@ -323,12 +324,18 @@ export async function resolveStructureIdentity({
     }
 
     if (deepening && decision.status !== IDENTITY_STATES.MATCH_VERIFIED && !deadline.signal.aborted) {
-      for (const [index, entry] of planIdentityExpansion(row, {
-        alreadyRequested: [...seenUrls],
-        maxQueries: Math.min(12, maxOfficialRequests),
-      }).entries()) {
-        if (deadline.signal.aborted || officialRequestCount >= maxOfficialRequests) break;
-        const expanded = await performOfficial(entry.request, `annuaire:expand:${index + 1}:${entry.reason}`,
+      // Rebuild the remaining plan after each checkpoint: a field chosen by a
+      // teacher during an in-flight request affects the next actual lookup.
+      let expansionIndex = 0;
+      while (!deadline.signal.aborted && officialRequestCount < maxOfficialRequests) {
+        const entry = planIdentityExpansion(row, {
+          alreadyRequested: [...seenUrls],
+          maxQueries: 1,
+          guidance,
+        })[0];
+        if (!entry) break;
+        expansionIndex += 1;
+        const expanded = await performOfficial(entry.request, `annuaire:expand:${expansionIndex}:${entry.reason}`,
           { required: false, paginate: true });
         candidates = mergeCandidates(candidates, expanded);
         decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
