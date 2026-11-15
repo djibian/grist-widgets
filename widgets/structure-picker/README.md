@@ -5,6 +5,20 @@ Widget Grist unique pour **rechercher, ajouter et compléter** les structures de
 L’interface sépare les deux usages principaux dans deux onglets fixes : **Rechercher / ajouter** et **Compléter la sélection**.
 
 
+
+### Incrément 8 — retrouver les autres établissements du gestionnaire
+
+Pendant une recherche approfondie, si l'enseignant choisit explicitement le **gestionnaire**
+d'un candidat déjà trouvé dans l'Annuaire, le planificateur peut consulter son **SIREN**
+afin de découvrir ses autres établissements géographiques. L'indice doit désigner
+un candidat effectivement observé et sa dénomination juridique publiée ; une
+correction libre, un candidat écarté ou une simple homonymie ne déclenchent pas
+ce rattachement. La requête SIREN et les SIRET retournés restent des **pistes
+non probantes** : le vérificateur juridique et les protections d'écriture Grist
+ne changent pas. Recherche soumise au quota Annuaire et aux filtres géographiques
+déjà configurés. Cette amélioration ne prétend pas constituer une validation
+indépendante sur les 50+ structures inédites encore à collecter.
+
 ### Recherche progressive — chantier #87 / PR #88
 
 La recherche de **Compléter la sélection** exploite maintenant les checkpoints \`onProgress\` et les événements \`onEvent\` déjà émis par les résolveurs. Le panneau présente les pistes disponibles avant le verdict final, cinq à la fois, avec les états réellement observés des sources dans « Activité réelle des sources ». La liste est explicitement **non vérifiée** : un nom, un SIRET ou une adresse simplement repéré n’est jamais une preuve juridique ou géographique et ne crée aucune proposition à appliquer dans Grist. Les propositions restent réservées au verdict final.
