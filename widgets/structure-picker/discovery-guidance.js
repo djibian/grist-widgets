@@ -1,5 +1,6 @@
 // Voluntary, session-scoped search hints. Never a legal, address or position proof.
 import { discoveryHintKey } from "./discovery-progress.js";
+import { extractLocationFromAddress } from "./search.js";
 
 export const GUIDANCE_FIELDS = Object.freeze(["name", "address", "commune", "operator", "siret"]);
 
@@ -17,7 +18,7 @@ export function guidanceFieldValue(candidate, field) {
   const value = ({
     name: candidate?.nomCommercial || candidate?.raisonSociale,
     address: candidate?.adresse,
-    commune: candidate?.commune,
+    commune: candidate?.commune || extractLocationFromAddress(candidate?.adresse).commune,
     operator: candidate?.operator?.raisonSociale || candidate?.raisonSociale,
     siret: candidate?.siret,
   })[field];
