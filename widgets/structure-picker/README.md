@@ -219,3 +219,12 @@ Les [résultats des 25 fiches](../../docs/structure-picker-context-review.md) do
 Les accès alternatifs d’un même lieu sont admis uniquement lorsque l’exploitant publie son SIRET exact, l’adresse enregistrée et le lien d’accès depuis l’adresse physique. Le SIRET doit encore être revalidé actif ; la voie, le numéro, la commune et les extraits natifs sont contrôlés. Une simple proximité ne suffit jamais.
 
 Le repli `certified-entrances.js` admet un point natif BAN de type `entrée`, publié par la commune et certifié, uniquement à l’adresse physique complète d’un lieu déjà confirmé. L’identifiant BAN, le numéro et le suffixe doivent être cohérents. Il intervient après les preuves de lieu/bâtiment et ne remplace pas une position plus forte. Les coordonnées représentent une entrée publiée, sans précision de toit ni exactitude métrique présumée. Les preuves publiques sont revérifiées lors de l’écriture dans Grist. Régénération : `node scripts/generate-certified-entrances.mjs /chemin/building-*.json`, depuis des captures d’adresses complètes.
+
+
+### Recherche autonome par adresse de voie (PR #88, incrément 5)
+
+Lors d'un **approfondissement volontaire**, le planificateur peut interroger l'API publique Annuaire des entreprises par **adresse de voie indépendamment de la dénomination**. Il retire le code postal de `q` et l'applique comme filtre : la recherche d'adresse postale est tentée avant la relaxation des noms. La recherche par voie sans filtre postal intervient ensuite, sous les mêmes budgets et départements configurés ; une saisie corrigée par l'enseignant passe en premier sans effacer l'adresse de la fiche originale.
+
+Les valeurs d'adresse issues de ces recherches sont exclusivement des **pistes**. Elles n'entraînent aucune confirmation juridique, aucun déplacement de site et aucune écriture Grist : le vérificateur `decideIdentity`, les protections de sélection et les validations d'écriture restent inchangés. Les adresses trop vagues (commune seule, code postal seul) ne génèrent pas de requête de voie. Le dédoublonnage d'URL, la limitation Annuaire et la reprise du plan entre réponses sont préservés.
+
+Source documentaire publique du mode de recherche par adresse et quotas : https://recherche-entreprises.api.gouv.fr/docs/ . **Limites :** le périmètre départemental demeure configuré dans le widget ; aucun gain de rappel n'est encore établi sur un corpus inédit indépendant. La fonctionnalité doit encore être validée en situation réelle dans Grist.
