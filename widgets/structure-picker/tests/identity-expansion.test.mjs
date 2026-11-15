@@ -195,3 +195,34 @@ test("non-head-office SIRET relays published legal name into text discovery with
     { siren: "112233445", legalName: "Ateliers du Littoral" },
   ], alreadyRequested: plan.map(item => item.request.url) }), []);
 });
+
+test("explicit corrections invalidate stale name, address, postal and identifier queries without altering Grist", () => {
+  const row = {
+    NomCommercial: "Ancienne appellation", Adresse: "4 rue du Moulin 44000 Nantes",
+    SirenSiret: "12345678900012",
+  };
+  const guidance = { selected: [
+    { field: "name", value: "Nouveau lieu", corrected: true },
+    { field: "address", value: "8 quai du Parc 49000 Angers", corrected: true },
+    { field: "siret", value: "98765432100019", corrected: true },
+  ] };
+  const requests = planIdentityExpansion(row, { guidance, maxQueries: 30 });
+  assert.equal(requests[0].request.identifier, "98765432100019");
+  assert.ok(!requests.some(entry => entry.request.identifier === "12345678900012"));
+  assert.ok(!requests.some(entry => entry.request.query?.includes("ancienne appellation")));
+  assert.ok(!requests.some(entry => entry.request.query === "4 rue du moulin"));
+  assert.ok(requests.some(entry => entry.request.query === "8 quai du parc" &&
+    entry.request.codePostal === "49000"));
+  assert.equal(row.Adresse, "4 rue du Moulin 44000 Nantes");
+  assert.equal(row.SirenSiret, "12345678900012");
+});
+
+test("corrected commune disallows the old postcode as a fallback filter", () => {
+  const row = { NomCommercial: "Lieu pilote", Adresse: "3 rue du Bourg 44000 Nantes" };
+  const guidance = { selected: [{ field: "commune", value: "Angers", corrected: true }] };
+  const requests = planIdentityExpansion(row, { guidance, maxQueries: 30 });
+  assert.ok(requests.some(q => q.reason === "name-commune-hint" && q.request.query.includes("angers")));
+  assert.ok(!requests.some(q => q.request.codePostal === "44000"));
+  assert.ok(!requests.some(q => q.request.query === "3 rue du bourg"),
+    "old address is not pursued when the recorded commune was corrected");
+});
