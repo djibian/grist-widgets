@@ -1,6 +1,18 @@
+### Incrément 14 — questions contextuelles et replanification (issue #87 / PR #88)
+
+**IN_PROGRESS.** Le module `discovery-diagnosis.js` analyse les pistes de recherche et distingue homonymies de lieux, contradiction d'adresse possible, plusieurs établissements d'un gestionnaire, manque de commune, divergence possible entre nom public et raison sociale, et indisponibilité des sources. Il privilégie une question courte et discriminante à la fois ; les réponses possibles sont proposées directement, avec correction libre et « Je ne sais pas ». Les questions résolues ou ignorées ne sont pas redemandées à l'identique durant cette analyse.
+
+**Couplage moteur :** le choix ou la correction devient un indice `guidance` ; il provoque la réorientation des requêtes Annuaire (nom, commune, gestionnaire, adresse) et, pour une adresse corrigée, une nouvelle recherche géographique. Une correction explicite élimine les requêtes ultérieures fondées sur l'ancienne valeur devenue suspecte. Les candidats et confirmations restent visibles pendant l'approfondissement. Les tests adversariaux démontrent les nouvelles **requêtes effectivement exécutées** et pas seulement un reclassement visuel.
+
+**Limites de sécurité :** l'utilisateur guide la découverte, mais ne valide ni un SIRET d'établissement, ni un géocode ou une position de site, et ne déclenche aucune écriture Grist. Les contrôles de l'identité juridique, les protections de sélection et les validations d'écriture restent indépendants. Les estimations des questions ne sont pas des scores de preuve.
+
+**Référence de développement :** la table `Structures_de_stage` de `suivi des stages dev2` (25 structures observées le 15/11/2026) en lecture seule, avec cas difficiles et variantes adversariales. Il n'est **plus nécessaire de constituer un corpus externe d'au moins 50 structures** pour continuer ou terminer le développement ; une évaluation statistique indépendante reste un travail facultatif distinct. Aucune amélioration générale de rappel n'est présumée sur cette seule base. CI et essai de la preview nécessaires avant validation finale.
+
+---
+
 ### Incrément 12 — Découverte des SIRET de sites non-sièges
 
-Une recherche directe par SIREN/SIRET dans l'Annuaire ne fournit pas toujours la liste des établissements du gestionnaire. En **Approfondir la recherche**, le widget reprend la dénomination légale publiée pour le SIREN interrogé et recherche textuellement les établissements correspondants, d'abord au code postal saisi puis dans les départements configurés. Les résultats homonymes dont le SIREN est différent sont écartés de ce relais. Le SIRET saisi et la dénomination de gestionnaire restent des **indices**, jamais une preuve suffisante du site ; le vérificateur et les écritures Grist ne sont pas modifiés. Les limites API restent en vigueur. Le gain sur 50+ structures réelles inédites reste à évaluer.
+Une recherche directe par SIREN/SIRET dans l'Annuaire ne fournit pas toujours la liste des établissements du gestionnaire. En **Approfondir la recherche**, le widget reprend la dénomination légale publiée pour le SIREN interrogé et recherche textuellement les établissements correspondants, d'abord au code postal saisi puis dans les départements configurés. Les résultats homonymes dont le SIREN est différent sont écartés de ce relais. Le SIRET saisi et la dénomination de gestionnaire restent des **indices**, jamais une preuve suffisante du site ; le vérificateur et les écritures Grist ne sont pas modifiés. Les limites API restent en vigueur. Les gains au-delà de l'observation opérationnelle ne sont pas démontrés statistiquement.
 
 # Assistant Structures
 
@@ -20,8 +32,7 @@ correction libre, un candidat écarté ou une simple homonymie ne déclenchent p
 ce rattachement. La requête SIREN et les SIRET retournés restent des **pistes
 non probantes** : le vérificateur juridique et les protections d'écriture Grist
 ne changent pas. Recherche soumise au quota Annuaire et aux filtres géographiques
-déjà configurés. Cette amélioration ne prétend pas constituer une validation
-indépendante sur les 50+ structures inédites encore à collecter.
+déjà configurés. Cette amélioration ne prétend pas constituer une validation statistique indépendante.
 
 ### Recherche progressive — chantier #87 / PR #88
 
@@ -33,7 +44,7 @@ Le bouton **Interrompre la recherche** annule les requêtes en cours et garde le
 
 **Guidage interactif (incrément 3) :** chaque piste propose des choix indépendants « Nom », « Adresse », « Commune », « Gestionnaire », « SIRET » et « Écarter / Réexaminer ». Un clic mémorise un **indice de recherche non probant**, réversible, sans modifier la fiche. Pendant une recherche ordinaire, le premier choix bascule vers l’approfondissement ciblé en annulant l’ancienne analyse ; les candidats déjà découverts sont conservés. Pendant l’approfondissement, le plan de requêtes est recalculé après chaque consultation Annuaire et intègre les champs nouvellement sélectionnés. Les recherches sont dédupliquées et bornées par le quota déjà en place. Une fiche sélectionnée dans Grist différente invalide ces choix. La sélection humaine ne modifie **jamais** le row utilisé par decideIdentity ni les preuves officielles, et une piste écartée bloque les propositions d’écriture de ce candidat. **Ne pas confondre ce guidage avec la validation définitive des propositions Grist**.
 
-**Limites actuelles :** le guidage porte sur des indices textuels et juridiques de découverte ; la confirmation autonome de position exacte, les contacts et les champs de fiche éditables pendant la recherche restent à construire. L’arrêt adaptatif au-delà des budgets fixes, la simplification des résolveurs, l’enrichissement indépendant des contacts et un corpus de validation indépendant d’au moins 50 nouvelles structures restent obligatoires. Voir l’issue #87. Les tests synthétiques de 50 pistes ne constituent pas une mesure de rappel.
+**Limites actuelles :** le guidage porte sur des indices textuels et juridiques de découverte ; la confirmation autonome de position exacte, les contacts et les champs de fiche éditables pendant la recherche restent à construire. L’arrêt adaptatif au-delà des budgets fixes, la simplification des résolveurs, l’enrichissement indépendant des contacts restent à compléter. Un corpus externe de 50 structures n’est plus une condition préalable ni un critère bloquant. Voir l’issue #87. Les tests synthétiques de 50 pistes ne constituent pas une mesure de rappel.
 
 
 ### Incrément 4 — corrections d'indices, consultation étendue et métriques
