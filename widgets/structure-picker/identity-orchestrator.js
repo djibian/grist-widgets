@@ -14,6 +14,7 @@ import {
   usableCoordinates,
 } from "./identity-resolution.js";
 import { boundedSource } from "./bounded-source.js";
+import { planIdentityExpansion } from "./identity-expansion.js";
 
 export const IDENTITY_BUDGET = Object.freeze({
   maxOfficialRequests: 6,
@@ -65,7 +66,7 @@ function combineCoverage(first, second) {
     complete,
     candidateLimitHit: Boolean(first?.candidateLimitHit || second?.candidateLimitHit),
     matchingLimitReached: Boolean(first?.matchingLimitReached || second?.matchingLimitReached),
-    pagesExamined: 2,
+    pagesExamined: (first?.pagesExamined ?? 1) + (second?.pagesExamined ?? 1),
   };
 }
 
@@ -129,6 +130,8 @@ export async function resolveStructureIdentity({
   findPoiLinks = null,
   deadlineMs = IDENTITY_BUDGET.deadlineMs,
   maxOfficialRequests = IDENTITY_BUDGET.maxOfficialRequests,
+  maxPaginationPages = IDENTITY_BUDGET.maxPaginationPages,
+  deepening = false,
   onProgress,
   onEvent,
 } = {}) {
@@ -138,6 +141,7 @@ export async function resolveStructureIdentity({
   const deadline = createDeadline(signal, deadlineMs);
   const coverage = new Map();
   const requests = [];
+  const seenUrls = new Set();
   const diagnostics = [];
   const identifiers = identifierParts(row.SirenSiret);
   let officialRequestCount = 0;
@@ -148,12 +152,13 @@ export async function resolveStructureIdentity({
   let selectedGeocode = null;
 
   const performOfficial = async (request, source, { required = true, paginate = false } = {}) => {
-    if (!request) return [];
+    if (!request || seenUrls.has(request.url)) return [];
     if (officialRequestCount >= maxOfficialRequests) {
       coverage.set(source, coverageEntry(source, "error", { complete: false }, required, "Budget Annuaire atteint"));
       diagnostics.push("Budget Annuaire atteint avant la fin de l’analyse.");
       return [];
     }
+    seenUrls.add(request.url);
     requests.push({ source, kind: request.kind, url: request.url });
     officialRequestCount += 1;
     try {
@@ -161,16 +166,27 @@ export async function resolveStructureIdentity({
         { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.requestMs, onEvent });
       let items = first?.items ?? [];
       let combined = first?.coverage ?? { complete: true };
-      if (paginate && combined?.hasNextPage && paginationPages < IDENTITY_BUDGET.maxPaginationPages && officialRequestCount < maxOfficialRequests) {
-        const secondRequest = nextPageRequest(request);
-        if (secondRequest) {
-          paginationPages += 1;
-          officialRequestCount += 1;
-          requests.push({ source: `${source}:page2`, kind: secondRequest.kind, url: secondRequest.url });
-          const second = await boundedSource(`${source}:page2`, sourceSignal => fetchOfficial(secondRequest, { signal: sourceSignal, onEvent }),
+      let pageRequest = request;
+      while (paginate && combined?.hasNextPage && paginationPages < maxPaginationPages &&
+        officialRequestCount < maxOfficialRequests && !deadline.signal.aborted) {
+        const next = nextPageRequest(pageRequest);
+        if (!next || seenUrls.has(next.url)) break;
+        pageRequest = next;
+        seenUrls.add(next.url);
+        paginationPages += 1;
+        officialRequestCount += 1;
+        const pageSource = `${source}:page${next.page}`;
+        requests.push({ source: pageSource, kind: next.kind, url: next.url });
+        try {
+          const result = await boundedSource(pageSource, sourceSignal => fetchOfficial(next, { signal: sourceSignal, onEvent }),
             { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.requestMs, onEvent });
-          items = mergeCandidates(items, second?.items ?? []);
-          combined = combineCoverage(combined, second?.coverage ?? null);
+          items = mergeCandidates(items, result?.items ?? []);
+          combined = combineCoverage(combined, result?.coverage ?? null);
+        } catch (error) {
+          if (signal?.aborted) throw makeAbortError();
+          combined = { ...combined, complete: false, hasNextPage: true };
+          diagnostics.push(`${pageSource} : ${error?.message || "indisponible"}`);
+          break;
         }
       }
       coverage.set(source, coverageEntry(source, "ok", combined, required));
@@ -231,7 +247,7 @@ export async function resolveStructureIdentity({
     let decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
     checkpoint(decision);
 
-    if (isDecisive(decision) || deadline.timedOut) {
+    if ((deepening ? decision.status === IDENTITY_STATES.MATCH_VERIFIED : isDecisive(decision)) || deadline.timedOut) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }
 
@@ -241,7 +257,7 @@ export async function resolveStructureIdentity({
       candidates=mergeCandidates(candidates,legal);
       decision=decideIdentity({row,candidates,links,coverage:[...coverage.values()],location:anchor});
       checkpoint(decision);
-      if(isDecisive(decision))return checkpoint(decision);
+      if(deepening ? decision.status === IDENTITY_STATES.MATCH_VERIFIED : isDecisive(decision))return checkpoint(decision);
     }
 
     // With a public name, the entered identifier is corroboration only. It
@@ -255,7 +271,7 @@ export async function resolveStructureIdentity({
     anchor = locationAnchor(row, selectedGeocode);
     decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
     checkpoint(decision);
-    if (isDecisive(decision)) {
+    if (deepening ? decision.status === IDENTITY_STATES.MATCH_VERIFIED : isDecisive(decision)) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }
 
@@ -270,12 +286,12 @@ export async function resolveStructureIdentity({
       candidates = mergeCandidates(candidates, nearby);
       decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
       checkpoint(decision);
-      if (isDecisive(decision)) {
+      if (deepening ? decision.status === IDENTITY_STATES.MATCH_VERIFIED : isDecisive(decision)) {
         return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
       }
     }
 
-    if (anchor && typeof findPoiLinks === "function" && shouldContinue(decision)) {
+    if (anchor && typeof findPoiLinks === "function" && (deepening ? decision.status !== IDENTITY_STATES.MATCH_VERIFIED : shouldContinue(decision))) {
       try {
         const poiResult = await boundedSource("osm:identity", sourceSignal => findPoiLinks({ row, latitude: anchor.latitude, longitude: anchor.longitude, radius: 500, signal: sourceSignal }),
           { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.poiMs, onEvent });
@@ -304,6 +320,21 @@ export async function resolveStructureIdentity({
         diagnostics.push(`OSM identité : ${error?.message || "indisponible"}`);
       }
       decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
+    }
+
+    if (deepening && decision.status !== IDENTITY_STATES.MATCH_VERIFIED && !deadline.signal.aborted) {
+      for (const [index, entry] of planIdentityExpansion(row, {
+        alreadyRequested: [...seenUrls],
+        maxQueries: Math.min(12, maxOfficialRequests),
+      }).entries()) {
+        if (deadline.signal.aborted || officialRequestCount >= maxOfficialRequests) break;
+        const expanded = await performOfficial(entry.request, `annuaire:expand:${index + 1}:${entry.reason}`,
+          { required: false, paginate: true });
+        candidates = mergeCandidates(candidates, expanded);
+        decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
+        checkpoint(decision);
+        if (decision.status === IDENTITY_STATES.MATCH_VERIFIED) break;
+      }
     }
 
     if (deadline.timedOut && decision.status !== IDENTITY_STATES.MATCH_VERIFIED) {
