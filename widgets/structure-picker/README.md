@@ -296,3 +296,12 @@ Limite : cette recherche peut échouer pour une entité dont la dénomination
 légale n'apparaît pas dans les résultats textuels ou dont les établissements
 sont hors des départements configurés. Aucun gain de rappel@5 indépendant n'est
 encore quantifié.
+
+
+### Réorientation géographique après correction humaine (PR #88)
+
+Une adresse choisie ou corrigée dans les pistes constitue une **hypothèse de recherche**, distincte de l'adresse enregistrée. Lorsqu'elle est présente au checkpoint de géocodage, l'IGN recherche cette adresse plutôt que l'ancienne. Pendant l'approfondissement, un changement d'adresse détecté entre deux requêtes déclenche un nouveau géocodage puis, si une position utilisable est trouvée et si le quota le permet, une nouvelle recherche Annuaire à 500 m. Les candidats déjà recueillis sont conservés, les URL déjà interrogées ne sont pas rejouées et l'opération reste annulable.
+
+**Séparation explicite des preuves :** le point de l'adresse corrigée sert uniquement à choisir *où chercher*. Il n'est ni transmis comme `selectedGeocode` officiel à l'agrégateur de preuves, ni utilisé par `decideIdentity` pour attribuer un SIRET ; la fiche et ses coordonnées restent inchangées. Une discordance avec l'adresse du site initial continue à interdire la certification par simple rapprochement. Les résultats intermédiaires et les limites des sources demeurent visibles.
+
+Régressions : `tests/identity-orchestrator.test.mjs` (adresse corrigée avant géocodage et pendant une requête, coordonnées historiques contradictoires, non-certification). **Limites :** la réorientation géographique ne couvre pour l'instant que l'approfondissement d'identité ; la recherche géographique élargie et l'évaluation indépendante ≥50 structures sont encore manquantes. La preview doit être essayée dans un vrai widget Grist.
