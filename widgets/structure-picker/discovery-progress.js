@@ -3,7 +3,7 @@
 export const MAX_DISCOVERY_HINTS = 250;
 export const MAX_SOURCE_ACTIVITY = 30;
 
-function hintKey(candidate) {
+export function discoveryHintKey(candidate) {
   const siret = String(candidate?.siret ?? "").replace(/\D/g, "");
   if (siret.length === 14) return "siret:" + siret;
   const name = String(candidate?.nomCommercial || candidate?.raisonSociale || "")
@@ -21,7 +21,7 @@ export function mergeDiscoveryProgress(previous, checkpoint) {
   const before = previous ?? emptyDiscoveryProgress();
   const hints = new Map();
   for (const candidate of [...(before.candidates ?? []), ...(checkpoint?.candidates ?? [])]) {
-    const key = hintKey(candidate);
+    const key = discoveryHintKey(candidate);
     if (!key) continue;
     // A later observation may enrich the previous record; it does not change its legal status.
     if (hints.has(key)) hints.set(key, { ...hints.get(key), ...candidate });
@@ -53,13 +53,15 @@ export function recordDiscoverySourceEvent(previous, event) {
   return { ...before, activity: [...activity.values()].slice(-MAX_SOURCE_ACTIVITY) };
 }
 
-export function discoveryHints(progress, limit = 5) {
+export function discoveryHints(progress, limit = 5, { excluded = [] } = {}) {
   const count = Math.max(0, Math.min(20, Math.floor(Number(limit) || 0)));
-  return (progress?.candidates ?? []).slice(0, count).map(candidate => ({
+  return (progress?.candidates ?? []).filter(candidate => !excluded.includes(discoveryHintKey(candidate))).slice(0, count).map(candidate => ({
+    key: discoveryHintKey(candidate),
     name: candidate.nomCommercial || candidate.raisonSociale || "Lieu sans nom",
     legalName: candidate.raisonSociale || "",
     address: candidate.adresse || "",
-    siret: /^\d{14}$/.test(String(candidate.siret ?? "")) ? candidate.siret : "",
+    siret: /^\d{14}$/.test(String(candidate.siret ?? "").replace(/\D/g, "")) ? String(candidate.siret).replace(/\D/g, "") : "",
+    candidate,
   }));
 }
 
