@@ -503,7 +503,7 @@ function appendDiscoveryQuestion(container, { searching = false } = {}) {
   const input = document.createElement("input");
   input.type = "text";
   input.maxLength = 250;
-  input.setAttribute("aria-label", "Autre précision utile pour la recherche");
+  input.setAttribute?.("aria-label", "Autre précision utile pour la recherche");
   input.placeholder = question.field === "commune" ? "Autre commune" :
     question.field === "address" ? "Autre adresse" : "Autre nom";
   input.value = state.questionDraft?.id === question.id ? state.questionDraft.value : "";
