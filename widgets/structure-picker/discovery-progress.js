@@ -82,13 +82,17 @@ export function discoveryRelevance(candidate, reference = {}, guidance = null) {
 
   const queryAddress = chosen("address") || reference?.Adresse || "";
   const candidateAddress = candidate?.adresse || candidate?.Adresse || "";
-  const street = address => normalize(String(address).split(/\\b\\d{5}\\b/)[0]);
+  const street = address => normalize(String(address).split(/\b\d{5}\b/)[0]);
   const queryStreet = street(queryAddress);
   const candidateStreet = street(candidateAddress);
   const streetMatch = queryStreet && candidateStreet ? fuzzyTextScore(queryStreet, candidateStreet) : 0;
-  const requestedPostal = extractLocationFromAddress(queryAddress).codePostal || String(reference?.CodePostal || "");
+  // A teacher-selected commune may contradict the old address. In that case,
+  // the original postcode is an unverified hypothesis, not a ranking veto.
+  // This is display-only; identity and site verification remain unchanged.
+  const requestedPostal = chosen("commune") ? ""
+    : extractLocationFromAddress(queryAddress).codePostal || String(reference?.CodePostal || "");
   const candidatePostal = String(candidate?.codePostal || extractLocationFromAddress(candidateAddress).codePostal || "");
-  const postalMatch = /^\\d{5}$/.test(requestedPostal) && /^\\d{5}$/.test(candidatePostal)
+  const postalMatch = /^\d{5}$/.test(requestedPostal) && /^\d{5}$/.test(candidatePostal)
     ? (requestedPostal === candidatePostal ? 1 : -1) : 0;
   const requestedCommune = chosen("commune") || reference?.Commune || extractLocationFromAddress(queryAddress).commune;
   const actualCommune = candidate?.commune || extractLocationFromAddress(candidateAddress).commune;
