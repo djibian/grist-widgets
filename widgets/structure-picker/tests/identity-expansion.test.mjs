@@ -14,7 +14,7 @@ test("general expansion searches untrusted identifier independently, then altern
   assert.equal(plan[0].request.identifier, "12345678900019");
   assert.ok(plan.some(x => x.request.kind === "text" && x.request.codePostal === "44000"));
   assert.ok(plan.some(x => x.request.kind === "text" && !x.request.codePostal));
-  assert.ok(plan.some(x => x.request.query.includes("cooperative des saules") && !x.request.codePostal));
+  assert.ok(plan.some(x => x.request.kind === "text" && x.request.query.includes("cooperative des saules") && !x.request.codePostal));
   assert.equal(new Set(plan.map(x => x.request.url)).size, plan.length);
 });
 
