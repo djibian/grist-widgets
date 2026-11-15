@@ -1,8 +1,71 @@
+### Incrément 16 — diagnostiquer les questions encore utiles (PR #88)
+
+**IN_PROGRESS.** Une précision de commune ou d'adresse restreint désormais le **périmètre des questions**, sans supprimer les observations officielles ni influencer `decideIdentity` : quand la réponse distingue déjà un site, on n'interroge plus l'enseignant sur l'adresse d'établissements d'autres communes. Si aucune piste ne correspond au lieu indiqué, l'assistant le signale comme une **localisation encore non confirmée**, sans accepter un site de substitution ni certifier une position.
+
+« Je ne sais pas » concerne le **champ** demandé, pas seulement l'identifiant d'une question : de nouvelles options homonymes ne doivent pas redemander la même commune. Une **nouvelle contradiction explicite** d'adresse peut toujours ouvrir une vérification distincte. Les explications de source indisponible ou contradictoire sont visibles même lorsqu'aucune question humaine pertinente n'existe.
+
+Le diagnostic examine l'ensemble des **250 pistes conservées** (pas les seules douze premières), considère leurs alias publics et n'offre pas de communes provenant de pistes nominalement étrangères. Lorsqu'une commune suffit, elle est préférée à la sélection d'une adresse détaillée parmi les sites du même gestionnaire. La sélection et la correction déclenchent toujours les recherches effectives de l'orchestrateur, sous quotas ; elles ne deviennent ni preuve juridique ni écriture Grist.
+
+**Observations de développement dev2 au 15/11/2026, lecture seule :** 25 fiches, 17 sans immatriculation, 12 sans code postal reconnaissable dans l'adresse, 25 sans coordonnées non nulles, 3 groupes de noms répétés. Ces comptes ne mesurent **pas** le rappel ni la justesse des identités. Tests adversariaux : réponse de commune suivie d'une absence de question redondante, abstention et question alternative, désaccord géographique, candidats tardifs, alias et suggestions non pertinentes. **CI et preview doivent être confirmées sur le HEAD exact avant validation.**
+
+---
+
+### Incrément 14 — questions contextuelles et replanification (issue #87 / PR #88)
+
+**IN_PROGRESS.** Le module `discovery-diagnosis.js` analyse les pistes de recherche et distingue homonymies de lieux, contradiction d'adresse possible, plusieurs établissements d'un gestionnaire, manque de commune, divergence possible entre nom public et raison sociale, et indisponibilité des sources. Il privilégie une question courte et discriminante à la fois ; les réponses possibles sont proposées directement, avec correction libre et « Je ne sais pas ». Les questions résolues ou ignorées ne sont pas redemandées à l'identique durant cette analyse.
+
+**Couplage moteur :** le choix ou la correction devient un indice `guidance` ; il provoque la réorientation des requêtes Annuaire (nom, commune, gestionnaire, adresse) et, pour une adresse corrigée, une nouvelle recherche géographique. Une correction explicite élimine les requêtes ultérieures fondées sur l'ancienne valeur devenue suspecte. Les candidats et confirmations restent visibles pendant l'approfondissement. Les tests adversariaux démontrent les nouvelles **requêtes effectivement exécutées** et pas seulement un reclassement visuel.
+
+**Limites de sécurité :** l'utilisateur guide la découverte, mais ne valide ni un SIRET d'établissement, ni un géocode ou une position de site, et ne déclenche aucune écriture Grist. Les contrôles de l'identité juridique, les protections de sélection et les validations d'écriture restent indépendants. Les estimations des questions ne sont pas des scores de preuve.
+
+**Référence de développement :** la table `Structures_de_stage` de `suivi des stages dev2` (25 structures observées le 15/11/2026) en lecture seule, avec cas difficiles et variantes adversariales. Il n'est **plus nécessaire de constituer un corpus externe d'au moins 50 structures** pour continuer ou terminer le développement ; une évaluation statistique indépendante reste un travail facultatif distinct. Aucune amélioration générale de rappel n'est présumée sur cette seule base. CI et essai de la preview nécessaires avant validation finale.
+
+---
+
+### Incrément 12 — Découverte des SIRET de sites non-sièges
+
+Une recherche directe par SIREN/SIRET dans l'Annuaire ne fournit pas toujours la liste des établissements du gestionnaire. En **Approfondir la recherche**, le widget reprend la dénomination légale publiée pour le SIREN interrogé et recherche textuellement les établissements correspondants, d'abord au code postal saisi puis dans les départements configurés. Les résultats homonymes dont le SIREN est différent sont écartés de ce relais. Le SIRET saisi et la dénomination de gestionnaire restent des **indices**, jamais une preuve suffisante du site ; le vérificateur et les écritures Grist ne sont pas modifiés. Les limites API restent en vigueur. Les gains au-delà de l'observation opérationnelle ne sont pas démontrés statistiquement.
+
 # Assistant Structures
 
 Widget Grist unique pour **rechercher, ajouter et compléter** les structures de stage.
 
 L’interface sépare les deux usages principaux dans deux onglets fixes : **Rechercher / ajouter** et **Compléter la sélection**.
+
+
+
+### Incrément 8 — retrouver les autres établissements du gestionnaire
+
+Pendant une recherche approfondie, si l'enseignant choisit explicitement le **gestionnaire**
+d'un candidat déjà trouvé dans l'Annuaire, le planificateur peut consulter son **SIREN**
+afin de découvrir ses autres établissements géographiques. L'indice doit désigner
+un candidat effectivement observé et sa dénomination juridique publiée ; une
+correction libre, un candidat écarté ou une simple homonymie ne déclenchent pas
+ce rattachement. La requête SIREN et les SIRET retournés restent des **pistes
+non probantes** : le vérificateur juridique et les protections d'écriture Grist
+ne changent pas. Recherche soumise au quota Annuaire et aux filtres géographiques
+déjà configurés. Cette amélioration ne prétend pas constituer une validation statistique indépendante.
+
+### Recherche progressive — chantier #87 / PR #88
+
+La recherche de **Compléter la sélection** exploite maintenant les checkpoints \`onProgress\` et les événements \`onEvent\` déjà émis par les résolveurs. Le panneau présente les pistes disponibles avant le verdict final, cinq à la fois, avec les états réellement observés des sources dans « Activité réelle des sources ». La liste est explicitement **non vérifiée** : un nom, un SIRET ou une adresse simplement repéré n’est jamais une preuve juridique ou géographique et ne crée aucune proposition à appliquer dans Grist. Les propositions restent réservées au verdict final.
+
+Le bouton **Interrompre la recherche** annule les requêtes en cours et garde les pistes visibles ; une relance sur la même fiche inchangée garde ces pistes de découverte en mémoire et réutilise, lorsque le client le permet, son cache de réponses. Une modification de sélection ou des informations de la fiche retire ce contexte. Les événements tardifs d’une analyse terminée ne doivent pas réouvrir le panneau de progression.
+
+**Avancement supplémentaire :** la commande distincte « Approfondir la recherche », proposée après une analyse sans identité juridiquement vérifiée ou après une interruption, déclenche un second passage facultatif. Il recherche des variantes du nom, l’immatriculation existante comme simple indice indépendant, puis élargit la recherche du code postal aux départements configurés. La pagination peut couvrir jusqu’à trois pages additionnelles, dans la limite de 12 requêtes Annuaire et de 28 s pour l’identité / 46 s au total. Le bouton « Analyser / compléter » conserve volontairement son comportement habituel (12 s / 24 s). Les SIRET trouvés restent soumis aux critères de preuve existants ; aucun rattachement géographique nouveau n’est inféré de la proximité ou de la saisie humaine.
+
+**Guidage interactif (incrément 3) :** chaque piste propose des choix indépendants « Nom », « Adresse », « Commune », « Gestionnaire », « SIRET » et « Écarter / Réexaminer ». Un clic mémorise un **indice de recherche non probant**, réversible, sans modifier la fiche. Pendant une recherche ordinaire, le premier choix bascule vers l’approfondissement ciblé en annulant l’ancienne analyse ; les candidats déjà découverts sont conservés. Pendant l’approfondissement, le plan de requêtes est recalculé après chaque consultation Annuaire et intègre les champs nouvellement sélectionnés. Les recherches sont dédupliquées et bornées par le quota déjà en place. Une fiche sélectionnée dans Grist différente invalide ces choix. La sélection humaine ne modifie **jamais** le row utilisé par decideIdentity ni les preuves officielles, et une piste écartée bloque les propositions d’écriture de ce candidat. **Ne pas confondre ce guidage avec la validation définitive des propositions Grist**.
+
+**Limites actuelles :** le guidage porte sur des indices textuels et juridiques de découverte ; la confirmation autonome de position exacte, les contacts et les champs de fiche éditables pendant la recherche restent à construire. L’arrêt adaptatif au-delà des budgets fixes, la simplification des résolveurs, l’enrichissement indépendant des contacts restent à compléter. Un corpus externe de 50 structures n’est plus une condition préalable ni un critère bloquant. Voir l’issue #87. Les tests synthétiques de 50 pistes ne constituent pas une mesure de rappel.
+
+
+### Incrément 4 — corrections d'indices, consultation étendue et métriques
+
+Les pistes conservées peuvent désormais être affichées par lots supplémentaires de cinq, jusqu'à la limite explicite de 250. Chaque piste possède un volet « Corriger ou préciser une information » (nom, adresse, commune, gestionnaire, SIREN/SIRET). Les corrections sont des **indices de découverte seulement** : elles n'altèrent ni la fiche Grist, ni l'observation officielle, ni les attestations juridiques et géographiques. Une correction identique n'enclenche pas de nouvelle recherche ; un identifiant incomplet ou invalide est refusé. Les corrections restent en mémoire pour une même fiche pendant les relances, mais sont effacées au changement de fiche.
+
+Un calculateur hors ligne de métriques est disponible dans `validation/score-heldout.mjs` (usage et format documentés dans `validation/heldout-evaluation-protocol.md`). Il exige 50 cas réels au moins, dix secteurs et des captures API publiques identiques pour comparer référence et PR. **Aucun corpus réel indépendant n'a encore été constitué et aucun gain mesuré**. Les tests synthétiques du calculateur ne prouvent pas la performance sur les nouvelles structures.
+
+**Limites :** les corrections servent à la recherche Annuaire approfondie et ne remplacent pas la valeur de la fiche servant de référence au vérificateur ; certaines preuves sectorielles déjà concluantes terminent la recherche avant l'exploration d'un indice corrigé. La recherche/ajout initiale, la validation indépendante des positions/contacts, le budget adaptatif et le chantier de simplification restent à compléter. Ne pas prendre une correction humaine pour une preuve permettant d'appliquer un SIRET.
 
 ## Départements recherchés
 
@@ -197,3 +260,71 @@ Les [résultats des 25 fiches](../../docs/structure-picker-context-review.md) do
 Les accès alternatifs d’un même lieu sont admis uniquement lorsque l’exploitant publie son SIRET exact, l’adresse enregistrée et le lien d’accès depuis l’adresse physique. Le SIRET doit encore être revalidé actif ; la voie, le numéro, la commune et les extraits natifs sont contrôlés. Une simple proximité ne suffit jamais.
 
 Le repli `certified-entrances.js` admet un point natif BAN de type `entrée`, publié par la commune et certifié, uniquement à l’adresse physique complète d’un lieu déjà confirmé. L’identifiant BAN, le numéro et le suffixe doivent être cohérents. Il intervient après les preuves de lieu/bâtiment et ne remplace pas une position plus forte. Les coordonnées représentent une entrée publiée, sans précision de toit ni exactitude métrique présumée. Les preuves publiques sont revérifiées lors de l’écriture dans Grist. Régénération : `node scripts/generate-certified-entrances.mjs /chemin/building-*.json`, depuis des captures d’adresses complètes.
+
+
+### Recherche autonome par adresse de voie (PR #88, incrément 5)
+
+Lors d'un **approfondissement volontaire**, le planificateur peut interroger l'API publique Annuaire des entreprises par **adresse de voie indépendamment de la dénomination**. Il retire le code postal de `q` et l'applique comme filtre : la recherche d'adresse postale est tentée avant la relaxation des noms. La recherche par voie sans filtre postal intervient ensuite, sous les mêmes budgets et départements configurés ; une saisie corrigée par l'enseignant passe en premier sans effacer l'adresse de la fiche originale.
+
+Les valeurs d'adresse issues de ces recherches sont exclusivement des **pistes**. Elles n'entraînent aucune confirmation juridique, aucun déplacement de site et aucune écriture Grist : le vérificateur `decideIdentity`, les protections de sélection et les validations d'écriture restent inchangés. Les adresses trop vagues (commune seule, code postal seul) ne génèrent pas de requête de voie. Le dédoublonnage d'URL, la limitation Annuaire et la reprise du plan entre réponses sont préservés.
+
+Source documentaire publique du mode de recherche par adresse et quotas : https://recherche-entreprises.api.gouv.fr/docs/ . **Limites :** le périmètre départemental demeure configuré dans le widget ; aucun gain de rappel n'est encore établi sur un corpus inédit indépendant. La fonctionnalité doit encore être validée en situation réelle dans Grist.
+
+### Classement de découverte (PR #88, incrément 6)
+
+La liste **Pistes à explorer** classe désormais les candidats **pour l'affichage uniquement** à partir de la ressemblance générique des noms (enseigne, dénomination, variantes), de la voie, du code postal, de la commune et, très faiblement, d'un SIRET saisi comme indice non fiable. Une correction humaine remplace les indices de recherche et re-classe immédiatement les pistes, **sans modifier la fiche Grist source**. Un score élevé ne certifie **ni un site, ni son SIRET, ni ses coordonnées** et ne participe jamais à `decideIdentity` ni aux propositions d'écriture.
+
+Les candidats restent inspectables après un verdict ambigu ou incomplet, même si le vérificateur présente déjà des alternatives. L'interface conserve au plus 250 pistes distinctes ; si ce réservoir borné est plein, une nouvelle piste mieux classée peut remplacer l'une des moins pertinentes, sans qu'aucune identité soit validée par ce classement. La valeur `totalHintsSeen` est un **minimum observé**, pas un inventaire exhaustif de tous les candidats lorsque la recherche dépasse cette limite. Le classement est une heuristique déterministe non calibrée : **aucun gain de rappel@5 ne peut être revendiqué avant le corpus indépendant gelé** décrit dans `validation/heldout-evaluation-protocol.md`.
+
+
+## Classement des pistes : code postal et commune confirmée
+
+Le classement des pistes de découverte est **indicatif et distinct de la preuve juridique**.
+Il compare séparément la voie (sans le code postal ni la commune), le code postal
+et la commune : une correspondance de code postal ne doit jamais être confondue
+avec une correspondance de rue. Si l'enseignant confirme explicitement une
+commune, le code postal issu de l'ancienne adresse n'est plus utilisé pour
+déclasser les candidats de cette commune ; les deux établissements homonymes
+restent consultables. Ce choix **n'entraîne aucune vérification officielle de
+SIRET, aucun géocodage certifié et aucune écriture Grist**.
+
+Tests adversariaux : `tests/discovery-progress.test.mjs`
+(codes postaux seuls, commune confirmée en contradiction avec l'adresse).
+
+### Recherche des établissements d'un gestionnaire — correction API (PR #88)
+
+**Comportement documenté de l'Annuaire** : une requête directe avec `q` composé
+exactement de 9 chiffres (SIREN) ou de 14 chiffres (SIRET) ignore les filtres
+géographiques ; elle ne fournit pas la liste `matching_etablissements` d'une
+recherche textuelle ordinaire. Il est donc erroné d'utiliser une requête directe
+par SIREN pour énumérer les établissements « frères » d'un gestionnaire.
+Références :
+https://recherche-entreprises.api.gouv.fr/docs/ et
+https://forum.data.gouv.fr/t/api-recherche-d-entreprises-peut-on-obtenir-la-liste-des-etablissements-a-partir-du-siren/815
+(réponse officielle du 4 mai 2026).
+
+Lorsqu'un enseignant sélectionne le gestionnaire d'un candidat réel publié
+par l'Annuaire (nom légal exact non modifié, identifiants de ce candidat
+cohérents, piste non écartée), l'approfondissement effectue désormais une
+**recherche textuelle par sa dénomination officielle**, ciblée d'abord sur le
+**code postal du site de stage**, puis étendue aux **départements configurés**
+sans filtre postal. Ces deux requêtes et les variantes ultérieures partagent
+le même mécanisme de dédoublonnage, de quota, d'annulation et de reprise.
+Le SIREN du gestionnaire n'est **jamais** attribué comme SIRET au site ;
+un établissement trouvé reste un candidat soumis au vérificateur juridique
+`decideIdentity`. Le changement ne modifie ni les règles de preuve, ni les
+positions certifiées, ni les écritures/ACL Grist.
+
+Limite : cette recherche peut échouer pour une entité dont la dénomination
+légale n'apparaît pas dans les résultats textuels ou dont les établissements
+sont hors des départements configurés. Aucun gain de rappel@5 indépendant n'est
+encore quantifié.
+
+
+### Réorientation géographique après correction humaine (PR #88)
+
+Une adresse choisie ou corrigée dans les pistes constitue une **hypothèse de recherche**, distincte de l'adresse enregistrée. Lorsqu'elle est présente au checkpoint de géocodage, l'IGN recherche cette adresse plutôt que l'ancienne. Pendant l'approfondissement, un changement d'adresse détecté entre deux requêtes déclenche un nouveau géocodage puis, si une position utilisable est trouvée et si le quota le permet, une nouvelle recherche Annuaire à 500 m. Les candidats déjà recueillis sont conservés, les URL déjà interrogées ne sont pas rejouées et l'opération reste annulable.
+
+**Séparation explicite des preuves :** le point de l'adresse corrigée sert uniquement à choisir *où chercher*. Il n'est ni transmis comme `selectedGeocode` officiel à l'agrégateur de preuves, ni utilisé par `decideIdentity` pour attribuer un SIRET ; la fiche et ses coordonnées restent inchangées. Une discordance avec l'adresse du site initial continue à interdire la certification par simple rapprochement. Les résultats intermédiaires et les limites des sources demeurent visibles.
+
+Régressions : `tests/identity-orchestrator.test.mjs` (adresse corrigée avant géocodage et pendant une requête, coordonnées historiques contradictoires, non-certification). **Limites :** la réorientation géographique ne couvre pour l'instant que l'approfondissement d'identité ; la recherche géographique élargie et l'évaluation indépendante ≥50 structures sont encore manquantes. La preview doit être essayée dans un vrai widget Grist.

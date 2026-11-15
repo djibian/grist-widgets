@@ -464,3 +464,37 @@ button { color: inherit; }
 .confidence-high { color:#146134; background:#e8f5ed; }
 .confidence-medium { color:#755000; background:#fff5d6; }
 .confidence-low { color:#942f27; background:#fcece8; }
+
+/* Progressive, voluntary discovery guidance; never mistaken for a save action. */
+.discovery-lead {
+  margin: 8px 0;
+  padding: 9px 10px;
+  border: 1px solid var(--gw-color-border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.discovery-guidance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+}
+.discovery-guidance-actions .button {
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: var(--gw-font-size-xs);
+}
+.discovery-guidance-actions .button[aria-pressed="true"] {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Contextual clarification: prominent, short, and separate from Grist writes. */
+.discovery-question { margin: 12px 0; padding: 12px; border: 1px solid var(--gw-color-primary); border-radius: 9px; background: var(--gw-color-surface-subtle); }
+.discovery-question > strong { display: block; font-size: var(--gw-font-size-sm); line-height: 1.45; }
+.discovery-question > .help { margin: 5px 0 9px; }
+.discovery-question-option { display: inline-block; margin: 3px 6px 3px 0; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.discovery-question-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 9px 0; }
+.discovery-question-entry input { flex: 1 1 180px; min-width: 0; max-width: 100%; }
+.discovery-question .button { max-width: 100%; white-space: normal; }

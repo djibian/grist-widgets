@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { resolveStructureIdentity } from "../identity-orchestrator.js";
 import { IDENTITY_STATES } from "../identity-resolution.js";
+import { emptyDiscoveryGuidance, correctDiscoveryGuidance } from "../discovery-guidance.js";
 
 function official(items, extra = {}) {
   return { items, coverage: { complete: true, hasNextPage: false, unitSirens: [...new Set(items.map(item => item.siren).filter(Boolean))], ...extra } };
@@ -125,4 +126,345 @@ test('an existing legal name can discover the site when its public name is not i
   return official(request.query==='martin automobiles'?[candidate({nomCommercial:'Garage Martin',aliases:['Garage Martin'],nomUsuelDistinct:true,raisonSociale:'MARTIN AUTOMOBILES',siret:'12345678900011',adresse:'12 rue des Champs 44270 Machecoul-Saint-Même'})]:[]);
  }});
  assert.equal(r.decision.status,'MATCH_VERIFIED');assert.deepEqual(calls,['garage martin','martin automobiles']);
+});
+
+
+test("optional deeper search discovers a novel local site using a broad name query without trusting the entered SIRET", async () => {
+  const calls = [];
+  const real = candidate({
+    nomCommercial: "Atelier des Saules", aliases: ["Atelier des Saules"], nomUsuelDistinct: true,
+    raisonSociale: "Coopérative des Saules", siren: "112233445", siret: "11223344500027",
+    adresse: "7 rue des Tisserands 44000 Nantes", codePostal: "44000", commune: "Nantes",
+  });
+  const wrong = candidate({
+    nomCommercial: "Autre activité", raisonSociale: "Exploitant étranger",
+    siren: "998877665", siret: "99887766500013",
+    adresse: "99 rue des Saules 44000 Nantes", codePostal: "44000", commune: "Nantes",
+  });
+  const row = { NomCommercial: "Atelier des Saules", Adresse: "7 rue des Tisserands 44000 Nantes", SirenSiret: wrong.siret };
+  const result = await resolveStructureIdentity({
+    row, deepening: true, deadlineMs: 28000, maxOfficialRequests: 12,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      calls.push(request);
+      if (request.kind === "siret") return official([wrong]);
+      if (request.kind === "text" && !request.codePostal) return official([real]);
+      return official([]);
+    },
+  });
+  assert.ok(calls.some(request => request.kind === "siret"), "entered identifier must be explored, not accepted");
+  assert.ok(calls.some(request => request.kind === "text" && !request.codePostal), "broaden the search");
+  assert.equal(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+  assert.equal(result.decision.candidate.siret, real.siret);
+  assert.equal(result.decision.identifierWarning?.entered, wrong.siret);
+  assert.equal(new Set(calls.map(request => request.url)).size, calls.length);
+});
+
+test("explicit deepening extends Annuaire pagination without inventing a SIRET or changing the abstention rule", async () => {
+  const calls = [];
+  const found = candidate({
+    nomCommercial: "Jardin des Aubépines", aliases: ["Jardin des Aubépines"], nomUsuelDistinct: true,
+    raisonSociale: "Exploitation horticole", siren: "223344556", siret: "22334455600031",
+    adresse: "42 route des Jardins 85000 La Roche-sur-Yon", codePostal: "85000", commune: "La Roche-sur-Yon",
+  });
+  const row = { NomCommercial: "Jardin des Aubépines", Adresse: "42 route des Jardins 85000 La Roche-sur-Yon" };
+  const result = await resolveStructureIdentity({
+    row, deepening: true, deadlineMs: 28000, maxOfficialRequests: 12, maxPaginationPages: 3,
+    fetchOfficial: async request => {
+      calls.push(request);
+      return official(request.page === 3 ? [found] : [], {
+        complete: request.page === 3, hasNextPage: request.page !== 3,
+      });
+    },
+  });
+  assert.deepEqual(calls.slice(0, 3).map(request => request.page), [1, 2, 3]);
+  assert.equal(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+  assert.equal(result.decision.candidate.siret, found.siret);
+  assert.equal(result.requests.some(req => req.source.endsWith(":page3")), true);
+});
+
+test("deepening may rank a contradictory address but must never confirm site identity from a matching number alone", async () => {
+  const wrong = candidate({
+    nomCommercial: "Ferme des Érables", aliases: ["Ferme des Érables"], nomUsuelDistinct: true,
+    raisonSociale: "Exploitant", siren: "334455667", siret: "33445566700029",
+    adresse: "22 route des Chênes 44000 Nantes", codePostal: "44000", commune: "Nantes",
+  });
+  const result = await resolveStructureIdentity({
+    row: { NomCommercial: "Ferme des Érables", Adresse: "12 route des Chênes 44000 Nantes", SirenSiret: wrong.siret },
+    deepening: true, deadlineMs: 28000, maxOfficialRequests: 8,
+    fetchOfficial: async () => official([wrong]),
+  });
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+});
+
+
+test("feedback at an active checkpoint really reorders later Annuaire lookups without granting legal proof", async () => {
+  const row = { NomCommercial: "Lieu à découvrir", Adresse: "5 rue du Chêne 44000 Nantes", SirenSiret: "" };
+  const guidance = { selected: [], rejected: [], version: 0 };
+  const requests = [];
+  let chosen = false;
+  const result = await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 5, maxPaginationPages: 0,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      requests.push(request);
+      return official([]);
+    },
+    onProgress: () => {
+      if (chosen) return;
+      chosen = true;
+      guidance.selected.push({ field: "name", key: "hint", value: "Atelier de la Source" });
+      guidance.version += 1;
+    },
+  });
+  assert.ok(chosen);
+  assert.ok(requests.some(item => item.kind === "text" && item.query.includes("atelier de la source")));
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+  assert.equal(row.NomCommercial, "Lieu à découvrir");
+});
+
+
+test("corrected search hints broaden discovery without becoming site identity evidence", async () => {
+  const row = { NomCommercial: "École du Verger", Adresse: "4 rue du Jardin 44000 Nantes", SirenSiret: "" };
+  const hint = candidate({ nomCommercial: "Atelier des Quais", siret: "98765432100019",
+    adresse: "10 quai des Quais 49000 Angers" });
+  const guidance = emptyDiscoveryGuidance();
+  assert.equal(correctDiscoveryGuidance(guidance, hint, "name", "Atelier des Quais"), true);
+  assert.equal(correctDiscoveryGuidance(guidance, hint, "address", "10 quai des Quais 49000 Angers"), true);
+  const calls = [];
+  const result = await resolveStructureIdentity({
+    row, guidance, deepening: true, deadlineMs: 28000, maxOfficialRequests: 12,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      calls.push(request);
+      return official(request.kind === "text" && request.query === "atelier des quais" &&
+        request.codePostal === "49000" ? [hint] : []);
+    },
+  });
+  assert.ok(calls.some(req => req.kind === "text" && req.query === "atelier des quais" && req.codePostal === "49000"),
+    "manual corrected name and address must generate an actual targeted request");
+  assert.ok(result.candidates.some(item => item.siret === hint.siret), "new candidate remains visible");
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED,
+    "guided candidate is never an official identity for a conflicting reference row");
+  assert.equal(row.NomCommercial, "École du Verger");
+  assert.equal(row.Adresse, "4 rue du Jardin 44000 Nantes");
+});
+
+test("a novel site may be found by address alone but the unrelated legal operator is not automatically verified", async () => {
+  const row = {
+    NomCommercial: "Maison des Saules", Adresse: "17 rue des Moissons 44000 Nantes",
+    SirenSiret: "", Latitude: "", Longitude: "",
+  };
+  const other = candidate({
+    nomCommercial: "Société anonyme XYZ", raisonSociale: "XYZ Développement",
+    siren: "111222333", siret: "11122233300044",
+    adresse: "17 rue des Moissons 44000 Nantes", codePostal: "44000", commune: "Nantes",
+  });
+  const queries = [];
+  const result = await resolveStructureIdentity({
+    row, deepening: true, maxOfficialRequests: 12, maxPaginationPages: 0,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      queries.push(request);
+      return official(request.kind === "text" && request.query === "17 rue des moissons" &&
+        request.codePostal === "44000" ? [other] : []);
+    },
+  });
+  assert.ok(queries.some(request => request.kind === "text" &&
+    request.query === "17 rue des moissons" && request.codePostal === "44000"));
+  assert.ok(result.candidates.some(item => item.siret === other.siret), "address discovery must preserve the candidate");
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED, "address-only match cannot prove the site's SIRET");
+  assert.equal(new Set(queries.map(request => request.url)).size, queries.length, "no duplicated URL");
+});
+
+test("human operator choice during live search discovers sibling sites without promoting their identity", async () => {
+  const row = { NomCommercial: "Atelier du Littoral", Adresse: "8 rue de l'Etang 44000 Nantes", SirenSiret: "" };
+  const manager = candidate({ nomCommercial: "Atelier du Littoral", aliases: ["Atelier du Littoral"],
+    nomUsuelDistinct: true, raisonSociale: "Gestion du Littoral", siren: "456789012",
+    siret: "45678901200011", adresse: "2 rue du Siège 44000 Nantes", codePostal: "44000", commune: "Nantes" });
+  const sibling = candidate({ nomCommercial: "Entrepôt Atlantique", aliases: ["Entrepôt Atlantique"],
+    nomUsuelDistinct: true, raisonSociale: "Gestion du Littoral", siren: "456789012",
+    siret: "45678901200029", adresse: "8 rue de l'Etang 44000 Nantes", codePostal: "44000", commune: "Nantes" });
+  const guidance = emptyDiscoveryGuidance();
+  const calls = [];
+  const outcome = await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 5, maxPaginationPages: 0,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      calls.push(request);
+      // Real direct SIREN searches have no matching_etablissements.
+      if (request.kind === "siren") return official([]);
+      if (request.kind === "text" && request.query === "gestion du littoral" &&
+          request.codePostal === "44000") return official([manager, sibling]);
+      if (request.kind === "text" && request.codePostal) return official([manager]);
+      return official([]);
+    },
+    onProgress: checkpoint => {
+      if (!guidance.selected.length && checkpoint.candidates.some(c => c.siret === manager.siret))
+        guidance.selected.push({ field: "operator", key: "siret:" + manager.siret, value: manager.raisonSociale });
+    },
+  });
+  assert.ok(calls.some(request => request.kind === "text" &&
+    request.query === "gestion du littoral" && request.codePostal === "44000"),
+    "actual sibling search uses the published operator name as text at the target site");
+  assert.ok(!calls.some(request => request.kind === "siren"),
+    "the direct SIREN API does not enumerate sibling establishments");
+  assert.ok(outcome.candidates.some(c => c.siret === sibling.siret), "sibling site enters discovery");
+  assert.notEqual(outcome.decision.status, IDENTITY_STATES.MATCH_VERIFIED,
+    "a shared operator and matching address cannot by themselves certify this different-name site");
+  assert.equal(row.SirenSiret, "");
+});
+
+
+test("orchestrator discovers non-siege site via legal name and rejects foreign same-name SIREN", async () => {
+  const row = { NomCommercial: "", Adresse: "17 chemin du Rivage 44000 Nantes", SirenSiret: "11223344500029" };
+  const site = candidate({ nomCommercial: "Entrepôt littoral", raisonSociale: "Ateliers du Littoral",
+    siren: "112233445", siret: "11223344500029", adresse: "99 rue du Port 44000 Nantes",
+    codePostal: "44000", commune: "Nantes" });
+  const foreign = candidate({ ...site, siren: "998877665", siret: "99887766500013" });
+  const calls = [];
+  const result = await resolveStructureIdentity({
+    row, deepening: true, maxOfficialRequests: 6, maxPaginationPages: 0, geocode: async () => [],
+    fetchOfficial: async request => {
+      calls.push(request);
+      if (request.kind === "siret") return official([], {
+        identifierLegalNames: [{ siren: "112233445", legalName: "Ateliers du Littoral" }],
+      });
+      if (request.kind === "text" && request.query === "ateliers du littoral") return official([site, foreign]);
+      return official([]);
+    },
+  });
+  assert.equal(calls[0].kind, "siret");
+  assert.ok(calls.some(req => req.kind === "text" && req.query === "ateliers du littoral" && req.codePostal === "44000"));
+  assert.ok(result.candidates.some(item => item.siret === site.siret));
+  assert.ok(!result.candidates.some(item => item.siret === foreign.siret));
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED,
+    "typed SIRET plus legal-name hint must not certify contradictory site address");
+  assert.equal(row.SirenSiret, "11223344500029");
+});
+
+test("a corrected address moves discovery without certifying a changed site", async () => {
+  const row = {
+    NomCommercial: "Atelier du Verger",
+    Adresse: "7 chemin des Sources 44000 Nantes",
+    Latitude: 47.24, Longitude: -1.55, SirenSiret: "",
+  };
+  const corrected = "9 rue des Lilas 49000 Angers";
+  const guidance = emptyDiscoveryGuidance();
+  const sites = [candidate({
+    nomCommercial: "Atelier du Verger", aliases: ["Atelier du Verger"],
+    nomUsuelDistinct: true, raisonSociale: "ATELIER DU VERGER",
+    siren: "123450001", siret: "12345000100024", adresse: corrected,
+    codePostal: "49000", commune: "Angers",
+  })];
+  const geocoded = [];
+  const requests = [];
+  let supplied = false;
+  const result = await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 5, maxPaginationPages: 0,
+    geocode: async address => {
+      geocoded.push(address);
+      return [{ latitude: 47.47, longitude: -0.55, adresse: corrected }];
+    },
+    fetchOfficial: async request => {
+      requests.push(request);
+      return official(request.kind === "nearby" ? sites : []);
+    },
+    onProgress: () => {
+      if (supplied) return;
+      supplied = true;
+      assert.equal(correctDiscoveryGuidance(guidance, { siret: "12345000100024" }, "address", corrected), true);
+    },
+  });
+  assert.deepEqual(geocoded, [corrected], "the initial checkpoint must redirect the subsequent geocode");
+  assert.ok(requests.some(request => request.kind === "nearby" &&
+    request.latitude === 47.47 && request.longitude === -0.55));
+  assert.equal(result.candidates.some(site => site.siret === "12345000100024"), true);
+  assert.equal(result.selectedGeocode, null, "teacher guidance is not exported as verified coordinates");
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED,
+    "a candidate at a human-corrected address must not override the original contrary address");
+  assert.equal(row.Adresse, "7 chemin des Sources 44000 Nantes");
+});
+
+test("an address corrected during expansion triggers another real geocode and nearby lookup", async () => {
+  const original = "5 avenue du Port 44000 Nantes";
+  const corrected = "8 place du Marché 49000 Angers";
+  const guidance = emptyDiscoveryGuidance();
+  const geocoded = [];
+  const nearbyLocations = [];
+  let redirected = false;
+  const found = candidate({
+    nomCommercial: "Maison de la Source", aliases: ["Maison de la Source"],
+    nomUsuelDistinct: true, raisonSociale: "MAISON DE LA SOURCE",
+    siren: "987650001", siret: "98765000100022", adresse: corrected,
+    codePostal: "49000", commune: "Angers",
+  });
+  const result = await resolveStructureIdentity({
+    row: { NomCommercial: "Maison de la Source", Adresse: original, SirenSiret: "" },
+    guidance, deepening: true, maxOfficialRequests: 6, maxPaginationPages: 0,
+    geocode: async address => {
+      geocoded.push(address);
+      return [{ latitude: address === corrected ? 47.47 : 47.22, longitude: -0.55 }];
+    },
+    fetchOfficial: async request => {
+      if (request.kind !== "nearby") return official([]);
+      nearbyLocations.push(request.latitude);
+      return official(request.latitude === 47.47 ? [found] : []);
+    },
+    onProgress: () => {
+      if (!redirected && nearbyLocations.length === 1) {
+        redirected = true;
+        correctDiscoveryGuidance(guidance, { siret: found.siret }, "address", corrected);
+      }
+    },
+  });
+  assert.equal(redirected, true);
+  assert.deepEqual(geocoded, [original, corrected]);
+  assert.deepEqual(nearbyLocations, [47.22, 47.47]);
+  assert.equal(result.candidates.some(site => site.siret === found.siret), true);
+  assert.equal(result.selectedGeocode, null);
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+});
+
+test("an answered question redirects the very FIRST Annuaire lookup to corrected name and commune", async () => {
+  const row = { NomCommercial: "Ancienne enseigne", Adresse: "4 rue des Pins 44000 Nantes", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const hint = candidate({ nomCommercial: "Nouvelle Maison", adresse: "2 avenue des Fleurs 49000 Angers",
+    siren: "234567890", siret: "23456789000019" });
+  assert.ok(correctDiscoveryGuidance(guidance, hint, "name", "Nouvelle Maison"));
+  assert.ok(correctDiscoveryGuidance(guidance, hint, "commune", "Angers"));
+  const requests = [];
+  await resolveStructureIdentity({
+    row, guidance, deepening: true, geocode: async () => [],
+    maxOfficialRequests: 8, maxPaginationPages: 0,
+    fetchOfficial: async request => { requests.push(request); return official([]); },
+  });
+  assert.equal(requests[0].kind, "text");
+  assert.equal(requests[0].query, "nouvelle maison angers");
+  assert.equal(requests[0].codePostal, "", "obsolete postcode does not constrain corrected commune");
+  assert.equal(row.NomCommercial, "Ancienne enseigne");
+  assert.equal(row.Adresse, "4 rue des Pins 44000 Nantes");
+});
+
+test("a corrected address changes initial postcode and geocode but cannot certify the location", async () => {
+  const row = { NomCommercial: "Maison des Saules", Adresse: "3 rue des Chênes 44000 Nantes", SirenSiret: "" };
+  const newAddress = "17 quai de Loire 49000 Angers";
+  const guidance = emptyDiscoveryGuidance();
+  assert.ok(correctDiscoveryGuidance(guidance,
+    candidate({ nomCommercial: "Maison des Saules", adresse: newAddress, siret: "11223344500018" }),
+    "address", newAddress));
+  const requests = [], geocoded = [];
+  const result = await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 8, maxPaginationPages: 0,
+    geocode: async address => {
+      geocoded.push(address); return [{ latitude: 47.47, longitude: -0.55 }];
+    },
+    fetchOfficial: async request => { requests.push(request); return official([]); },
+  });
+  assert.equal(requests[0].kind, "text");
+  assert.equal(requests[0].codePostal, "49000");
+  assert.ok(geocoded.includes(newAddress));
+  assert.ok(requests.some(req => req.kind === "nearby"));
+  assert.equal(result.selectedGeocode, null, "human-corrected geocode remains a search clue only");
+  assert.equal(row.Adresse, "3 rue des Chênes 44000 Nantes");
 });

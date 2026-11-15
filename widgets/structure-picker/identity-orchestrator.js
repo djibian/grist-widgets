@@ -14,6 +14,7 @@ import {
   usableCoordinates,
 } from "./identity-resolution.js";
 import { boundedSource } from "./bounded-source.js";
+import { planIdentityExpansion } from "./identity-expansion.js";
 
 export const IDENTITY_BUDGET = Object.freeze({
   maxOfficialRequests: 6,
@@ -65,7 +66,7 @@ function combineCoverage(first, second) {
     complete,
     candidateLimitHit: Boolean(first?.candidateLimitHit || second?.candidateLimitHit),
     matchingLimitReached: Boolean(first?.matchingLimitReached || second?.matchingLimitReached),
-    pagesExamined: 2,
+    pagesExamined: (first?.pagesExamined ?? 1) + (second?.pagesExamined ?? 1),
   };
 }
 
@@ -129,6 +130,9 @@ export async function resolveStructureIdentity({
   findPoiLinks = null,
   deadlineMs = IDENTITY_BUDGET.deadlineMs,
   maxOfficialRequests = IDENTITY_BUDGET.maxOfficialRequests,
+  maxPaginationPages = IDENTITY_BUDGET.maxPaginationPages,
+  deepening = false,
+  guidance = null,
   onProgress,
   onEvent,
 } = {}) {
@@ -138,22 +142,27 @@ export async function resolveStructureIdentity({
   const deadline = createDeadline(signal, deadlineMs);
   const coverage = new Map();
   const requests = [];
+  const seenUrls = new Set();
   const diagnostics = [];
   const identifiers = identifierParts(row.SirenSiret);
   let officialRequestCount = 0;
   let paginationPages = 0;
   let candidates = [];
+  let identifierLegalNames = [];
   let links = [];
   let geocodeCandidates = [];
   let selectedGeocode = null;
+  let discoveryAnchor = null;
+  let activeDiscoveryAddress = null;
 
   const performOfficial = async (request, source, { required = true, paginate = false } = {}) => {
-    if (!request) return [];
+    if (!request || seenUrls.has(request.url)) return [];
     if (officialRequestCount >= maxOfficialRequests) {
       coverage.set(source, coverageEntry(source, "error", { complete: false }, required, "Budget Annuaire atteint"));
       diagnostics.push("Budget Annuaire atteint avant la fin de l’analyse.");
       return [];
     }
+    seenUrls.add(request.url);
     requests.push({ source, kind: request.kind, url: request.url });
     officialRequestCount += 1;
     try {
@@ -161,16 +170,35 @@ export async function resolveStructureIdentity({
         { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.requestMs, onEvent });
       let items = first?.items ?? [];
       let combined = first?.coverage ?? { complete: true };
-      if (paginate && combined?.hasNextPage && paginationPages < IDENTITY_BUDGET.maxPaginationPages && officialRequestCount < maxOfficialRequests) {
-        const secondRequest = nextPageRequest(request);
-        if (secondRequest) {
-          paginationPages += 1;
-          officialRequestCount += 1;
-          requests.push({ source: `${source}:page2`, kind: secondRequest.kind, url: secondRequest.url });
-          const second = await boundedSource(`${source}:page2`, sourceSignal => fetchOfficial(secondRequest, { signal: sourceSignal, onEvent }),
+      if (request.kind === "siren" || request.kind === "siret") {
+        const siren = identifierParts(request.identifier).siren;
+        const published = (combined.identifierLegalNames ?? [])
+          .filter(item => normalizeIdentifier(item?.siren) === siren && normalize(item?.legalName).length >= 3);
+        identifierLegalNames = [...new Map(
+          [...identifierLegalNames, ...published].map(item => [item.siren + ":" + normalize(item.legalName), item]),
+        ).values()].slice(0, 8);
+      }
+      let pageRequest = request;
+      while (paginate && combined?.hasNextPage && paginationPages < maxPaginationPages &&
+        officialRequestCount < maxOfficialRequests && !deadline.signal.aborted) {
+        const next = nextPageRequest(pageRequest);
+        if (!next || seenUrls.has(next.url)) break;
+        pageRequest = next;
+        seenUrls.add(next.url);
+        paginationPages += 1;
+        officialRequestCount += 1;
+        const pageSource = `${source}:page${next.page}`;
+        requests.push({ source: pageSource, kind: next.kind, url: next.url });
+        try {
+          const result = await boundedSource(pageSource, sourceSignal => fetchOfficial(next, { signal: sourceSignal, onEvent }),
             { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.requestMs, onEvent });
-          items = mergeCandidates(items, second?.items ?? []);
-          combined = combineCoverage(combined, second?.coverage ?? null);
+          items = mergeCandidates(items, result?.items ?? []);
+          combined = combineCoverage(combined, result?.coverage ?? null);
+        } catch (error) {
+          if (signal?.aborted) throw makeAbortError();
+          combined = { ...combined, complete: false, hasNextPage: true };
+          diagnostics.push(`${pageSource} : ${error?.message || "indisponible"}`);
+          break;
         }
       }
       coverage.set(source, coverageEntry(source, "ok", combined, required));
@@ -189,10 +217,10 @@ export async function resolveStructureIdentity({
     }
   };
 
-  const performGeocode = async () => {
-    if (!String(row.Adresse ?? "").trim() || typeof geocode !== "function") return [];
+  const performGeocode = async address => {
+    if (!String(address ?? "").trim() || typeof geocode !== "function") return [];
     try {
-      const result = await boundedSource("ign:discovery", sourceSignal => geocode(row.Adresse, { signal: sourceSignal, limit: 3 }),
+      const result = await boundedSource("ign:discovery", sourceSignal => geocode(address, { signal: sourceSignal, limit: 3 }),
         { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.geocodeMs, onEvent });
       coverage.set("ign:discovery", coverageEntry("ign:discovery", "ok", { complete: true }, false));
       return result;
@@ -218,30 +246,40 @@ export async function resolveStructureIdentity({
   };
 
   try {
-    const location = extractLocationFromAddress(row.Adresse);
-    const initialQuery = identitySearchName(row);
-    const initialRequest = initialQuery
-      ? buildOfficialTextSearchRequest(initialQuery, { codePostal: location.codePostal })
-      : identifiers.identifier ? buildOfficialIdentifierSearchRequest(identifiers.identifier) : null;
+    // A new teacher clue changes the FIRST lookup, not only the final
+    // expansion phase. Original row data remains untouched for decideIdentity.
+    const selectedHint = field => guidance?.selected?.find(item => item.field === field)?.value || "";
+    const guidedAddress = selectedHint("address");
+    const guidedCommune = normalize(selectedHint("commune"));
+    const location = extractLocationFromAddress(guidedAddress || row.Adresse);
+    const initialQuery = normalize(selectedHint("name") || selectedHint("operator") || identitySearchName(row));
+    const focusedQuery = guidedCommune && initialQuery
+      ? initialQuery + " " + guidedCommune : initialQuery;
+    // A corrected/confirmed commune can contradict the old site's postcode.
+    const focusedPostalCode = guidedCommune && !guidedAddress ? "" : location.codePostal;
+    const initialIdentifier = selectedHint("siret") || identifiers.identifier;
+    const initialRequest = focusedQuery
+      ? buildOfficialTextSearchRequest(focusedQuery, { codePostal: focusedPostalCode })
+      : initialIdentifier ? buildOfficialIdentifierSearchRequest(initialIdentifier) : null;
     const initialOfficial = initialRequest ? await performOfficial(initialRequest,
-      initialQuery ? "annuaire:text" : "annuaire:identifier-hint", { paginate: Boolean(initialQuery), required: true }) : [];
+      focusedQuery ? "annuaire:text" : "annuaire:identifier-hint", { paginate: Boolean(focusedQuery), required: true }) : [];
     candidates = mergeCandidates(candidates, initialOfficial);
 
     let anchor = locationAnchor(row, null);
     let decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
     checkpoint(decision);
 
-    if (isDecisive(decision) || deadline.timedOut) {
+    if ((deepening ? decision.status === IDENTITY_STATES.MATCH_VERIFIED : isDecisive(decision)) || deadline.timedOut) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }
 
     const legalHint=normalize(row.RaisonSociale);
     if(legalHint.length>=3 && legalHint!==initialQuery && officialRequestCount<maxOfficialRequests){
-      const legal=await performOfficial(buildOfficialTextSearchRequest(legalHint,{codePostal:location.codePostal}),"annuaire:legal-hint",{required:false});
+      const legal=await performOfficial(buildOfficialTextSearchRequest(legalHint,{codePostal:focusedPostalCode}),"annuaire:legal-hint",{required:false});
       candidates=mergeCandidates(candidates,legal);
       decision=decideIdentity({row,candidates,links,coverage:[...coverage.values()],location:anchor});
       checkpoint(decision);
-      if(isDecisive(decision))return checkpoint(decision);
+      if(deepening ? decision.status === IDENTITY_STATES.MATCH_VERIFIED : isDecisive(decision))return checkpoint(decision);
     }
 
     // With a public name, the entered identifier is corroboration only. It
@@ -249,35 +287,54 @@ export async function resolveStructureIdentity({
     // identifiers are still revalidated explicitly when they supply a bridge.
     // A known site address already supports the identity decision. Waiting for
     // an optional street geocode would consume the budget for stronger registry proof.
-    const geocoded = await performGeocode();
-    geocodeCandidates = Array.isArray(geocoded) ? geocoded : [];
-    selectedGeocode = geocodeCandidates[0] ?? null;
-    anchor = locationAnchor(row, selectedGeocode);
+    // A corrected address is a search clue, not an official position or site
+    // attestation. Keep discovery geography separate from certificate geography.
+    const discoveryAddress = () => String(
+      guidance?.selected?.find(item => item.field === "address")?.value || row.Adresse || "",
+    ).trim();
+    const refreshDiscoveryLocation = async () => {
+      const address = discoveryAddress();
+      if (address === activeDiscoveryAddress) return false;
+      activeDiscoveryAddress = address;
+      const guided = normalize(address) !== normalize(row.Adresse);
+      const geocoded = await performGeocode(address);
+      geocodeCandidates = Array.isArray(geocoded) ? geocoded : [];
+      const found = geocodeCandidates[0] ?? null;
+      // Never export a teacher-corrected geocode as the selected official
+      // location: the coordinator also uses selectedGeocode for evidence.
+      selectedGeocode = guided ? null : found;
+      anchor = locationAnchor(row, selectedGeocode);
+      discoveryAnchor = guided
+        ? usableCoordinates(found?.latitude, found?.longitude) || anchor
+        : anchor;
+      return true;
+    };
+    await refreshDiscoveryLocation();
     decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
     checkpoint(decision);
-    if (isDecisive(decision)) {
+    if (deepening ? decision.status === IDENTITY_STATES.MATCH_VERIFIED : isDecisive(decision)) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }
 
-    if (anchor && officialRequestCount < maxOfficialRequests) {
+    if (discoveryAnchor && officialRequestCount < maxOfficialRequests) {
       const rowCoordinates = usableCoordinates(row.Latitude, row.Longitude);
-      const radius = rowCoordinates ? 0.3 : 0.5;
+      const radius = rowCoordinates && discoveryAnchor === anchor ? 0.3 : 0.5;
       const nearby = await performOfficial(
-        buildOfficialNearbySearchRequest({ latitude: anchor.latitude, longitude: anchor.longitude, radius }),
+        buildOfficialNearbySearchRequest({ latitude: discoveryAnchor.latitude, longitude: discoveryAnchor.longitude, radius }),
         "annuaire:nearby",
         { paginate: true, required: true },
       );
       candidates = mergeCandidates(candidates, nearby);
       decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
       checkpoint(decision);
-      if (isDecisive(decision)) {
+      if (deepening ? decision.status === IDENTITY_STATES.MATCH_VERIFIED : isDecisive(decision)) {
         return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
       }
     }
 
-    if (anchor && typeof findPoiLinks === "function" && shouldContinue(decision)) {
+    if (discoveryAnchor && typeof findPoiLinks === "function" && (deepening ? decision.status !== IDENTITY_STATES.MATCH_VERIFIED : shouldContinue(decision))) {
       try {
-        const poiResult = await boundedSource("osm:identity", sourceSignal => findPoiLinks({ row, latitude: anchor.latitude, longitude: anchor.longitude, radius: 500, signal: sourceSignal }),
+        const poiResult = await boundedSource("osm:identity", sourceSignal => findPoiLinks({ row, latitude: discoveryAnchor.latitude, longitude: discoveryAnchor.longitude, radius: 500, signal: sourceSignal }),
           { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.poiMs, onEvent });
         coverage.set("osm:identity", coverageEntry("osm:identity", "ok", { complete: poiResult?.complete !== false }, false));
         const pois = Array.isArray(poiResult?.candidates) ? poiResult.candidates : [];
@@ -304,6 +361,50 @@ export async function resolveStructureIdentity({
         diagnostics.push(`OSM identité : ${error?.message || "indisponible"}`);
       }
       decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
+    }
+
+    if (deepening && decision.status !== IDENTITY_STATES.MATCH_VERIFIED && !deadline.signal.aborted) {
+      // Rebuild the remaining plan after each checkpoint: a field chosen by a
+      // teacher during an in-flight request affects the next actual lookup.
+      let expansionIndex = 0;
+      while (!deadline.signal.aborted && officialRequestCount < maxOfficialRequests) {
+        // An address corrected while HTTP requests were in flight must redirect
+        // the very next geographic lookup without restarting the whole analysis.
+        if (discoveryAddress() !== activeDiscoveryAddress) {
+          await refreshDiscoveryLocation();
+          if (discoveryAnchor && officialRequestCount < maxOfficialRequests) {
+            const redirected = await performOfficial(
+              buildOfficialNearbySearchRequest({
+                latitude: discoveryAnchor.latitude, longitude: discoveryAnchor.longitude, radius: 0.5,
+              }),
+              "annuaire:guided-nearby", { required: false });
+            candidates = mergeCandidates(candidates, redirected);
+          }
+          decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
+          checkpoint(decision);
+          if (decision.status === IDENTITY_STATES.MATCH_VERIFIED) break;
+        }
+        const entry = planIdentityExpansion(row, {
+          alreadyRequested: [...seenUrls],
+          maxQueries: 1,
+          guidance,
+          discoveredCandidates: candidates,
+          identifierLegalNames,
+        })[0];
+        if (!entry) break;
+        expansionIndex += 1;
+        const expanded = await performOfficial(entry.request, `annuaire:expand:${expansionIndex}:${entry.reason}`,
+          { required: false, paginate: true });
+        // A name search can return other enterprises with the same name.
+        // This bridge may discover sites ONLY of the exact looked-up SIREN.
+        const newCandidates = entry.boundSiren
+          ? expanded.filter(item => normalizeIdentifier(item?.siren) === entry.boundSiren)
+          : expanded;
+        candidates = mergeCandidates(candidates, newCandidates);
+        decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
+        checkpoint(decision);
+        if (decision.status === IDENTITY_STATES.MATCH_VERIFIED) break;
+      }
     }
 
     if (deadline.timedOut && decision.status !== IDENTITY_STATES.MATCH_VERIFIED) {

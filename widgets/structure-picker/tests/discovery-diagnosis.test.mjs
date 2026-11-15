@@ -1,0 +1,284 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { diagnoseDiscovery, skipDiscoveryQuestion } from "../discovery-diagnosis.js";
+import { emptyDiscoveryProgress, mergeDiscoveryProgress } from "../discovery-progress.js";
+import { chooseDiscoveryGuidance, correctDiscoveryGuidance, emptyDiscoveryGuidance } from "../discovery-guidance.js";
+import { planIdentityExpansion } from "../identity-expansion.js";
+import { resolveStructureIdentity } from "../identity-orchestrator.js";
+
+function site({ name = "Les Petits Loups", street = "1 rue du Parc", code = "44000",
+  city = "Nantes", siren = "123456789", nic = "00012", operator = "Association Arc" } = {}) {
+  return { nomCommercial: name, raisonSociale: operator, siren, siret: siren + nic,
+    adresse: street + " " + code + " " + city, commune: city, codePostal: code,
+    etatAdministratif: "A", aliases: [], latitude: null, longitude: null };
+}
+function progress(...sites) {
+  return mergeDiscoveryProgress(emptyDiscoveryProgress(), { candidates: sites });
+}
+function official(items) {
+  return { items, coverage: { complete: true, hasNextPage: false } };
+}
+test("A: ambiguous homonyms ask for commune and answer generates an actual new Annuaire request", async () => {
+  const nantes = site(), angers = site({ code: "49000", city: "Angers", nic: "00020" });
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const diagnosis = diagnoseDiscovery({ reference: row, progress: progress(nantes, angers), guidance, searching: true });
+  assert.equal(diagnosis.blocker, "ambiguous-sites");
+  assert.equal(diagnosis.question.field, "commune");
+  const selected = diagnosis.question.options.find(x => x.label === "Angers");
+  assert.ok(selected);
+  assert.equal(chooseDiscoveryGuidance(guidance, selected.candidate, selected.field), true);
+  const requests = [];
+  await resolveStructureIdentity({
+    row, guidance, deepening: true, geocode: async () => [], maxOfficialRequests: 8,
+    maxPaginationPages: 0,
+    fetchOfficial: async req => {
+      requests.push(req);
+      return official(req.query?.includes("angers") ? [angers] : []);
+    },
+  });
+  assert.ok(requests.some(req => req.kind === "text" && req.query.includes("angers")),
+    "user response must actually change HTTP lookup, not only UI sort");
+  const after = diagnoseDiscovery({ reference: row, progress: progress(nantes, angers), guidance });
+  assert.equal(after.question, null,
+    "once the commune distinguishes a single site, avoid asking about addresses belonging to other communes");
+  assert.notEqual(after.blocker, "ambiguous-sites");
+});
+
+test("B: contradictory address offers a correction and triggers geographic discovery without site certification", async () => {
+  const target = site({ street: "9 rue du Parc", code: "49000", city: "Angers" });
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "5 rue des Érables 44000 Nantes", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const diagnosis = diagnoseDiscovery({ reference: row, progress: progress(target), guidance, searching: false });
+  assert.equal(diagnosis.blocker, "conflicting-address");
+  assert.equal(diagnosis.question.field, "address");
+  const chosen = diagnosis.question.options[0];
+  assert.equal(chooseDiscoveryGuidance(guidance, chosen.candidate, chosen.field), true);
+  const geocoded = [], calls = [];
+  const result = await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 8,
+    geocode: async address => {
+      geocoded.push(address);
+      return [{ latitude: 47.47, longitude: -0.55 }];
+    },
+    fetchOfficial: async req => {
+      calls.push(req);
+      return official(req.kind === "nearby" ? [target] : []);
+    },
+  });
+  assert.ok(geocoded.includes(target.adresse));
+  assert.ok(calls.some(req => req.kind === "nearby"), "corrected address redirects official proximity lookup");
+  assert.equal(result.selectedGeocode, null, "human correction never validates a site position");
+  assert.equal(row.Adresse, "5 rue des Érables 44000 Nantes");
+});
+
+test("C: sibling sites from same manager ask for the internship site, not a SIREN attribution", () => {
+  const a = site(), b = site({ street: "29 boulevard des Tilleuls", code: "44000", city: "Nantes", nic: "00020" });
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "123456789" };
+  const guidance = emptyDiscoveryGuidance();
+  chooseDiscoveryGuidance(guidance, a, "operator");
+  const question = diagnoseDiscovery({ reference: row, progress: progress(a, b), guidance }).question;
+  assert.equal(question.kind, "operator-sites");
+  assert.equal(question.field, "address");
+  assert.equal(question.options.length, 2);
+  const selected = question.options.find(x => x.label.includes("29 boulevard"));
+  chooseDiscoveryGuidance(guidance, selected.candidate, selected.field);
+  const planned = planIdentityExpansion(row, { guidance });
+  assert.ok(planned.some(q => q.reason === "address-postcode" && q.request.query?.includes("boulevard")),
+    "chosen site is searched by address instead of borrowing the manager's SIRET");
+});
+
+test("C2: a local public name differing from the legal operator leads to targeted sibling discovery", () => {
+  const row = { NomCommercial: "La Cabane des Mômes", Adresse: "12 rue du Château 44400 Rezé", SirenSiret: "" };
+  const operator = site({ name: "", operator: "ASSOCIATION AIDE JEUNESSE",
+    street: "12 rue du Château", code: "44400", city: "Rezé" });
+  const guidance = emptyDiscoveryGuidance();
+  const question = diagnoseDiscovery({ reference: row, progress: progress(operator), guidance }).question;
+  assert.equal(question?.kind, "possible-manager");
+  const choice = question.options[0];
+  assert.equal(chooseDiscoveryGuidance(guidance, choice.candidate, "operator"), true);
+  const plan = planIdentityExpansion(row, { guidance, discoveredCandidates: [operator], maxQueries: 30 });
+  assert.ok(plan.some(entry => entry.reason === "operator-establishments" &&
+    entry.request.query?.includes("association aide jeunesse")),
+    "a possible operator must trigger actual searches for its establishments");
+  assert.ok(!("verifiedOfficial" in guidance), "human confirmation never certifies any manager/site SIRET");
+});
+
+test("D: 'Je ne sais pas' suppresses only the same question and retains other opportunities", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const p = progress(site(), site({ code: "49000", city: "Angers", nic: "00020" }));
+  const initial = diagnoseDiscovery({ reference: row, progress: p, guidance }).question;
+  assert.equal(initial.kind, "homonyms");
+  assert.equal(skipDiscoveryQuestion(guidance, initial.id), true);
+  assert.equal(skipDiscoveryQuestion(guidance, initial.id), false);
+  assert.notEqual(diagnoseDiscovery({ reference: row, progress: p, guidance }).question?.field, "commune",
+    "do not re-ask the same commune; a different discriminant such as an address is allowed");
+  assert.deepEqual(guidance.selected, [], "ignorance is not treated as a confirmed choice");
+  const changed = progress(site(), site({ code: "49000", city: "Angers", nic: "00020" }),
+    site({ code: "35000", city: "Rennes", nic: "00030" }));
+  assert.notEqual(diagnoseDiscovery({ reference: row, progress: changed, guidance }).question?.field, "commune",
+    "new options must not revive an unknown commune under a different question identifier");
+});
+
+test("E: answer at a live checkpoint changes subsequent official requests", async () => {
+  const first = site(), second = site({ code: "49000", city: "Angers", nic: "00020" });
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const calls = [];
+  let questionChosen = false;
+  await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 8, maxPaginationPages: 0,
+    geocode: async () => [],
+    fetchOfficial: async req => {
+      calls.push(req);
+      return official(calls.length === 1 ? [first, second] : []);
+    },
+    onProgress: checkpoint => {
+      if (questionChosen) return;
+      const question = diagnoseDiscovery({
+        reference: row, progress: progress(...checkpoint.candidates), guidance, decision: checkpoint.decision, searching: true,
+      }).question;
+      assert.equal(question?.field, "commune");
+      const answer = question.options.find(o => o.label === "Angers");
+      chooseDiscoveryGuidance(guidance, answer.candidate, answer.field);
+      questionChosen = true;
+    },
+  });
+  assert.ok(questionChosen);
+  assert.ok(calls.some(c => c.query?.includes("angers")), "in-flight replan must execute the new query");
+});
+
+test("F/H: source failure is not an address contradiction, easy cases ask nothing", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "1 rue du Parc 44000 Nantes" };
+  const p = { candidates: [], activity: [{ source: "annuaire:text", state: "timeout" }] };
+  const failed = diagnoseDiscovery({ reference: row, progress: p, searching: true });
+  assert.equal(failed.blocker, "sources-unavailable");
+  assert.equal(failed.question, null);
+  assert.equal(diagnoseDiscovery({ reference: row, progress: progress(site()),
+    decision: { status: "MATCH_VERIFIED" } }).question, null);
+});
+
+test("two successive corrections preserve hypotheses while creating different lookup families", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "5 rue des Érables", SirenSiret: "" };
+  const a = site(), b = site({ city: "Angers", code: "49000", nic: "00020", street: "14 rue des Pins" });
+  const guidance = emptyDiscoveryGuidance();
+  const first = diagnoseDiscovery({ reference: row, progress: progress(a, b), guidance }).question;
+  const answer = first.options.find(x => x.label === "Angers");
+  chooseDiscoveryGuidance(guidance, answer.candidate, answer.field);
+  const second = diagnoseDiscovery({ reference: row, progress: progress(b), guidance }).question;
+  assert.equal(second?.field, "address", "new evidence can reveal a new address contradiction");
+  correctDiscoveryGuidance(guidance, b, "address", "14 rue des Pins 49000 Angers");
+  const urls = planIdentityExpansion(row, { guidance }).map(x => x.request.url);
+  assert.ok(urls.some(url => /angers/i.test(decodeURIComponent(url))));
+  assert.ok(urls.some(url => /pins/i.test(decodeURIComponent(url))));
+  assert.equal(guidance.selected.length, 2);
+  assert.equal(b.adresse, "14 rue des Pins 49000 Angers", "official observation is not rewritten");
+});
+
+test("conflicting source observations are not mislabeled as a wrong user address", () => {
+  const a = site(), b = site({ street: "41 rue des Écoles", code: "49000", city: "Angers" });
+  const unstable = { ...a, observations: [a, b] };
+  const row = { NomCommercial: "Les Petits Loups", Adresse: a.adresse, SirenSiret: "" };
+  const diagnosis = diagnoseDiscovery({ reference: row, progress: progress(unstable) });
+  assert.equal(diagnosis.blocker, "conflicting-sources");
+  assert.equal(diagnosis.question, null, "only independent source validation can resolve contradictory evidence");
+});
+
+test("diagnosis includes the rare relevant site after the first twelve leads", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const leads = Array.from({ length: 18 }, (_, i) =>
+    site({ city: "Nantes", code: "44000", nic: String(i + 12).padStart(5, "0") }));
+  leads.push(site({ city: "Angers", code: "49000", nic: "00999" }));
+  const diagnosis = diagnoseDiscovery({ reference: row, progress: progress(...leads) });
+  assert.equal(diagnosis.question?.field, "commune");
+  assert.ok(diagnosis.question.options.some(o => o.label === "Angers"));
+});
+
+test("commune beats a full address when both distinguish the same manager sites", () => {
+  const a = site();
+  const b = site({ city: "Angers", code: "49000", nic: "00020" });
+  const guidance = emptyDiscoveryGuidance();
+  chooseDiscoveryGuidance(guidance, a, "operator");
+  const result = diagnoseDiscovery({ reference: { NomCommercial: "Les Petits Loups", Adresse: "" },
+    progress: progress(a, b), guidance });
+  assert.equal(result.question?.field, "commune", "asking for a commune is easier than a full site address");
+});
+
+test("a commune inferred from the official address remains selectable and changes the actual search", async () => {
+  const a = site({ city: "Nantes", code: "44000" });
+  const b = site({ city: "Angers", code: "49000", nic: "00020" });
+  delete b.commune;
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const question = diagnoseDiscovery({ reference: row, progress: progress(a, b), guidance }).question;
+  assert.equal(question?.field, "commune");
+  const answer = question.options.find(x => x.label === "Angers");
+  assert.ok(answer, "the commune was extracted from the address");
+  assert.equal(chooseDiscoveryGuidance(guidance, answer.candidate, "commune"), true,
+    "a displayed option must always be actionable");
+  const executed = [];
+  await resolveStructureIdentity({ row, guidance, deepening: true, maxPaginationPages: 0,
+    maxOfficialRequests: 6, geocode: async () => [],
+    fetchOfficial: async req => {
+      executed.push(req);
+      return official([]);
+    },
+  });
+  assert.ok(executed.some(req => req.query?.includes("angers")),
+    "answering an inferred commune must change an actual official request");
+});
+
+test("public aliases reveal genuine homonyms even when legal names differ", () => {
+  const a = { ...site({ name: "SARL Groupe Nord" }), aliases: ["Les Petits Loups"] };
+  const b = { ...site({ name: "ASSOCIATION Centre Est", city: "Angers", code: "49000", nic: "00020" }),
+    aliases: ["Les Petits Loups"] };
+  const result = diagnoseDiscovery({ reference: { NomCommercial: "Les Petits Loups", Adresse: "" },
+    progress: progress(a, b), searching: true });
+  assert.equal(result.question?.kind, "homonyms");
+  assert.equal(result.question?.options.length, 2);
+});
+
+test("irrelevant results do not produce false location options", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const unrelated = site({ name: "Atelier de Chaudronnerie", operator: "Industrie Martin" });
+  const diagnosis = diagnoseDiscovery({ reference: row, progress: progress(unrelated), searching: true });
+  assert.equal(diagnosis.question?.field, "commune");
+  assert.equal(diagnosis.question?.options.length, 0, "do not offer a town based on an unrelated company");
+});
+
+test("an address chosen among homonyms avoids unrelated follow-up questions", () => {
+  const a = site({ city: "Nantes", code: "44000" });
+  const b = site({ city: "Angers", code: "49000", nic: "00020", street: "24 rue des Roses" });
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  chooseDiscoveryGuidance(guidance, b, "address");
+  const result = diagnoseDiscovery({ reference: row, progress: progress(a, b), guidance });
+  assert.equal(result.question, null);
+  assert.notEqual(result.blocker, "ambiguous-sites");
+});
+
+test("guided commune absent from returned candidates is reported as unconfirmed, not silently substituted", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  correctDiscoveryGuidance(guidance, site(), "commune", "Rennes");
+  const result = diagnoseDiscovery({
+    reference: row, progress: progress(site(), site({ city: "Angers", code: "49000", nic: "00020" })),
+    guidance, searching: true,
+  });
+  assert.equal(result.blocker, "guided-location-unconfirmed");
+  assert.equal(result.question, null);
+  assert.match(result.why, /recherche continue/i);
+});
+
+test("a genuinely new address contradiction can still be raised after unknown address", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "4 rue du Lac 44000 Nantes", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const first = diagnoseDiscovery({ reference: row, progress: progress(site()) }).question;
+  assert.equal(first.field, "address");
+  skipDiscoveryQuestion(guidance, first.id);
+  assert.equal(diagnoseDiscovery({ reference: row, progress: progress(site()), guidance }).question, null);
+  const other = site({ street: "29 rue des Roses", city: "Angers", code: "49000", nic: "00020" });
+  assert.equal(diagnoseDiscovery({ reference: row, progress: progress(other), guidance }).question?.kind,
+    "address-contradiction", "new contradictory evidence warrants rechecking even after a skipped question");
+});

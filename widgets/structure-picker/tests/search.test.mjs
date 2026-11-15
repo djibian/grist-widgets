@@ -137,3 +137,18 @@ test("DINUM search and filtering use the configured departments", () => {
     setActiveDepartments(DEFAULT_DEPARTMENTS);
   }
 });
+
+
+test("direct SIRET absent from establishments yields only exact legal-unit discovery hint", () => {
+  const payload = { results: [
+    { siren: "112233445", nom_raison_sociale: "ATELIERS DU LITTORAL", matching_etablissements: [] },
+    { siren: "998877665", nom_raison_sociale: "HOMONYME", matching_etablissements: [] },
+  ] };
+  const result = extractOfficialCandidates(payload, { identifierQuery: "11223344500029" });
+  assert.deepEqual(result.items, []);
+  assert.deepEqual(result.coverage.identifierLegalNames, [
+    { siren: "112233445", legalName: "ATELIERS DU LITTORAL" },
+  ]);
+  assert.deepEqual(extractOfficialCandidates(payload).coverage.identifierLegalNames, []);
+  assert.deepEqual(extractOfficialCandidates(payload, { identifierQuery: "00000000000000" }).coverage.identifierLegalNames, []);
+});

@@ -1,0 +1,133 @@
+import {
+  buildOfficialIdentifierSearchRequest,
+  buildOfficialTextSearchRequest,
+  extractLocationFromAddress,
+  normalize,
+  normalizeIdentifier,
+} from "./search.js";
+import { identitySearchName, targetNameVariants } from "./identity-resolution.js";
+
+// The public Annuaire API also searches by street address. Keep the street
+// separate from the postal filter; do not turn this lookup into site proof.
+// Broad or postal-only addresses are deliberately not searched as street names.
+export function addressSearchPhrase(value) {
+  const raw = String(value ?? "").trim().slice(0, 240);
+  const { codePostal } = extractLocationFromAddress(raw);
+  const beforePostal = codePostal ? raw.slice(0, raw.lastIndexOf(codePostal)) : raw;
+  const street = normalize(beforePostal);
+  const words = street.split(" ").filter(Boolean);
+  if (street.length < 8 || words.length < 2 || !words.some(word => word.length >= 4 && /[a-z]/.test(word)))
+    return "";
+  return street.slice(0, 120);
+}
+
+// Discovery requests are hypotheses, never confirmation of the establishment.
+// The existing identity decision remains the sole validator.
+export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries = 12, guidance = null, discoveredCandidates = [], identifierLegalNames = [] } = {}) {
+  const used = new Set(alreadyRequested.filter(Boolean));
+  const selected = guidance?.selected ?? [];
+  const hint = field => selected.find(entry => entry.field === field)?.value ?? "";
+  const corrected = field => selected.some(entry => entry.field === field && entry.corrected);
+  const selectedAddress = hint("address");
+  const selectedCommune = normalize(hint("commune"));
+  const suppliedLocation = extractLocationFromAddress(selectedAddress || row?.Adresse);
+  // A correction revokes the old geographic hypothesis for future requests,
+  // but never alters the actual Grist row or the independent identity decision.
+  const location = corrected("commune") && !corrected("address")
+    ? { ...suppliedLocation, codePostal: "" } : suppliedLocation;
+  const addressOptions = [...new Set([selectedAddress, ...(
+    corrected("address") || corrected("commune") ? [] : [row?.Adresse]
+  )].map(value => String(value ?? "").trim()).filter(Boolean))]
+    .map(value => ({ ...extractLocationFromAddress(value), street: addressSearchPhrase(value) }));
+  const queries = [];
+  const add = (request, reason, boundSiren = "") => {
+    if (!request?.url || used.has(request.url) || queries.length >= maxQueries) return;
+    used.add(request.url);
+    queries.push({ request, reason, ...(boundSiren ? { boundSiren } : {}) });
+  };
+
+  // An entered identifier is searched *independently* from the name.
+  // Its results are not treated as corroboration without site evidence.
+  for (const identifier of [hint("siret"), ...(corrected("siret") ? [] : [row?.SirenSiret])]) {
+    if (String(identifier ?? "").trim())
+      add(buildOfficialIdentifierSearchRequest(identifier), "identifier-hint");
+  }
+
+  // A direct SIREN/SIRET lookup identifies a legal unit, not the site.
+  // Use its published name for new text searches, never as a site proof.
+  const enteredSirens = new Set([hint("siret"), ...(corrected("siret") ? [] : [row?.SirenSiret])]
+    .map(value => normalizeIdentifier(value).slice(0, 9)).filter(value => value.length === 9));
+  for (const unit of identifierLegalNames) {
+    const siren = normalizeIdentifier(unit?.siren);
+    const legalName = normalize(unit?.legalName);
+    if (!enteredSirens.has(siren) || siren.length !== 9 || legalName.length < 3) continue;
+    if (location.codePostal)
+      add(buildOfficialTextSearchRequest(legalName, { codePostal: location.codePostal }),
+        "identifier-legal-name", siren);
+    add(buildOfficialTextSearchRequest(legalName), "identifier-legal-name", siren);
+  }
+
+  // A teacher may recognise a *manager*, not the geographic internship site.
+  // The Annuaire direct SIREN endpoint returns the legal unit but NOT the
+  // matching establishments (its geographic filters are silently ignored).
+  // Search the published legal name as TEXT instead; this is the endpoint that
+  // returns matching establishments. Require a real, unedited official candidate
+  // before using its name, and never promote any sibling to verified site identity.
+  for (const selection of selected) {
+    if (selection.field !== "operator" || selection.corrected ||
+        guidance?.rejected?.includes(selection.key)) continue;
+    const manager = discoveredCandidates.find(candidate => {
+      const siret = normalizeIdentifier(candidate?.siret);
+      return siret.length === 14 && selection.key === "siret:" + siret &&
+        normalize(selection.value) === normalize(candidate?.raisonSociale);
+    });
+    const siren = normalizeIdentifier(manager?.siren);
+    const legalName = normalize(manager?.raisonSociale);
+    if (siren.length !== 9 || normalizeIdentifier(manager?.siret).slice(0, 9) !== siren ||
+        legalName.length < 3) continue;
+    // Target the probable site postcode, not the manager's headquarters.
+    if (location.codePostal)
+      add(buildOfficialTextSearchRequest(legalName, { codePostal: location.codePostal }), "operator-establishments");
+    // If the postcode was wrong or the site is elsewhere in the configured
+    // departments, retain an independent unscoped-by-postcode opportunity.
+    add(buildOfficialTextSearchRequest(legalName), "operator-establishments");
+  }
+
+  const names = [...new Set([
+    hint("name"),
+    hint("operator"),
+    ...(corrected("name") ? [] : [identitySearchName(row), ...targetNameVariants(row)]),
+    normalize(row?.RaisonSociale ?? ""),
+  ].map(name => normalize(name)).filter(name => name.length >= 3))];
+
+  // A teacher-confirmed commune is an independent search clue. Never force
+  // the old postal code onto it: the old address may describe another site.
+  if (selectedCommune.length >= 3) {
+    for (const name of names)
+      add(buildOfficialTextSearchRequest(name + " " + selectedCommune), "name-commune-hint");
+  }
+
+  // First explore alternate names at the supplied postal code. Then loosen
+  // that constraint without changing the departments configured in Grist.
+  for (const name of names) {
+    if (location.codePostal)
+      add(buildOfficialTextSearchRequest(name, { codePostal: location.codePostal }), "name-postcode");
+  }
+  // A street query can discover an unknown trading name or an operator whose
+  // legal name is unrelated to the place. Require a postal filter first to
+  // avoid exhausting the quota on common street names nationwide.
+  for (const address of addressOptions) {
+    if (address.street && address.codePostal)
+      add(buildOfficialTextSearchRequest(address.street, { codePostal: address.codePostal }), "address-postcode");
+  }
+  for (const name of names) {
+    add(buildOfficialTextSearchRequest(name), "name-department");
+  }
+  // Only after name-based lookups: relax the postal constraint of address
+  // hypotheses. These are discovery requests, never verified site locations.
+  for (const address of addressOptions) {
+    if (address.street)
+      add(buildOfficialTextSearchRequest(address.street), "address-department");
+  }
+  return queries;
+}

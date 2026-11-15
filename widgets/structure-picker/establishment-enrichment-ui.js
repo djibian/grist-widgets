@@ -19,6 +19,22 @@ import { IDENTITY_STATES, decisionEvidence } from "./identity-resolution.js";
 import { findOsmIdentityPois } from "./osm-identity.js";
 import { POSITION_STATES } from "./establishment-position.js";
 import { warmSitePositionManifest } from "./site-position-sources.js";
+import {
+  emptyDiscoveryProgress,
+  mergeDiscoveryProgress,
+  recordDiscoverySourceEvent,
+  discoveryHints,
+  discoveryHintKey,
+  discoverySourceLabel,
+} from "./discovery-progress.js";
+import {
+  emptyDiscoveryGuidance,
+  chooseDiscoveryGuidance,
+  correctDiscoveryGuidance,
+  isRejectedGuidance,
+  guidanceFieldValue,
+} from "./discovery-guidance.js";
+import { diagnoseDiscovery, skipDiscoveryQuestion } from "./discovery-diagnosis.js";
 
 const ui = {
   enrichButton: document.getElementById("enrich-button"),
@@ -40,6 +56,13 @@ const state = {
   proposals: [],
   diagnostics: [],
   trace: [],
+  progress: null,
+  progressKey: null,
+  visibleHintCount: 5,
+  guidance: emptyDiscoveryGuidance(),
+  isDeepening: false,
+  guidedRestart: false,
+  questionDraft: null,
 };
 
 function clearNode(node) {
@@ -88,7 +111,17 @@ function resetAnalysis() {
   state.proposals = [];
   state.diagnostics = [];
   state.trace = [];
-  if (ui.enrichButton) ui.enrichButton.disabled = true;
+  state.progress = null;
+  state.progressKey = null;
+  state.visibleHintCount = 5;
+  state.guidance = emptyDiscoveryGuidance();
+  state.isDeepening = false;
+  state.guidedRestart = false;
+  state.questionDraft = null;
+  if (ui.enrichButton) {
+    ui.enrichButton.disabled = true;
+    ui.enrichButton.textContent = "Analyser / compléter";
+  }
   clearNode(ui.candidate);
   clearNode(ui.proposalPanel);
   setStatus("");
@@ -262,7 +295,314 @@ function candidateCard(candidate) {
   }
   content.appendChild(details);
   card.appendChild(content);
+  appendGuidanceControls(card, candidate);
   return card;
+}
+
+
+// A teacher's choice changes lookup priority, never the target row used by
+// decideIdentity, the official proof set or the Grist write authorization.
+function redirectDiscovery() {
+  if (state.controller && !state.isDeepening) {
+    state.guidedRestart = true;
+    state.controller.abort(new DOMException("Nouvelle piste choisie", "AbortError"));
+    return;
+  }
+  if (!state.controller) {
+    runIdentityAnalysis({ deepening: true });
+    return;
+  }
+  setStatus("Choix pris en compte pour les prochaines recherches. Aucune donnée Grist modifiée.");
+  renderDiscoveryProgress();
+}
+
+function appendGuidanceControls(container, candidate) {
+  const actions = document.createElement("div");
+  actions.className = "discovery-guidance-actions";
+  const fields = [
+    ["name", "Nom"], ["address", "Adresse"], ["commune", "Commune"],
+    ["operator", "Gestionnaire"], ["siret", "SIRET"],
+  ];
+  for (const [field, label] of fields) {
+    const value = guidanceFieldValue(candidate, field);
+    if (!value) continue;
+    const selected = state.guidance.selected.some(item =>
+      item.field === field && item.value === value
+    );
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button-secondary";
+    button.textContent = (selected ? "✓ " : "") + label;
+    button.title = "Utiliser cette information pour chercher ; ne prouve pas l’identité du site.";
+    button.ariaPressed = String(selected);
+    button.addEventListener("click", () => {
+      if (!chooseDiscoveryGuidance(state.guidance, candidate, field)) return;
+      redirectDiscovery();
+    });
+    actions.appendChild(button);
+  }
+  const rejected = isRejectedGuidance(state.guidance, candidate);
+  const reject = document.createElement("button");
+  reject.type = "button";
+  reject.className = "button button-secondary";
+  reject.textContent = rejected ? "Réexaminer" : "Écarter";
+  reject.ariaPressed = String(rejected);
+  reject.addEventListener("click", () => {
+    if (!chooseDiscoveryGuidance(state.guidance, candidate, "", "reject")) return;
+    redirectDiscovery();
+  });
+  actions.appendChild(reject);
+  container.appendChild(actions);
+
+  const correction = document.createElement("details");
+  correction.className = "discovery-correction";
+  const summary = document.createElement("summary");
+  summary.textContent = "Corriger ou préciser une information";
+  const selector = document.createElement("select");
+  selector.className = "discovery-correction-field";
+  for (const [field, label] of fields) {
+    const option = document.createElement("option");
+    option.value = field;
+    option.textContent = label;
+    selector.appendChild(option);
+  }
+  selector.value = "name";
+  selector.setAttribute?.("aria-label", "Information à corriger pour la recherche");
+  const entry = document.createElement("input");
+  entry.type = "text";
+  entry.className = "discovery-correction-value";
+  entry.maxLength = 250;
+  entry.setAttribute?.("aria-label", "Valeur corrigée, utilisée uniquement pour rechercher");
+  const candidateKey = discoveryHintKey(candidate);
+  const refreshEntry = () => {
+    entry.value = state.guidance.selected.find(item => item.key === candidateKey && item.field === selector.value)?.value
+      ?? guidanceFieldValue(candidate, selector.value);
+  };
+  selector.addEventListener("change", refreshEntry);
+  refreshEntry();
+  const useCorrection = document.createElement("button");
+  useCorrection.type = "button";
+  useCorrection.className = "button button-secondary discovery-correction-apply";
+  useCorrection.textContent = "Rechercher avec cette correction";
+  useCorrection.addEventListener("click", () => {
+    const row = selectedRow();
+    if (!row || state.progressKey !== [row.id, row.NomCommercial, row.Adresse, row.SirenSiret].join("|")) return;
+    if (!correctDiscoveryGuidance(state.guidance, candidate, selector.value, entry.value)) {
+      setStatus("Correction inchangée ou invalide. Pour le SIRET, saisir 9 ou 14 chiffres.", "error");
+      return;
+    }
+    redirectDiscovery();
+  });
+  const note = document.createElement("div");
+  note.className = "help";
+  note.textContent = "Indice de recherche uniquement : ne certifie pas le SIRET, l’adresse ou le site et n’enregistre rien dans Grist.";
+  correction.append(summary, selector, entry, useCorrection, note);
+  container.appendChild(correction);
+}
+
+function appendGuidanceSummary(container) {
+  const corrections = state.guidance.selected.filter(item => item.corrected);
+  if (!corrections.length) return;
+  const line = document.createElement("div");
+  line.className = "help";
+  line.textContent = "Corrections utilisées pour la recherche (non vérifiées) : " +
+    corrections.map(item => item.field + " : " + item.value).join(" ; ");
+  container.appendChild(line);
+}
+
+function appendDiscoveryHints(container, { excluded = [] } = {}) {
+  const reference = selectedRow();
+  const leads = discoveryHints(state.progress, state.visibleHintCount, {
+    excluded, reference, guidance: state.guidance,
+  });
+  if (!leads.length) return;
+  const available = (state.progress?.candidates ?? []).filter(candidate =>
+    !excluded.includes(discoveryHintKey(candidate))).length;
+  const label = document.createElement("div");
+  label.className = "help";
+  label.textContent = `Pistes à explorer (${leads.length} affichées sur ${available} disponibles). Classement indicatif par nom et lieu, sans preuve d’identité. Les pistes restent conservées et consultables ; les choix orientent la recherche sans modifier Grist.`;
+  container.appendChild(label);
+  for (const lead of leads) {
+    const line = document.createElement("div");
+    line.className = "discovery-lead";
+    const description = document.createElement("div");
+    description.className = "choice-detail";
+    description.textContent = [
+      lead.name, lead.address,
+      lead.siret ? "SIRET indiqué : " + formatSiret(lead.siret) + " (à vérifier)" : "",
+    ].filter(Boolean).join(" — ");
+    line.appendChild(description);
+    appendGuidanceControls(line, lead.candidate);
+    container.appendChild(line);
+  }
+  const remaining = available - leads.length;
+  if (remaining > 0) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "button button-secondary discovery-more";
+    more.textContent = "Afficher " + Math.min(5, remaining) + " autres pistes (" + remaining + " restantes)";
+    more.addEventListener("click", () => {
+      state.visibleHintCount = Math.min(250, state.visibleHintCount + 5);
+      if (state.decision) renderEstablishment();
+      else renderDiscoveryProgress();
+    });
+    container.appendChild(more);
+  }
+}
+
+
+// One contextual question at a time. Its answer becomes a search hint, never
+// official evidence and never a Grist write. Re-rendering preserves typed text.
+function appendDiscoveryQuestion(container, { searching = false } = {}) {
+  const row = selectedRow();
+  if (!row) return;
+  const diagnosis = diagnoseDiscovery({
+    reference: row, progress: state.progress, guidance: state.guidance,
+    decision: state.decision, searching,
+  });
+  const question = diagnosis.question;
+  if (!question) {
+    // A blocked automatic verification is different from missing Grist data.
+    // Give a useful explanation without asking the teacher to certify it.
+    if (["conflicting-sources", "sources-unavailable", "guided-location-unconfirmed"].includes(diagnosis.blocker)) {
+      const explanation = document.createElement("div");
+      explanation.className = "help discovery-diagnosis-explanation";
+      explanation.textContent = diagnosis.why;
+      container.appendChild(explanation);
+    }
+    return;
+  }
+  const panel = document.createElement("section");
+  panel.className = "discovery-question";
+  const title = document.createElement("strong");
+  title.textContent = question.message;
+  const reason = document.createElement("p");
+  reason.className = "help";
+  reason.textContent = question.reason;
+  panel.append(title, reason);
+
+  const stillSameRow = () => {
+    const latest = selectedRow();
+    return latest && state.progressKey === [latest.id, latest.NomCommercial, latest.Adresse, latest.SirenSiret].join("|");
+  };
+  const apply = (candidate, value, field, correction = false) => {
+    if (!stillSameRow()) return;
+    const updated = correction
+      ? correctDiscoveryGuidance(state.guidance, candidate, field, value)
+      : chooseDiscoveryGuidance(state.guidance, candidate, field);
+    if (!updated) {
+      setStatus("Précision inchangée ou invalide.", "error");
+      return;
+    }
+    state.questionDraft = null;
+    redirectDiscovery();
+  };
+  for (const choice of question.options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button-secondary discovery-question-option";
+    button.textContent = choice.label;
+    button.title = "Utiliser pour la prochaine recherche (sans valider l’établissement)";
+    button.addEventListener("click", () =>
+      apply(choice.candidate, choice.label, choice.field));
+    panel.appendChild(button);
+  }
+
+  const form = document.createElement("form");
+  form.className = "discovery-question-entry";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "discovery-question-value";
+  input.maxLength = 250;
+  input.setAttribute?.("aria-label", "Autre précision utile pour la recherche");
+  input.placeholder = question.field === "commune" ? "Autre commune" :
+    question.field === "address" ? "Autre adresse" : "Autre nom";
+  input.value = state.questionDraft?.id === question.id ? state.questionDraft.value : "";
+  input.addEventListener("input", () => {
+    state.questionDraft = { id: question.id, value: input.value };
+  });
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "button button-secondary";
+  submit.textContent = "Rechercher avec cette précision";
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    apply(question.anchor, input.value, question.field, true);
+  });
+  form.append(input, submit);
+  panel.appendChild(form);
+  const skip = document.createElement("button");
+  skip.type = "button";
+  skip.className = "button button-secondary";
+  skip.textContent = "Je ne sais pas / Ignorer";
+  skip.addEventListener("click", () => {
+    if (!stillSameRow()) return;
+    skipDiscoveryQuestion(state.guidance, question.id);
+    state.questionDraft = null;
+    if (state.decision) renderEstablishment();
+    else renderDiscoveryProgress();
+    // Automatic lookup continues while running. A completed ordinary search
+    // may be deepened without asking the same question again.
+    if (!state.controller && !state.isDeepening)
+      runIdentityAnalysis({ deepening: true });
+  });
+  panel.appendChild(skip);
+  const warning = document.createElement("div");
+  warning.className = "help";
+  warning.textContent = "Votre réponse guide la recherche ; elle ne certifie ni l’identité juridique, ni la position, et n’écrit rien dans Grist.";
+  panel.appendChild(warning);
+  container.appendChild(panel);
+}
+
+function renderDiscoveryProgress({ stopped = false } = {}) {
+  if (!state.progress) return;
+  // Source events can arrive while a teacher is typing. Do not replace the
+  // focused question/input and steal keystrokes. The next render or final
+  // verdict still uses the latest candidate state and preserved draft.
+  if (!stopped && document.activeElement?.className === "discovery-question-value" &&
+      ui.candidate?.contains?.(document.activeElement)) return;
+  clearNode(ui.candidate);
+  const heading = document.createElement("h3");
+  heading.textContent = stopped ? "Recherche interrompue — pistes conservées" : "Recherche en cours — premiers résultats";
+  ui.candidate.appendChild(heading);
+  appendGuidanceSummary(ui.candidate);
+  appendDiscoveryQuestion(ui.candidate, { searching: !stopped && Boolean(state.controller) });
+  appendDiscoveryHints(ui.candidate);
+
+  const activity = state.progress.activity ?? [];
+  if (activity.length) {
+    const details = document.createElement("details");
+    const title = document.createElement("summary");
+    title.textContent = "Activité réelle des sources (" + activity.length + ")";
+    details.appendChild(title);
+    for (const entry of activity) {
+      const line = document.createElement("div");
+      line.className = "choice-detail";
+      line.textContent = entry.source + " : " + discoverySourceLabel(entry.state) +
+        (entry.elapsedMs === null ? "" : " — " + entry.elapsedMs + " ms");
+      details.appendChild(line);
+    }
+    ui.candidate.appendChild(details);
+  }
+  if (stopped) {
+    const deepen = document.createElement("button");
+    deepen.type = "button";
+    deepen.className = "button button-secondary";
+    deepen.textContent = "Approfondir la recherche";
+    deepen.addEventListener("click", () => runIdentityAnalysis({ deepening: true }));
+    ui.candidate.appendChild(deepen);
+  }
+  if (!stopped && state.controller && !state.controller.signal.aborted) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button-secondary";
+    button.textContent = "Interrompre la recherche";
+    button.addEventListener("click", () => {
+      if (state.controller && !state.controller.signal.aborted)
+        state.controller.abort(new DOMException("Interruption demandée", "AbortError"));
+    });
+    ui.candidate.appendChild(button);
+  }
 }
 
 function renderEstablishment() {
@@ -283,10 +623,27 @@ function renderEstablishment() {
           ? " — Certaines vérifications n’ont pas abouti. Les informations reçues restent disponibles."
           : "");
   ui.candidate.append(title, summary);
+  appendGuidanceSummary(ui.candidate);
+  appendDiscoveryQuestion(ui.candidate);
   if (state.candidate) ui.candidate.appendChild(candidateCard(state.candidate));
-  else
-    for (const candidate of (decision.alternatives ?? []).slice(0, 2))
+  else {
+    const alternatives = (decision.alternatives ?? []).slice(0, 5);
+    for (const candidate of alternatives)
       ui.candidate.appendChild(candidateCard(candidate));
+  }
+  if (decision.status !== IDENTITY_STATES.MATCH_VERIFIED) {
+    // Even an ambiguous verdict may contain more independent clues than its
+    // first five official alternatives. Avoid duplicating displayed cards.
+    const displayed = [state.candidate, ...(decision.alternatives ?? []).slice(0, 5)]
+      .filter(Boolean).map(discoveryHintKey);
+    appendDiscoveryHints(ui.candidate, { excluded: displayed });
+    const deepen = document.createElement("button");
+    deepen.type = "button";
+    deepen.className = "button button-secondary";
+    deepen.textContent = "Approfondir la recherche";
+    deepen.addEventListener("click", () => runIdentityAnalysis({ deepening: true }));
+    ui.candidate.appendChild(deepen);
+  }
   if (decision.identifierWarning) {
     const warning = document.createElement("div");
     warning.className = "help";
@@ -353,6 +710,11 @@ function renderProposalPanel() {
   clearNode(ui.proposalPanel);
   const row = selectedRow();
   if (!row) return;
+  if (state.candidate && isRejectedGuidance(state.guidance, state.candidate)) {
+    state.proposals = [];
+    ui.proposalPanel.append(emptyMessage("Cette piste a été écartée : aucune modification ne peut être appliquée."));
+    return;
+  }
   state.proposals = buildEnrichmentProposals(row, state.candidate, {
     identityStatus: state.decision?.status ?? "",
   });
@@ -491,13 +853,23 @@ async function applySelectedProposals() {
   }
 }
 
-async function runIdentityAnalysis() {
+async function runIdentityAnalysis({ deepening = false } = {}) {
   const row = selectedRow();
   if (!row || !canAnalyze() || state.controller) return;
+  const key = [row.id, row.NomCommercial, row.Adresse, row.SirenSiret].join("|");
+  const retained = state.progressKey === key ? state.progress : null;
+  const retainedGuidance = state.progressKey === key ? state.guidance : null;
+  const retainedVisibleCount = state.progressKey === key ? state.visibleHintCount : 5;
   resetAnalysis();
+  state.visibleHintCount = retainedVisibleCount;
+  state.guidance = retainedGuidance ?? emptyDiscoveryGuidance();
+  state.isDeepening = deepening;
   const generation = ++state.generation;
   const controller = new AbortController();
+  let settled = false;
   state.controller = controller;
+  state.progressKey = key;
+  state.progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), retained, { reference: row, guidance: state.guidance });
   const timeout = setTimeout(() => {
     controller.abort(
       new DOMException(
@@ -505,22 +877,36 @@ async function runIdentityAnalysis() {
         "TimeoutError",
       ),
     );
-  }, ESTABLISHMENT_BUDGET.deadlineMs);
+  }, deepening ? 46000 : ESTABLISHMENT_BUDGET.deadlineMs);
   ui.enrichButton.disabled = true;
-  setStatus("Analyse de l’identité puis de la position du site…");
+  setStatus(deepening ? "Recherche approfondie en cours : variantes de noms et identifiants…" : "Analyse de l’identité puis de la position du site…");
+  renderDiscoveryProgress();
 
   try {
     const result = await resolveEstablishmentForEnrichment({
       row,
       signal: controller.signal,
+      deepening,
+      guidance: state.guidance,
       geocode: geocodeAddress,
       fetchOfficial: fetchOfficialRequest,
+      onProgress: (checkpoint) => {
+        if (settled || generation !== state.generation || controller.signal.aborted) return;
+        state.progress = mergeDiscoveryProgress(state.progress, checkpoint, { reference: row, guidance: state.guidance });
+        renderDiscoveryProgress();
+      },
+      onEvent: (event) => {
+        if (settled || generation !== state.generation || controller.signal.aborted) return;
+        state.progress = recordDiscoverySourceEvent(state.progress, event);
+        renderDiscoveryProgress();
+      },
       resolveFallback: (options) =>
         resolveStructureIdentity({
           ...options,
           findPoiLinks: findOsmIdentityPois,
         }),
     });
+    settled = true;
     if (generation !== state.generation) return;
 
     state.decision = result.decision;
@@ -550,25 +936,37 @@ async function runIdentityAnalysis() {
       result.decision?.status === IDENTITY_STATES.INCOMPLETE ? "error" : "",
     );
   } catch (error) {
+    settled = true;
     if (generation !== state.generation) return;
     if (
       controller.signal.reason?.name === "TimeoutError" ||
       error?.name === "TimeoutError"
     ) {
       setStatus(controller.signal.reason?.message || error.message, "error");
+      renderDiscoveryProgress({ stopped: true });
       return;
     }
-    if (error?.name === "AbortError") return;
+    if (error?.name === "AbortError") {
+      setStatus("Recherche interrompue. Les pistes restent visibles ; relancez pour approfondir.");
+      renderDiscoveryProgress({ stopped: true });
+      if (ui.enrichButton) ui.enrichButton.textContent = "Analyser / compléter";
+      return;
+    }
     console.error(error);
     setStatus(
       error.message || "Impossible d’analyser cette structure.",
       "error",
     );
   } finally {
+    settled = true;
     clearTimeout(timeout);
     if (generation === state.generation) {
       state.controller = null;
       ui.enrichButton.disabled = !canAnalyze();
+      if (state.guidedRestart) {
+        state.guidedRestart = false;
+        runIdentityAnalysis({ deepening: true });
+      }
     }
   }
 }

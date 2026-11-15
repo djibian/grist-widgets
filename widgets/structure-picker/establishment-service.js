@@ -154,10 +154,12 @@ export async function resolveEstablishmentForEnrichment({
   ...identityOptions
 } = {}) {
   const startedAt = Date.now();
+  const totalDeadlineMs = identityOptions.deepening ? 46000 : ESTABLISHMENT_BUDGET.deadlineMs;
+  const identityDeadlineMs = identityOptions.deepening ? 28000 : IDENTITY_BUDGET.deadlineMs;
   const remaining = (cap) =>
     Math.max(
       1,
-      Math.min(cap, ESTABLISHMENT_BUDGET.deadlineMs - (Date.now() - startedAt)),
+      Math.min(cap, totalDeadlineMs - (Date.now() - startedAt)),
     );
   const administrative = await findAdministrativeSite({
     ...identityOptions,
@@ -178,7 +180,7 @@ export async function resolveEstablishmentForEnrichment({
         },
       }),
     { signal },
-    remaining(IDENTITY_BUDGET.deadlineMs),
+    remaining(identityDeadlineMs),
   );
   const decision = identity.decision;
   const eligible = [
