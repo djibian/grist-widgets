@@ -248,3 +248,18 @@ Source documentaire publique du mode de recherche par adresse et quotas : https:
 La liste **Pistes à explorer** classe désormais les candidats **pour l'affichage uniquement** à partir de la ressemblance générique des noms (enseigne, dénomination, variantes), de la voie, du code postal, de la commune et, très faiblement, d'un SIRET saisi comme indice non fiable. Une correction humaine remplace les indices de recherche et re-classe immédiatement les pistes, **sans modifier la fiche Grist source**. Un score élevé ne certifie **ni un site, ni son SIRET, ni ses coordonnées** et ne participe jamais à `decideIdentity` ni aux propositions d'écriture.
 
 Les candidats restent inspectables après un verdict ambigu ou incomplet, même si le vérificateur présente déjà des alternatives. L'interface conserve au plus 250 pistes distinctes ; si ce réservoir borné est plein, une nouvelle piste mieux classée peut remplacer l'une des moins pertinentes, sans qu'aucune identité soit validée par ce classement. La valeur `totalHintsSeen` est un **minimum observé**, pas un inventaire exhaustif de tous les candidats lorsque la recherche dépasse cette limite. Le classement est une heuristique déterministe non calibrée : **aucun gain de rappel@5 ne peut être revendiqué avant le corpus indépendant gelé** décrit dans `validation/heldout-evaluation-protocol.md`.
+
+
+## Classement des pistes : code postal et commune confirmée
+
+Le classement des pistes de découverte est **indicatif et distinct de la preuve juridique**.
+Il compare séparément la voie (sans le code postal ni la commune), le code postal
+et la commune : une correspondance de code postal ne doit jamais être confondue
+avec une correspondance de rue. Si l'enseignant confirme explicitement une
+commune, le code postal issu de l'ancienne adresse n'est plus utilisé pour
+déclasser les candidats de cette commune ; les deux établissements homonymes
+restent consultables. Ce choix **n'entraîne aucune vérification officielle de
+SIRET, aucun géocodage certifié et aucune écriture Grist**.
+
+Tests adversariaux : `tests/discovery-progress.test.mjs`
+(codes postaux seuls, commune confirmée en contradiction avec l'adresse).
