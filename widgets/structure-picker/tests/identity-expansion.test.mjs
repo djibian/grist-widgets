@@ -110,7 +110,7 @@ test("explicit commune guidance outranks an obsolete postal code without turning
   assert.equal(row.Adresse, "3 rue du Moulin 44000 Nantes");
 });
 
-test("a selected official operator opens a distinct SIREN discovery, not a site proof", () => {
+test("a selected official operator searches its published name as text, not direct SIREN", () => {
   const row = { NomCommercial: "Le Verger", Adresse: "4 rue du Jardin 44000 Nantes" };
   const manager = { nomCommercial: "Le Verger", raisonSociale: "Gestion des Jardins",
     siren: "112233445", siret: "11223344500018",
@@ -119,8 +119,14 @@ test("a selected official operator opens a distinct SIREN discovery, not a site 
     value: "Gestion des Jardins" }], rejected: [], version: 1 };
   const plan = planIdentityExpansion(row, { guidance, discoveredCandidates: [manager] });
   assert.equal(plan[0].reason, "operator-establishments");
-  assert.equal(plan[0].request.kind, "siren");
-  assert.equal(plan[0].request.identifier, "112233445");
+  assert.equal(plan[0].request.kind, "text");
+  assert.equal(plan[0].request.query, "gestion des jardins");
+  assert.equal(plan[0].request.codePostal, "44000", "use the internship site, not the 75000 headquarters");
+  assert.ok(plan.some(entry => entry.reason === "operator-establishments" &&
+    entry.request.kind === "text" && !entry.request.codePostal),
+  "a second textual lookup relaxes the postcode in the configured departments");
+  assert.ok(!plan.some(entry => entry.request.kind === "siren"),
+    "the direct SIREN endpoint does not return matching_etablissements");
   assert.ok(plan.some(entry => entry.reason === "name-postcode"));
   assert.equal(row.SirenSiret, undefined, "no identity is written into the reference row");
   assert.equal(new Set(plan.map(item => item.request.url)).size, plan.length);
@@ -141,4 +147,26 @@ test("operator lookups require the exact selected published candidate and respec
   assert.ok(!plan({ selected: [{ ...selection, value: "Exploitant différent" }] }).some(item => item.reason === "operator-establishments"));
   assert.ok(!planIdentityExpansion(row, { guidance: { selected: [selection] } })
     .some(item => item.reason === "operator-establishments"));
+});
+
+test("operator-text discovery is deduplicated and does not trust corrected or stale identities", () => {
+  const row = { NomCommercial: "Site de la Dune", Adresse: "21 rue des Dunes 44000 Nantes" };
+  const manager = { raisonSociale: "Association du Rivage", siren: "123123123",
+    siret: "12312312300012", adresse: "2 avenue du Siège 75000 Paris" };
+  const chosen = { key: "siret:12312312300012", field: "operator", value: "Association du Rivage" };
+  const options = { guidance: { selected: [chosen] }, discoveredCandidates: [manager] };
+  const first = planIdentityExpansion(row, options);
+  assert.deepEqual(first.filter(x => x.reason === "operator-establishments")
+    .map(x => x.request.codePostal), ["44000", ""]);
+  assert.equal(new Set(first.map(x => x.request.url)).size, first.length);
+  assert.ok(!planIdentityExpansion(row, {
+    ...options, alreadyRequested: first.map(x => x.request.url),
+  }).some(x => x.reason === "operator-establishments"), "previous lookups are not repeated");
+  assert.ok(!planIdentityExpansion(row, {
+    ...options, guidance: { selected: [{ ...chosen, corrected: true }] },
+  }).some(x => x.reason === "operator-establishments"), "edited names cannot impersonate published evidence");
+  assert.ok(!planIdentityExpansion(row, {
+    ...options, guidance: { selected: [chosen], rejected: [chosen.key] },
+  }).some(x => x.reason === "operator-establishments"), "rejected manager cannot reopen search");
+  assert.equal(row.SirenSiret, undefined);
 });
