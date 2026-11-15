@@ -407,12 +407,17 @@ function appendGuidanceSummary(container) {
   container.appendChild(line);
 }
 
-function appendDiscoveryHints(container) {
-  const leads = discoveryHints(state.progress, state.visibleHintCount);
+function appendDiscoveryHints(container, { excluded = [] } = {}) {
+  const reference = selectedRow();
+  const leads = discoveryHints(state.progress, state.visibleHintCount, {
+    excluded, reference, guidance: state.guidance,
+  });
   if (!leads.length) return;
+  const available = (state.progress?.candidates ?? []).filter(candidate =>
+    !excluded.includes(discoveryHintKey(candidate))).length;
   const label = document.createElement("div");
   label.className = "help";
-  label.textContent = `Pistes à explorer (${leads.length} affichées sur ${state.progress.candidates.length} conservées). Choisissez séparément les informations utiles ; elles orientent les requêtes sans prouver un SIRET ni modifier Grist.`;
+  label.textContent = `Pistes à explorer (${leads.length} affichées sur ${available} disponibles). Classement indicatif par nom et lieu, sans preuve d’identité. Les pistes restent conservées et consultables ; les choix orientent la recherche sans modifier Grist.`;
   container.appendChild(label);
   for (const lead of leads) {
     const line = document.createElement("div");
@@ -427,7 +432,7 @@ function appendDiscoveryHints(container) {
     appendGuidanceControls(line, lead.candidate);
     container.appendChild(line);
   }
-  const remaining = (state.progress?.candidates?.length ?? 0) - leads.length;
+  const remaining = available - leads.length;
   if (remaining > 0) {
     const more = document.createElement("button");
     more.type = "button";
@@ -511,9 +516,13 @@ function renderEstablishment() {
     const alternatives = (decision.alternatives ?? []).slice(0, 5);
     for (const candidate of alternatives)
       ui.candidate.appendChild(candidateCard(candidate));
-    if (!alternatives.length) appendDiscoveryHints(ui.candidate);
   }
   if (decision.status !== IDENTITY_STATES.MATCH_VERIFIED) {
+    // Even an ambiguous verdict may contain more independent clues than its
+    // first five official alternatives. Avoid duplicating displayed cards.
+    const displayed = [state.candidate, ...(decision.alternatives ?? []).slice(0, 5)]
+      .filter(Boolean).map(discoveryHintKey);
+    appendDiscoveryHints(ui.candidate, { excluded: displayed });
     const deepen = document.createElement("button");
     deepen.type = "button";
     deepen.className = "button button-secondary";
