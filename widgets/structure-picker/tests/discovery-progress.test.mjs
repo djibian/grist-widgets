@@ -148,3 +148,32 @@ test("late relevant site survives a full 250-hint bounded reservoir", () => {
   assert.ok(progress.candidates.includes(late), "late matching evidence must not be discarded merely by arrival");
   assert.equal(discoveryHints(progress, 250).length, MAX_DISCOVERY_HINTS);
 });
+
+test("postal hints contribute only their explicit postal score, not a fake street match", () => {
+  const reference = { Adresse: "44000 Nantes" };
+  const local = { codePostal: "44000" };
+  const foreign = { codePostal: "75000" };
+  // The address has no street; a postcode must not be parsed as a street.
+  assert.equal(discoveryRelevance(local, reference), 1.25);
+  assert.equal(discoveryRelevance(foreign, reference), -1.25);
+  assert.equal(discoveryRelevance({ ...local, adresse: "44000 Nantes" }, reference), 1.25);
+});
+
+test("a specifically confirmed commune outranks a stale postcode in display ranking", () => {
+  const reference = Object.freeze({
+    NomCommercial: "Maison des Tilleuls",
+    Adresse: "12 rue du Lavoir 75000 Paris",
+  });
+  const paris = { nomCommercial: "Maison des Tilleuls",
+    adresse: "12 rue du Lavoir 75000 Paris", commune: "Paris", codePostal: "75000" };
+  const nantes = { nomCommercial: "Maison des Tilleuls",
+    adresse: "12 rue du Lavoir 44000 Nantes", commune: "Nantes", codePostal: "44000" };
+  const progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), { candidates: [paris, nantes] });
+  assert.equal(discoveryHints(progress, 2, { reference })[0].candidate, paris);
+  const guidance = { selected: [{ field: "commune", value: "Nantes", key: "teacher" }] };
+  const ranked = discoveryHints(progress, 2, { reference, guidance });
+  assert.equal(ranked[0].candidate, nantes);
+  assert.equal(ranked[1].candidate, paris, "alternatives are retained, not rejected");
+  assert.equal(reference.Adresse, "12 rue du Lavoir 75000 Paris");
+  assert.equal(nantes.verifiedOfficial, undefined, "rank does not grant official site proof");
+});
