@@ -609,6 +609,9 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     await settle();
     assert.equal(nodes["proposal-panel"].querySelector("#identity-apply-proposals"), null);
     assert.equal(writes.length, 0, "a rejected candidate must not remain writable");
+    // Restore a different selection so the next scenario cannot inherit an
+    // in-flight guided deepening of the same row under the fake clock.
+    await select(2);
   });
 
   await t.test("real progress can be interrupted without applying an unverified identity or accepting late replies", async () => {
