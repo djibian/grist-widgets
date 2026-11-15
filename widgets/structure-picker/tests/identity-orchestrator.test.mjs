@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { resolveStructureIdentity } from "../identity-orchestrator.js";
 import { IDENTITY_STATES } from "../identity-resolution.js";
+import { emptyDiscoveryGuidance, correctDiscoveryGuidance } from "../discovery-guidance.js";
 
 function official(items, extra = {}) {
   return { items, coverage: { complete: true, hasNextPage: false, unitSirens: [...new Set(items.map(item => item.siren).filter(Boolean))], ...extra } };
@@ -220,4 +221,31 @@ test("feedback at an active checkpoint really reorders later Annuaire lookups wi
   assert.ok(requests.some(item => item.kind === "text" && item.query.includes("atelier de la source")));
   assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
   assert.equal(row.NomCommercial, "Lieu à découvrir");
+});
+
+
+test("corrected search hints broaden discovery without becoming site identity evidence", async () => {
+  const row = { NomCommercial: "École du Verger", Adresse: "4 rue du Jardin 44000 Nantes", SirenSiret: "" };
+  const hint = candidate({ nomCommercial: "Atelier des Quais", siret: "98765432100019",
+    adresse: "10 quai des Quais 49000 Angers" });
+  const guidance = emptyDiscoveryGuidance();
+  assert.equal(correctDiscoveryGuidance(guidance, hint, "name", "Atelier des Quais"), true);
+  assert.equal(correctDiscoveryGuidance(guidance, hint, "address", "10 quai des Quais 49000 Angers"), true);
+  const calls = [];
+  const result = await resolveStructureIdentity({
+    row, guidance, deepening: true, deadlineMs: 28000, maxOfficialRequests: 12,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      calls.push(request);
+      return official(request.kind === "text" && request.query === "atelier des quais" &&
+        request.codePostal === "49000" ? [hint] : []);
+    },
+  });
+  assert.ok(calls.some(req => req.kind === "text" && req.query === "atelier des quais" && req.codePostal === "49000"),
+    "manual corrected name and address must generate an actual targeted request");
+  assert.ok(result.candidates.some(item => item.siret === hint.siret), "new candidate remains visible");
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED,
+    "guided candidate is never an official identity for a conflicting reference row");
+  assert.equal(row.NomCommercial, "École du Verger");
+  assert.equal(row.Adresse, "4 rue du Jardin 44000 Nantes");
 });
