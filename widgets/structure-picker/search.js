@@ -278,6 +278,7 @@ export function extractOfficialCandidates(payload, {
   limit = IDENTITY_CANDIDATE_LIMIT,
   departments = getActiveDepartments(),
   requestedSiret = "",
+  identifierQuery = "",
   allowSiegeFallback = false,
   page = 1,
   perPage = 25,
@@ -314,6 +315,16 @@ export function extractOfficialCandidates(payload, {
   const completenessKnown = totalResults !== null;
   const complete = !candidateLimitHit && !matchingLimitReached && (!completenessKnown || !hasNextPage);
 
+  // Direct SIREN/SIRET results describe a legal unit, not its geographic
+  // establishments. Only the exact queried unit may supply a search hint.
+  const searched = identifierParts(identifierQuery);
+  const identifierLegalNames = searched.siren
+    ? (payload?.results ?? []).filter(unit => normalizeIdentifier(unit?.siren) === searched.siren)
+      .map(unit => ({ siren: searched.siren,
+        legalName: String(unit?.nom_raison_sociale || unit?.nom_complet || "").trim().slice(0, 180) }))
+      .filter(unit => normalize(unit.legalName).length >= 3).slice(0, 2)
+    : [];
+
   return {
     items: candidates,
     coverage: {
@@ -323,6 +334,7 @@ export function extractOfficialCandidates(payload, {
       totalResults,
       returnedUnits: Array.isArray(payload?.results) ? payload.results.length : 0,
       unitSirens: uniqueStrings((payload?.results ?? []).map(unit => String(unit?.siren ?? ""))).filter(value => normalizeIdentifier(value).length === 9),
+      identifierLegalNames,
       candidateCount: candidates.length,
       candidateLimitHit,
       matchingLimitReached,
