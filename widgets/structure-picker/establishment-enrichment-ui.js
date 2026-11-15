@@ -572,6 +572,7 @@ async function runIdentityAnalysis() {
   resetAnalysis();
   const generation = ++state.generation;
   const controller = new AbortController();
+  let settled = false;
   state.controller = controller;
   state.progressKey = key;
   state.progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), retained);
@@ -594,12 +595,12 @@ async function runIdentityAnalysis() {
       geocode: geocodeAddress,
       fetchOfficial: fetchOfficialRequest,
       onProgress: (checkpoint) => {
-        if (generation !== state.generation || controller.signal.aborted) return;
+        if (settled || generation !== state.generation || controller.signal.aborted) return;
         state.progress = mergeDiscoveryProgress(state.progress, checkpoint);
         renderDiscoveryProgress();
       },
       onEvent: (event) => {
-        if (generation !== state.generation || controller.signal.aborted) return;
+        if (settled || generation !== state.generation || controller.signal.aborted) return;
         state.progress = recordDiscoverySourceEvent(state.progress, event);
         renderDiscoveryProgress();
       },
@@ -609,6 +610,7 @@ async function runIdentityAnalysis() {
           findPoiLinks: findOsmIdentityPois,
         }),
     });
+    settled = true;
     if (generation !== state.generation) return;
 
     state.decision = result.decision;
@@ -638,6 +640,7 @@ async function runIdentityAnalysis() {
       result.decision?.status === IDENTITY_STATES.INCOMPLETE ? "error" : "",
     );
   } catch (error) {
+    settled = true;
     if (generation !== state.generation) return;
     if (
       controller.signal.reason?.name === "TimeoutError" ||
@@ -659,6 +662,7 @@ async function runIdentityAnalysis() {
       "error",
     );
   } finally {
+    settled = true;
     clearTimeout(timeout);
     if (generation === state.generation) {
       state.controller = null;
