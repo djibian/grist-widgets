@@ -464,3 +464,28 @@ button { color: inherit; }
 .confidence-high { color:#146134; background:#e8f5ed; }
 .confidence-medium { color:#755000; background:#fff5d6; }
 .confidence-low { color:#942f27; background:#fcece8; }
+
+/* Progressive, voluntary discovery guidance; never mistaken for a save action. */
+.discovery-lead {
+  margin: 8px 0;
+  padding: 9px 10px;
+  border: 1px solid var(--gw-color-border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.discovery-guidance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+}
+.discovery-guidance-actions .button {
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: var(--gw-font-size-xs);
+}
+.discovery-guidance-actions .button[aria-pressed="true"] {
+  font-weight: 700;
+  text-decoration: underline;
+}
