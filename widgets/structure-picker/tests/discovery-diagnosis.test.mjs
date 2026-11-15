@@ -86,6 +86,22 @@ test("C: sibling sites from same manager ask for the internship site, not a SIRE
     "chosen site is searched by address instead of borrowing the manager's SIRET");
 });
 
+test("C2: a local public name differing from the legal operator leads to targeted sibling discovery", () => {
+  const row = { NomCommercial: "La Cabane des Mômes", Adresse: "12 rue du Château 44400 Rezé", SirenSiret: "" };
+  const operator = site({ name: "", operator: "ASSOCIATION AIDE JEUNESSE",
+    street: "12 rue du Château", code: "44400", city: "Rezé" });
+  const guidance = emptyDiscoveryGuidance();
+  const question = diagnoseDiscovery({ reference: row, progress: progress(operator), guidance }).question;
+  assert.equal(question?.kind, "possible-manager");
+  const choice = question.options[0];
+  assert.equal(chooseDiscoveryGuidance(guidance, choice.candidate, "operator"), true);
+  const plan = planIdentityExpansion(row, { guidance, discoveredCandidates: [operator], maxQueries: 30 });
+  assert.ok(plan.some(entry => entry.reason === "operator-establishments" &&
+    entry.request.query?.includes("association aide jeunesse")),
+    "a possible operator must trigger actual searches for its establishments");
+  assert.ok(!("verifiedOfficial" in guidance), "human confirmation never certifies any manager/site SIRET");
+});
+
 test("D: 'Je ne sais pas' suppresses only the same question and retains other opportunities", () => {
   const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
   const guidance = emptyDiscoveryGuidance();
