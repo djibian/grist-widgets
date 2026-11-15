@@ -112,13 +112,13 @@ test("D: 'Je ne sais pas' suppresses only the same question and retains other op
   assert.equal(initial.kind, "homonyms");
   assert.equal(skipDiscoveryQuestion(guidance, initial.id), true);
   assert.equal(skipDiscoveryQuestion(guidance, initial.id), false);
-  assert.equal(diagnoseDiscovery({ reference: row, progress: p, guidance }).question, null,
-    "do not re-ask the same commune as a missing-location question");
+  assert.notEqual(diagnoseDiscovery({ reference: row, progress: p, guidance }).question?.field, "commune",
+    "do not re-ask the same commune; a different discriminant such as an address is allowed");
   assert.deepEqual(guidance.selected, [], "ignorance is not treated as a confirmed choice");
   const changed = progress(site(), site({ code: "49000", city: "Angers", nic: "00020" }),
     site({ code: "35000", city: "Rennes", nic: "00030" }));
-  assert.equal(diagnoseDiscovery({ reference: row, progress: changed, guidance }).question, null,
-    "new choices do not justify asking for information the teacher explicitly does not know");
+  assert.notEqual(diagnoseDiscovery({ reference: row, progress: changed, guidance }).question?.field, "commune",
+    "new options must not revive an unknown commune under a different question identifier");
 });
 
 test("E: answer at a live checkpoint changes subsequent official requests", async () => {
