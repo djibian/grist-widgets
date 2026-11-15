@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   MAX_DISCOVERY_HINTS, emptyDiscoveryProgress, mergeDiscoveryProgress,
-  recordDiscoverySourceEvent, discoveryHints, discoverySourceLabel,
+  recordDiscoverySourceEvent, discoveryHints, discoveryHintKey, discoveryRelevance, discoverySourceLabel,
 } from "../discovery-progress.js";
 
 function hint(number, extra = {}) {
@@ -81,4 +81,55 @@ test("each discovery hint retains a stable key and raw candidate for reversible 
   assert.equal(leads[0].candidate.nomCommercial, candidate.nomCommercial);
   assert.equal(discoveryHints(progress, 5, { excluded: [leads[0].key] })[0].key, leads[1].key);
   assert.equal(progress.candidates.length, 2);
+});
+
+
+test("late unseen site ranks in the top five without changing the evidence store or confirming identity", () => {
+  const reference = { NomCommercial: "Le Jardin des Lierres", Adresse: "14 rue des Océans 44000 Nantes", SirenSiret: "" };
+  const noise = Array.from({ length: 18 }, (_, i) => ({
+    nomCommercial: "Commerce distinct " + i,
+    adresse: (i + 20) + " chemin des Sorbiers 85000 La Roche-sur-Yon",
+    siret: String(10000000000000 + i),
+  }));
+  const match = { nomCommercial: "Le Jardin des Lierres",
+    adresse: "14 rue des Océans 44000 Nantes", siret: "11223344500026" };
+  const progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), { candidates: [...noise, match] });
+  assert.equal(progress.candidates[18], match, "arrival and evidence order must remain unchanged");
+  const top = discoveryHints(progress, 5, { reference });
+  assert.equal(top[0].candidate, match, "a late relevant clue must not stay hidden behind early results");
+  assert.equal(top[0].siret, match.siret);
+  assert.equal("verifiedOfficial" in top[0], false, "ranking is not legal proof");
+  assert.equal(progress.candidates[0], noise[0]);
+  assert.equal(discoveryHints(progress, 5)[0].candidate, noise[0], "legacy order stays available without context");
+});
+
+test("site address and postal code disambiguate homonyms without promoting a SIRET hint to proof", () => {
+  const reference = { NomCommercial: "Maison du Chêne", Adresse: "3 rue des Dunes 44000 Nantes",
+    SirenSiret: "12345678900010" };
+  const wrongSite = { nomCommercial: "Maison du Chêne", siret: "12345678900010",
+    adresse: "3 rue des Dunes 75000 Paris" };
+  const localSite = { nomCommercial: "Maison du Chêne", siret: "98765432100019",
+    adresse: "3 rue des Dunes 44000 Nantes" };
+  const progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), { candidates: [wrongSite, localSite] });
+  const leads = discoveryHints(progress, 5, { reference });
+  assert.equal(leads[0].candidate, localSite, "the entered identifier must not outweigh contrary location evidence");
+  assert.ok(discoveryRelevance(localSite, reference) > discoveryRelevance(wrongSite, reference));
+  assert.equal(leads.length, 2, "homonyms remain visible for review");
+  assert.deepEqual(progress.candidates, [wrongSite, localSite], "no candidate may be discarded or rewritten");
+});
+
+test("corrected human search hints change rank without changing the source row or assuming official confirmation", () => {
+  const reference = Object.freeze({ NomCommercial: "Atelier des Roses", Adresse: "10 rue du Port 44000 Nantes" });
+  const original = { nomCommercial: "Atelier des Roses", adresse: "10 rue du Port 44000 Nantes", siret: "11111111100012" };
+  const corrected = { nomCommercial: "Ferme du Verger", adresse: "7 route des Vergers 49000 Angers", siret: "22222222200028" };
+  const progress = mergeDiscoveryProgress(emptyDiscoveryProgress(), { candidates: [original, corrected] });
+  assert.equal(discoveryHints(progress, 1, { reference })[0].candidate, original);
+  const guidance = { selected: [
+    { field: "name", key: "corrected", value: "Ferme du Verger", corrected: true },
+    { field: "address", key: "corrected", value: "7 route des Vergers 49000 Angers", corrected: true },
+  ], rejected: [], version: 2 };
+  assert.equal(discoveryHints(progress, 1, { reference, guidance })[0].candidate, corrected);
+  assert.equal(reference.Adresse, "10 rue du Port 44000 Nantes");
+  assert.equal(corrected.verifiedOfficial, undefined);
+  assert.equal(discoveryHints(progress, 5, { reference, guidance, excluded: [discoveryHintKey(corrected)] }).length, 1);
 });
