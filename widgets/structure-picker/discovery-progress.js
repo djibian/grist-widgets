@@ -19,7 +19,7 @@ export function emptyDiscoveryProgress() {
   return { candidates: [], activity: [], totalHintsSeen: 0 };
 }
 
-export function mergeDiscoveryProgress(previous, checkpoint) {
+export function mergeDiscoveryProgress(previous, checkpoint, { reference = null, guidance = null } = {}) {
   const before = previous ?? emptyDiscoveryProgress();
   const hints = new Map();
   for (const candidate of [...(before.candidates ?? []), ...(checkpoint?.candidates ?? [])]) {
@@ -29,9 +29,15 @@ export function mergeDiscoveryProgress(previous, checkpoint) {
     if (hints.has(key)) hints.set(key, { ...hints.get(key), ...candidate });
     else hints.set(key, candidate);
   }
+  const accumulated = [...hints.values()];
+  // When the bounded UI reservoir fills up, a late useful discovery must be
+  // able to displace an irrelevant early one. Relevance never grants proof.
+  const retained = reference && accumulated.length > MAX_DISCOVERY_HINTS
+    ? orderDiscoveryLeads(accumulated, reference, guidance).slice(0, MAX_DISCOVERY_HINTS)
+    : accumulated.slice(0, MAX_DISCOVERY_HINTS);
   return {
     ...before,
-    candidates: [...hints.values()].slice(0, MAX_DISCOVERY_HINTS),
+    candidates: retained,
     totalHintsSeen: Math.max(before.totalHintsSeen ?? 0, hints.size),
   };
 }
@@ -89,15 +95,18 @@ export function discoveryRelevance(candidate, reference = {}, guidance = null) {
     + communeMatch * 0.65 + identifierHint;
 }
 
+// Score each item once, keep ties deterministic, and never mutate the input.
+function orderDiscoveryLeads(candidates, reference, guidance) {
+  if (!reference) return candidates;
+  return candidates.map((candidate, index) => ({
+    candidate, index, score: discoveryRelevance(candidate, reference, guidance),
+  })).sort((a, b) => b.score - a.score || a.index - b.index).map(item => item.candidate);
+}
+
 export function discoveryHints(progress, limit = 5, { excluded = [], reference = null, guidance = null } = {}) {
   const count = Math.max(0, Math.min(MAX_DISCOVERY_HINTS, Math.floor(Number(limit) || 0)));
   const candidates = (progress?.candidates ?? []).filter(candidate => !excluded.includes(discoveryHintKey(candidate)));
-  // Stable ties preserve original discovery order; the underlying evidence
-  // store remains untouched and can still be browsed in full.
-  const ranked = reference ? candidates.map((candidate, index) => ({
-    candidate, index, score: discoveryRelevance(candidate, reference, guidance),
-  })).sort((a, b) => b.score - a.score || a.index - b.index).map(item => item.candidate) : candidates;
-  return ranked.slice(0, count).map(candidate => ({
+  return orderDiscoveryLeads(candidates, reference, guidance).slice(0, count).map(candidate => ({
     key: discoveryHintKey(candidate),
     name: candidate.nomCommercial || candidate.raisonSociale || "Lieu sans nom",
     legalName: candidate.raisonSociale || "",
