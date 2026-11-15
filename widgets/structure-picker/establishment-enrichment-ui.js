@@ -26,6 +26,12 @@ import {
   discoveryHints,
   discoverySourceLabel,
 } from "./discovery-progress.js";
+import {
+  emptyDiscoveryGuidance,
+  chooseDiscoveryGuidance,
+  isRejectedGuidance,
+  guidanceFieldValue,
+} from "./discovery-guidance.js";
 
 const ui = {
   enrichButton: document.getElementById("enrich-button"),
@@ -49,6 +55,9 @@ const state = {
   trace: [],
   progress: null,
   progressKey: null,
+  guidance: emptyDiscoveryGuidance(),
+  isDeepening: false,
+  guidedRestart: false,
 };
 
 function clearNode(node) {
@@ -99,6 +108,9 @@ function resetAnalysis() {
   state.trace = [];
   state.progress = null;
   state.progressKey = null;
+  state.guidance = emptyDiscoveryGuidance();
+  state.isDeepening = false;
+  state.guidedRestart = false;
   if (ui.enrichButton) {
     ui.enrichButton.disabled = true;
     ui.enrichButton.textContent = "Analyser / compléter";
@@ -276,25 +288,84 @@ function candidateCard(candidate) {
   }
   content.appendChild(details);
   card.appendChild(content);
+  appendGuidanceControls(card, candidate);
   return card;
 }
 
+
+// A teacher's choice changes lookup priority, never the target row used by
+// decideIdentity, the official proof set or the Grist write authorization.
+function redirectDiscovery() {
+  if (state.controller && !state.isDeepening) {
+    state.guidedRestart = true;
+    state.controller.abort(new DOMException("Nouvelle piste choisie", "AbortError"));
+    return;
+  }
+  if (!state.controller) {
+    runIdentityAnalysis({ deepening: true });
+    return;
+  }
+  setStatus("Choix pris en compte pour les prochaines recherches. Aucune donnée Grist modifiée.");
+  renderDiscoveryProgress();
+}
+
+function appendGuidanceControls(container, candidate) {
+  const actions = document.createElement("div");
+  actions.className = "discovery-guidance-actions";
+  const fields = [
+    ["name", "Nom"], ["address", "Adresse"], ["commune", "Commune"],
+    ["operator", "Gestionnaire"], ["siret", "SIRET"],
+  ];
+  for (const [field, label] of fields) {
+    const value = guidanceFieldValue(candidate, field);
+    if (!value) continue;
+    const selected = state.guidance.selected.some(item =>
+      item.field === field && item.value === value
+    );
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button-secondary";
+    button.textContent = (selected ? "✓ " : "") + label;
+    button.title = "Utiliser cette information pour chercher ; ne prouve pas l’identité du site.";
+    button.setAttribute("aria-pressed", String(selected));
+    button.addEventListener("click", () => {
+      if (!chooseDiscoveryGuidance(state.guidance, candidate, field)) return;
+      redirectDiscovery();
+    });
+    actions.appendChild(button);
+  }
+  const rejected = isRejectedGuidance(state.guidance, candidate);
+  const reject = document.createElement("button");
+  reject.type = "button";
+  reject.className = "button button-secondary";
+  reject.textContent = rejected ? "Réexaminer" : "Écarter";
+  reject.setAttribute("aria-pressed", String(rejected));
+  reject.addEventListener("click", () => {
+    if (!chooseDiscoveryGuidance(state.guidance, candidate, "", "reject")) return;
+    redirectDiscovery();
+  });
+  actions.appendChild(reject);
+  container.appendChild(actions);
+}
 
 function appendDiscoveryHints(container) {
   const leads = discoveryHints(state.progress, 5);
   if (!leads.length) return;
   const label = document.createElement("div");
   label.className = "help";
-  label.textContent = "Pistes recueillies (5 maximum affichées). Aucune identité ni aucun SIRET de site ne sont vérifiés par cette liste.";
+  label.textContent = "Pistes à explorer (5 affichées). Choisissez séparément les informations utiles ; elles orientent les requêtes sans prouver un SIRET ni modifier Grist.";
   container.appendChild(label);
   for (const lead of leads) {
     const line = document.createElement("div");
-    line.className = "choice-detail";
-    line.textContent = [
-      lead.name,
-      lead.address,
-      lead.siret ? "SIRET indiqué : " + lead.siret + " (à vérifier)" : "",
+    line.className = "discovery-lead";
+    const description = document.createElement("div");
+    description.className = "choice-detail";
+    description.textContent = [
+      lead.name, lead.address,
+      lead.siret ? "SIRET indiqué : " + formatSiret(lead.siret) + " (à vérifier)" : "",
     ].filter(Boolean).join(" — ");
+    line.appendChild(description);
+    appendGuidanceControls(line, lead.candidate);
     container.appendChild(line);
   }
 }
@@ -442,6 +513,11 @@ function renderProposalPanel() {
   clearNode(ui.proposalPanel);
   const row = selectedRow();
   if (!row) return;
+  if (state.candidate && isRejectedGuidance(state.guidance, state.candidate)) {
+    state.proposals = [];
+    ui.proposalPanel.append(emptyMessage("Cette piste a été écartée : aucune modification ne peut être appliquée."));
+    return;
+  }
   state.proposals = buildEnrichmentProposals(row, state.candidate, {
     identityStatus: state.decision?.status ?? "",
   });
@@ -585,7 +661,10 @@ async function runIdentityAnalysis({ deepening = false } = {}) {
   if (!row || !canAnalyze() || state.controller) return;
   const key = [row.id, row.NomCommercial, row.Adresse, row.SirenSiret].join("|");
   const retained = state.progressKey === key ? state.progress : null;
+  const retainedGuidance = state.progressKey === key ? state.guidance : null;
   resetAnalysis();
+  state.guidance = retainedGuidance ?? emptyDiscoveryGuidance();
+  state.isDeepening = deepening;
   const generation = ++state.generation;
   const controller = new AbortController();
   let settled = false;
@@ -609,6 +688,7 @@ async function runIdentityAnalysis({ deepening = false } = {}) {
       row,
       signal: controller.signal,
       deepening,
+      guidance: state.guidance,
       geocode: geocodeAddress,
       fetchOfficial: fetchOfficialRequest,
       onProgress: (checkpoint) => {
@@ -684,6 +764,10 @@ async function runIdentityAnalysis({ deepening = false } = {}) {
     if (generation === state.generation) {
       state.controller = null;
       ui.enrichButton.disabled = !canAnalyze();
+      if (state.guidedRestart) {
+        state.guidedRestart = false;
+        runIdentityAnalysis({ deepening: true });
+      }
     }
   }
 }
