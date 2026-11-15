@@ -31,6 +31,27 @@ Exécuter sur **le même corpus et les mêmes captures publiques** le `main` de 
 
 Rapporter numérateurs/dénominateurs, intervalles de confiance quand l'échantillon le permet, et cas `unknown` exclus des métriques qui exigent une vérité terrain. Un gain de rappel ne justifie **jamais** une hausse des faux rattachements dangereux.
 
+## Scoring hors ligne (outil livré, données réelles non livrées)
+
+Commande après constitution et gel du manifeste **réel** et des réponses API publiques capturées :
+
+```sh
+node widgets/structure-picker/validation/score-heldout.mjs \
+  heldout.jsonl baseline-observations.jsonl pr-observations.jsonl
+```
+
+Une observation par ID du manifeste, sur chacune des versions :
+
+```json
+{"id":"H001","captureSetSha256":"<sha256 des réponses publiques figées>","candidates":[{"siret":"12345678900012"}],"decision":{"status":"MATCH_VERIFIED","candidate":{"siret":"12345678900012","position":{"status":"SITE_CONFIRMED","latitude":47,"longitude":-1}}},"firstHintMs":150,"verificationMs":1000,"requests":[],"sourceEvents":[],"userActions":2}
+```
+
+Le SHA-256 de capture doit être présent et **identique pour chaque cas** sur les deux versions ; les 50+ ID doivent être identiques, répartis dans au moins 10 secteurs. Le manifeste doit fournir `siteSiretStatus: verified | unknown | none_proven`, les vérités `verified` ayant un SIRET de site complet et des sources publiques documentées.
+
+Le programme calcule rappel@5, nombres de rattachements corrects/erronés, abstentions, position confirmée à 100 m (seulement lorsque la vérité de même qualité est disponible), distributions de latence, appels, indisponibilités et effort humain. Les latences, les décomptes API et les vérités manquants restent **non mesurés** : aucune valeur n'est inventée. Le programme refuse les jeux incomplets, non comparables ou insuffisants.
+
+**Limite actuelle :** il s'agit d'un calculateur de métriques et de tests synthétiques de sa logique, **pas d'un banc d'acquisition et de rejeu**. La collecte des 50+ établissements réels inédits, les captures de sources, leur double validation et leur rejeu dans les deux moteurs restent à faire **avant de conclure à une amélioration du rappel**.
+
 ## État de mise en œuvre
 
 - Tests existants : historique, incidents, adversaires et conservation de 50 pistes synthétiques.
