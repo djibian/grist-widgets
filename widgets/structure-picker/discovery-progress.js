@@ -49,12 +49,19 @@ export function recordDiscoverySourceEvent(previous, event) {
     return before;
   const activity = new Map((before.activity ?? []).map(item => [item.source, item]));
   const prior = activity.get(event.source);
-  // Late duplicate "start" signals cannot make a completed request appear active again.
-  if (prior && TERMINAL_STATES.has(prior.state) && event.state === "start")
+  // The same source name can run several *different* HTTP requests.
+  // A new request may reopen the source state; the old request's late result
+  // must not overwrite the new one. Without a request URL, keep the legacy
+  // fail-closed rule for ambiguous duplicate starts.
+  const requestUrl = typeof event.url === "string" ? event.url : "";
+  const newRequest = Boolean(prior?.requestUrl && requestUrl && prior.requestUrl !== requestUrl);
+  if (prior && newRequest && event.state !== "start") return before;
+  if (prior && TERMINAL_STATES.has(prior.state) && event.state === "start" && !newRequest)
     return before;
   activity.set(event.source, {
     source: event.source,
     state: event.state,
+    requestUrl: requestUrl || prior?.requestUrl || "",
     elapsedMs: Number.isFinite(event.elapsedMs) ? event.elapsedMs : null,
     budgetMs: Number.isFinite(event.budgetMs) ? event.budgetMs : null,
   });

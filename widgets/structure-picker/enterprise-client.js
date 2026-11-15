@@ -155,7 +155,11 @@ export async function fetchOfficialRequest(request, {
     const value = { items: extracted.items, coverage: extracted.coverage };
     writeCache(request, value, cacheTtlMs);
     return { ...value, cached: false };
-  }, { signal, timeoutMs, onEvent });
+  }, { signal, timeoutMs,
+    // Include the concrete request identity on boundedSource lifecycle events.
+    // The UI displays only the source label, never the URL or a typed SIRET.
+    onEvent: entry => emitTrace(onEvent, { ...entry, url: request.url }),
+  });
 }
 
 export async function fetchExternalText(query, {

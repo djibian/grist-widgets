@@ -597,7 +597,9 @@ export async function resolveIdentityForEnrichment(options = {}) {
       {
         signal: requestOptions.signal ?? planSignal,
         timeoutMs: IDENTITY_BUDGET.requestMs,
-        onEvent: event,
+        // Several lookups share the same annuaire:<kind> source label.
+        // Distinguish their real lifecycles without exposing their URLs in UI.
+        onEvent: entry => event({ ...entry, url: request.url }),
       },
     );
     if (result.cached === false || result.verifiedSnapshot)
