@@ -292,7 +292,10 @@ test("human operator choice during live search discovers sibling sites without p
     geocode: async () => [],
     fetchOfficial: async request => {
       calls.push(request);
-      if (request.kind === "siren") return official([manager, sibling]);
+      // Real direct SIREN searches have no matching_etablissements.
+      if (request.kind === "siren") return official([]);
+      if (request.kind === "text" && request.query === "gestion du littoral" &&
+          request.codePostal === "44000") return official([manager, sibling]);
       if (request.kind === "text" && request.codePostal) return official([manager]);
       return official([]);
     },
@@ -301,7 +304,11 @@ test("human operator choice during live search discovers sibling sites without p
         guidance.selected.push({ field: "operator", key: "siret:" + manager.siret, value: manager.raisonSociale });
     },
   });
-  assert.ok(calls.some(request => request.kind === "siren" && request.identifier === "456789012"));
+  assert.ok(calls.some(request => request.kind === "text" &&
+    request.query === "gestion du littoral" && request.codePostal === "44000"),
+    "actual sibling search uses the published operator name as text at the target site");
+  assert.ok(!calls.some(request => request.kind === "siren"),
+    "the direct SIREN API does not enumerate sibling establishments");
   assert.ok(outcome.candidates.some(c => c.siret === sibling.siret), "sibling site enters discovery");
   assert.notEqual(outcome.decision.status, IDENTITY_STATES.MATCH_VERIFIED,
     "a shared operator and matching address cannot by themselves certify this different-name site");
