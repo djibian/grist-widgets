@@ -1,3 +1,15 @@
+### Incrément 16 — diagnostiquer les questions encore utiles (PR #88)
+
+**IN_PROGRESS.** Une précision de commune ou d'adresse restreint désormais le **périmètre des questions**, sans supprimer les observations officielles ni influencer `decideIdentity` : quand la réponse distingue déjà un site, on n'interroge plus l'enseignant sur l'adresse d'établissements d'autres communes. Si aucune piste ne correspond au lieu indiqué, l'assistant le signale comme une **localisation encore non confirmée**, sans accepter un site de substitution ni certifier une position.
+
+« Je ne sais pas » concerne le **champ** demandé, pas seulement l'identifiant d'une question : de nouvelles options homonymes ne doivent pas redemander la même commune. Une **nouvelle contradiction explicite** d'adresse peut toujours ouvrir une vérification distincte. Les explications de source indisponible ou contradictoire sont visibles même lorsqu'aucune question humaine pertinente n'existe.
+
+Le diagnostic examine l'ensemble des **250 pistes conservées** (pas les seules douze premières), considère leurs alias publics et n'offre pas de communes provenant de pistes nominalement étrangères. Lorsqu'une commune suffit, elle est préférée à la sélection d'une adresse détaillée parmi les sites du même gestionnaire. La sélection et la correction déclenchent toujours les recherches effectives de l'orchestrateur, sous quotas ; elles ne deviennent ni preuve juridique ni écriture Grist.
+
+**Observations de développement dev2 au 15/11/2026, lecture seule :** 25 fiches, 17 sans immatriculation, 12 sans code postal reconnaissable dans l'adresse, 25 sans coordonnées non nulles, 3 groupes de noms répétés. Ces comptes ne mesurent **pas** le rappel ni la justesse des identités. Tests adversariaux : réponse de commune suivie d'une absence de question redondante, abstention et question alternative, désaccord géographique, candidats tardifs, alias et suggestions non pertinentes. **CI et preview doivent être confirmées sur le HEAD exact avant validation.**
+
+---
+
 ### Incrément 14 — questions contextuelles et replanification (issue #87 / PR #88)
 
 **IN_PROGRESS.** Le module `discovery-diagnosis.js` analyse les pistes de recherche et distingue homonymies de lieux, contradiction d'adresse possible, plusieurs établissements d'un gestionnaire, manque de commune, divergence possible entre nom public et raison sociale, et indisponibilité des sources. Il privilégie une question courte et discriminante à la fois ; les réponses possibles sont proposées directement, avec correction libre et « Je ne sais pas ». Les questions résolues ou ignorées ne sont pas redemandées à l'identique durant cette analyse.
