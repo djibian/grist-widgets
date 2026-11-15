@@ -502,6 +502,7 @@ function appendDiscoveryQuestion(container, { searching = false } = {}) {
   form.className = "discovery-question-entry";
   const input = document.createElement("input");
   input.type = "text";
+  input.className = "discovery-question-value";
   input.maxLength = 250;
   input.setAttribute?.("aria-label", "Autre précision utile pour la recherche");
   input.placeholder = question.field === "commune" ? "Autre commune" :
@@ -545,6 +546,11 @@ function appendDiscoveryQuestion(container, { searching = false } = {}) {
 
 function renderDiscoveryProgress({ stopped = false } = {}) {
   if (!state.progress) return;
+  // Source events can arrive while a teacher is typing. Do not replace the
+  // focused question/input and steal keystrokes. The next render or final
+  // verdict still uses the latest candidate state and preserved draft.
+  if (!stopped && document.activeElement?.className === "discovery-question-value" &&
+      ui.candidate?.contains?.(document.activeElement)) return;
   clearNode(ui.candidate);
   const heading = document.createElement("h3");
   heading.textContent = stopped ? "Recherche interrompue — pistes conservées" : "Recherche en cours — premiers résultats";
