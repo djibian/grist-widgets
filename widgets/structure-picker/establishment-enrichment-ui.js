@@ -412,7 +412,7 @@ function appendDiscoveryHints(container) {
   if (!leads.length) return;
   const label = document.createElement("div");
   label.className = "help";
-  label.textContent = "Pistes à explorer (5 affichées). Choisissez séparément les informations utiles ; elles orientent les requêtes sans prouver un SIRET ni modifier Grist.";
+  label.textContent = `Pistes à explorer (${leads.length} affichées sur ${state.progress.candidates.length} conservées). Choisissez séparément les informations utiles ; elles orientent les requêtes sans prouver un SIRET ni modifier Grist.`;
   container.appendChild(label);
   for (const lead of leads) {
     const line = document.createElement("div");
