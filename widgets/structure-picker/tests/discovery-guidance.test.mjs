@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  emptyDiscoveryGuidance, chooseDiscoveryGuidance, isRejectedGuidance,
+  emptyDiscoveryGuidance, chooseDiscoveryGuidance, correctDiscoveryGuidance, isRejectedGuidance,
   guidanceFieldValue,
 } from "../discovery-guidance.js";
 
@@ -41,4 +41,31 @@ test("malformed or absent hints cannot generate an identifier lookup", () => {
   assert.equal(chooseDiscoveryGuidance(guidance, a, "__proto__"), false);
   assert.equal(guidanceFieldValue(a, "siret"), "12345678900012");
   assert.equal(guidance.version, 0);
+});
+
+
+test("user-entered corrected clues are separate, idempotent and never mutate official evidence", () => {
+  const guidance = emptyDiscoveryGuidance();
+  const original = structuredClone(a);
+  assert.equal(correctDiscoveryGuidance(guidance, a, "address", " 9 quai de la Gare 49000 Angers "), true);
+  assert.deepEqual(guidance.selected, [{ key: "siret:12345678900012", field: "address",
+    value: "9 quai de la Gare 49000 Angers", corrected: true }]);
+  assert.equal(correctDiscoveryGuidance(guidance, a, "address", "9 quai de la Gare 49000 Angers"), false);
+  assert.equal(guidance.version, 1, "no unnecessary replan for unchanged text");
+  assert.equal(correctDiscoveryGuidance(guidance, a, "siret", "987 654 321 00019"), true);
+  assert.equal(guidance.selected.find(item => item.field === "siret").value, "98765432100019");
+  assert.equal(guidance.verifiedOfficial, undefined);
+  assert.deepEqual(a, original, "candidate official observation remains unchanged");
+  assert.equal(correctDiscoveryGuidance(guidance, a, "siret", "9876543210"), false);
+  assert.equal(correctDiscoveryGuidance(guidance, a, "siret", "fake 98765432100019"), false);
+  assert.equal(correctDiscoveryGuidance(guidance, a, "siret", "98765432100019<script>"), false);
+  assert.equal(correctDiscoveryGuidance(guidance, a, "name", "x".repeat(251)), false);
+  assert.equal(correctDiscoveryGuidance(guidance, a, "__proto__", "X"), false);
+  assert.equal(correctDiscoveryGuidance(guidance, null, "name", "Test"), false);
+  assert.equal(guidance.version, 2, "invalid corrections cannot mutate guidance");
+  chooseDiscoveryGuidance(guidance, a, "", "reject");
+  assert.ok(isRejectedGuidance(guidance, a));
+  assert.deepEqual(guidance.selected, []);
+  assert.equal(correctDiscoveryGuidance(guidance, a, "commune", "Angers"), true);
+  assert.equal(isRejectedGuidance(guidance, a), false, "a new correction restores the candidate for discovery");
 });
