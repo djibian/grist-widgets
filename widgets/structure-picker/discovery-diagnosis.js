@@ -4,7 +4,6 @@ import { discoveryHints } from "./discovery-progress.js";
 import { extractLocationFromAddress, fuzzyTextScore, normalize, normalizeIdentifier } from "./search.js";
 
 const ANSWERED = new Set(["name", "commune", "address", "operator", "siret"]);
-const unique = values => [...new Map(values.filter(Boolean).map(value => [normalize(value), value])).values()];
 const chosen = (guidance, field) => guidance?.selected?.find(item => item.field === field)?.value || "";
 const placeName = c => c?.nomCommercial || c?.raisonSociale || "";
 const municipality = c => c?.commune || extractLocationFromAddress(c?.adresse).commune || "";
@@ -109,6 +108,28 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
     }
   }
 
+  // A public place can be managed by a legal entity with a completely
+  // different name. A candidate with a compatible address but dissimilar
+  // public name can supply a *possible manager*, not the site identifier.
+  // Keep this below a direct address contradiction and above an open question.
+  if (!chosen(guidance, "operator") && reference.Adresse && chosenName) {
+    const matches = raw.filter(lead => {
+      const c = lead.candidate;
+      const siren = normalizeIdentifier(c?.siren || c?.siret).slice(0, 9);
+      return siren.length === 9 && c?.raisonSociale &&
+        fuzzyTextScore(reference.Adresse, c?.adresse) >= 0.76 &&
+        fuzzyTextScore(chosenName, placeName(c)) < 0.58;
+    });
+    const managers = valueGroups(matches, c => c?.raisonSociale);
+    if (managers.length) {
+      suggestions.push(question("possible-manager", "operator",
+        "Le lieu recherché pourrait dépendre de cet organisme. Reconnaissez-vous son gestionnaire ?",
+        "Sa confirmation permettra de rechercher d’autres établissements du même organisme, sans attribuer son SIRET au lieu de stage.",
+        managers.map(c => option("operator", c.candidate, c.value)),
+        anchor, 85, normalize(reference.Adresse)));
+    }
+  }
+
   if (!targetCommune && !knownPostal && !chosen(guidance, "commune")) {
     // Ask once the automatic search has yielded some evidence or has run to completion.
     if (hasCandidates || !searching) {
@@ -120,7 +141,7 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
     }
   }
 
-  if (!hasCandidates && !searching && !chosen(guidance, "name")) {
+  if ((!hasCandidates || !plausible.length) && !searching && !chosen(guidance, "name")) {
     suggestions.push(question("unidentified-name", "name",
       "Le nom indiqué ne suffit pas pour retrouver le lieu. Connaissez-vous un autre nom utilisé sur place ?",
       "Un nom d’enseigne ou un nom public peut être différent de la raison sociale.",
