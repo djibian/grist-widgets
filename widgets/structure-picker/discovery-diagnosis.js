@@ -59,7 +59,7 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
   const chosenName = chosen(guidance, "name") || reference.NomCommercial || reference.RaisonSociale || "";
   // A source can return semantically unrelated businesses. Do not ask teachers
   // to arbitrate arbitrary search results as though these were homonyms.
-  const plausible = raw.filter(lead =>
+  let plausible = raw.filter(lead =>
     !chosenName || fuzzyTextScore(chosenName, placeName(lead.candidate)) >= 0.68 ||
     fuzzyTextScore(chosenName, lead.candidate?.raisonSociale) >= 0.68);
   // Human choices narrow which uncertainty is useful to ask about, without
@@ -88,7 +88,7 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
     const addresses = observations.map(item => String(item?.adresse ?? "").trim()).filter(Boolean);
     return addresses.length > 1 && addresses.some(value => fuzzyTextScore(value, addresses[0]) < 0.70);
   });
-  const originalLocation = extractLocationFromAddress(reference.Adresse);
+  const originalLocation = extractLocationFromAddress(selectedAddress || reference.Adresse);
   const targetCommune = chosen(guidance, "commune") ||
     reference.Commune || originalLocation.commune || "";
   const knownPostal = chosen(guidance, "commune") ? "" : originalLocation.codePostal;
