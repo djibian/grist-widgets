@@ -175,3 +175,23 @@ test("operator-text discovery is deduplicated and does not trust corrected or st
   }).some(x => x.reason === "operator-establishments"),
   "conflicting SIREN and SIRET must not provide a published-manager bridge");
 });
+
+
+test("non-head-office SIRET relays published legal name into text discovery without certifying identity", () => {
+  const row = { NomCommercial: "", Adresse: "17 chemin du Rivage 44000 Nantes", SirenSiret: "11223344500029" };
+  const plan = planIdentityExpansion(row, { identifierLegalNames: [
+    { siren: "112233445", legalName: "Ateliers du Littoral" },
+    { siren: "998877665", legalName: "Une autre entreprise" },
+  ] });
+  const matches = plan.filter(item => item.reason === "identifier-legal-name");
+  assert.equal(matches.length, 2);
+  assert.equal(matches[0].request.query, "ateliers du littoral");
+  assert.equal(matches[0].request.codePostal, "44000");
+  assert.equal(matches[0].boundSiren, "112233445");
+  assert.equal(matches[1].request.codePostal, "");
+  assert.ok(!plan.some(item => item.request.query === "une autre entreprise"));
+  assert.equal(new Set(plan.map(item => item.request.url)).size, plan.length);
+  assert.deepEqual(planIdentityExpansion(row, { identifierLegalNames: [
+    { siren: "112233445", legalName: "Ateliers du Littoral" },
+  ], alreadyRequested: plan.map(item => item.request.url) }), []);
+});
