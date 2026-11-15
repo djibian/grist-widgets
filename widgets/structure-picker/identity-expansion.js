@@ -34,7 +34,7 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
     identitySearchName(row),
     ...targetNameVariants(row),
     normalize(row?.RaisonSociale ?? ""),
-  ].map(name => String(name ?? "").trim()).filter(name => name.length >= 3))];
+  ].map(name => normalize(name)).filter(name => name.length >= 3))];
 
   // First explore alternate names at the supplied postal code. Then loosen
   // that constraint without changing the departments configured in Grist.
