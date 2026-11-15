@@ -147,6 +147,7 @@ export async function fetchOfficialRequest(request, {
       localIdentifiers,
       limit: limit ?? (allowSiegeFallback ? EXTERNAL_LIMIT : undefined),
       requestedSiret: request.requestedSiret ?? "",
+      identifierQuery: request.identifier ?? "",
       allowSiegeFallback,
       page: request.page ?? 1,
       perPage: request.perPage ?? 25,
