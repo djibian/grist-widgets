@@ -153,7 +153,7 @@ test("F/H: source failure is not an address contradiction, easy cases ask nothin
 });
 
 test("two successive corrections preserve hypotheses while creating different lookup families", () => {
-  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "5 rue des Érables", SirenSiret: "" };
   const a = site(), b = site({ city: "Angers", code: "49000", nic: "00020", street: "14 rue des Pins" });
   const guidance = emptyDiscoveryGuidance();
   const first = diagnoseDiscovery({ reference: row, progress: progress(a, b), guidance }).question;
