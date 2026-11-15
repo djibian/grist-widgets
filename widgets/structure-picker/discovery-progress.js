@@ -1,3 +1,5 @@
+import { extractLocationFromAddress, fuzzyTextScore, normalize, normalizeIdentifier } from "./search.js";
+
 // UI-only accumulation of discovery hints and actual source lifecycle events.
 // No candidate in this module is an official identity/position attestation.
 export const MAX_DISCOVERY_HINTS = 250;
@@ -53,9 +55,48 @@ export function recordDiscoverySourceEvent(previous, event) {
   return { ...before, activity: [...activity.values()].slice(-MAX_SOURCE_ACTIVITY) };
 }
 
-export function discoveryHints(progress, limit = 5, { excluded = [] } = {}) {
+// Display-only ordering. It must never participate in decideIdentity,
+// official evidence, geographic certification, or Grist writes.
+// No hard-coded establishment names, sector weights or fitted thresholds.
+export function discoveryRelevance(candidate, reference = {}, guidance = null) {
+  const chosen = field => guidance?.selected?.find(item => item.field === field)?.value || "";
+  const names = [candidate?.nomCommercial, candidate?.raisonSociale,
+    ...(Array.isArray(candidate?.aliases) ? candidate.aliases : [])].filter(Boolean);
+  const queryName = chosen("name") || reference?.NomCommercial || reference?.RaisonSociale || "";
+  const queryOperator = chosen("operator") || reference?.RaisonSociale || "";
+  const nameMatch = queryName ? Math.max(0, ...names.map(name => fuzzyTextScore(queryName, name))) : 0;
+  const operatorMatch = queryOperator ? fuzzyTextScore(queryOperator, candidate?.raisonSociale) : 0;
+
+  const queryAddress = chosen("address") || reference?.Adresse || "";
+  const candidateAddress = candidate?.adresse || candidate?.Adresse || "";
+  const street = address => normalize(String(address).split(/\\b\\d{5}\\b/)[0]);
+  const queryStreet = street(queryAddress);
+  const candidateStreet = street(candidateAddress);
+  const streetMatch = queryStreet && candidateStreet ? fuzzyTextScore(queryStreet, candidateStreet) : 0;
+  const requestedPostal = extractLocationFromAddress(queryAddress).codePostal || String(reference?.CodePostal || "");
+  const candidatePostal = String(candidate?.codePostal || extractLocationFromAddress(candidateAddress).codePostal || "");
+  const postalMatch = /^\\d{5}$/.test(requestedPostal) && /^\\d{5}$/.test(candidatePostal)
+    ? (requestedPostal === candidatePostal ? 1 : -1) : 0;
+  const requestedCommune = chosen("commune") || reference?.Commune || extractLocationFromAddress(queryAddress).commune;
+  const actualCommune = candidate?.commune || extractLocationFromAddress(candidateAddress).commune;
+  const communeMatch = requestedCommune && actualCommune ? fuzzyTextScore(requestedCommune, actualCommune) : 0;
+  const requestedSiret = normalizeIdentifier(chosen("siret") || reference?.SirenSiret);
+  const siteSiret = normalizeIdentifier(candidate?.siret);
+  // An entered number is only a weak search clue. A shared SIREN cannot
+  // distinguish the operator's headquarters from the internship site.
+  const identifierHint = requestedSiret.length === 14 && requestedSiret === siteSiret ? 0.15 : 0;
+  return nameMatch * 5 + operatorMatch + streetMatch * 2.5 + postalMatch * 1.25
+    + communeMatch * 0.65 + identifierHint;
+}
+
+export function discoveryHints(progress, limit = 5, { excluded = [], reference = null, guidance = null } = {}) {
   const count = Math.max(0, Math.min(MAX_DISCOVERY_HINTS, Math.floor(Number(limit) || 0)));
-  return (progress?.candidates ?? []).filter(candidate => !excluded.includes(discoveryHintKey(candidate))).slice(0, count).map(candidate => ({
+  const candidates = (progress?.candidates ?? []).filter(candidate => !excluded.includes(discoveryHintKey(candidate)));
+  // Stable ties preserve original discovery order; the underlying evidence
+  // store remains untouched and can still be browsed in full.
+  if (reference) candidates.sort((a, b) =>
+    discoveryRelevance(b, reference, guidance) - discoveryRelevance(a, reference, guidance));
+  return candidates.slice(0, count).map(candidate => ({
     key: discoveryHintKey(candidate),
     name: candidate.nomCommercial || candidate.raisonSociale || "Lieu sans nom",
     legalName: candidate.raisonSociale || "",
