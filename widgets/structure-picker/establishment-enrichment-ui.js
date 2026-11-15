@@ -34,6 +34,7 @@ import {
   isRejectedGuidance,
   guidanceFieldValue,
 } from "./discovery-guidance.js";
+import { diagnoseDiscovery, skipDiscoveryQuestion } from "./discovery-diagnosis.js";
 
 const ui = {
   enrichButton: document.getElementById("enrich-button"),
@@ -61,6 +62,7 @@ const state = {
   guidance: emptyDiscoveryGuidance(),
   isDeepening: false,
   guidedRestart: false,
+  questionDraft: null,
 };
 
 function clearNode(node) {
@@ -115,6 +117,7 @@ function resetAnalysis() {
   state.guidance = emptyDiscoveryGuidance();
   state.isDeepening = false;
   state.guidedRestart = false;
+  state.questionDraft = null;
   if (ui.enrichButton) {
     ui.enrichButton.disabled = true;
     ui.enrichButton.textContent = "Analyser / compléter";
@@ -447,6 +450,99 @@ function appendDiscoveryHints(container, { excluded = [] } = {}) {
   }
 }
 
+
+// One contextual question at a time. Its answer becomes a search hint, never
+// official evidence and never a Grist write. Re-rendering preserves typed text.
+function appendDiscoveryQuestion(container, { searching = false } = {}) {
+  const row = selectedRow();
+  if (!row) return;
+  const diagnosis = diagnoseDiscovery({
+    reference: row, progress: state.progress, guidance: state.guidance,
+    decision: state.decision, searching,
+  });
+  const question = diagnosis.question;
+  if (!question) return;
+  const panel = document.createElement("section");
+  panel.className = "discovery-question";
+  const title = document.createElement("strong");
+  title.textContent = question.message;
+  const reason = document.createElement("p");
+  reason.className = "help";
+  reason.textContent = question.reason;
+  panel.append(title, reason);
+
+  const stillSameRow = () => {
+    const latest = selectedRow();
+    return latest && state.progressKey === [latest.id, latest.NomCommercial, latest.Adresse, latest.SirenSiret].join("|");
+  };
+  const apply = (candidate, value, field, correction = false) => {
+    if (!stillSameRow()) return;
+    const updated = correction
+      ? correctDiscoveryGuidance(state.guidance, candidate, field, value)
+      : chooseDiscoveryGuidance(state.guidance, candidate, field);
+    if (!updated) {
+      setStatus("Précision inchangée ou invalide.", "error");
+      return;
+    }
+    state.questionDraft = null;
+    redirectDiscovery();
+  };
+  for (const choice of question.options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button-secondary discovery-question-option";
+    button.textContent = choice.label;
+    button.title = "Utiliser pour la prochaine recherche (sans valider l’établissement)";
+    button.addEventListener("click", () =>
+      apply(choice.candidate, choice.label, choice.field));
+    panel.appendChild(button);
+  }
+
+  const form = document.createElement("form");
+  form.className = "discovery-question-entry";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.maxLength = 250;
+  input.setAttribute("aria-label", "Autre précision utile pour la recherche");
+  input.placeholder = question.field === "commune" ? "Autre commune" :
+    question.field === "address" ? "Autre adresse" : "Autre nom";
+  input.value = state.questionDraft?.id === question.id ? state.questionDraft.value : "";
+  input.addEventListener("input", () => {
+    state.questionDraft = { id: question.id, value: input.value };
+  });
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "button button-secondary";
+  submit.textContent = "Rechercher avec cette précision";
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    apply(question.anchor, input.value, question.field, true);
+  });
+  form.append(input, submit);
+  panel.appendChild(form);
+  const skip = document.createElement("button");
+  skip.type = "button";
+  skip.className = "button button-secondary";
+  skip.textContent = "Je ne sais pas / Ignorer";
+  skip.addEventListener("click", () => {
+    if (!stillSameRow()) return;
+    skipDiscoveryQuestion(state.guidance, question.id);
+    state.questionDraft = null;
+    if (state.decision) renderEstablishment();
+    else renderDiscoveryProgress();
+    // Automatic lookup continues while running. A completed ordinary search
+    // may be deepened without asking the same question again.
+    if (!state.controller && !state.isDeepening)
+      runIdentityAnalysis({ deepening: true });
+  });
+  panel.appendChild(skip);
+  const warning = document.createElement("div");
+  warning.className = "help";
+  warning.textContent = "Votre réponse guide la recherche ; elle ne certifie ni l’identité juridique, ni la position, et n’écrit rien dans Grist.";
+  panel.appendChild(warning);
+  container.appendChild(panel);
+}
+
 function renderDiscoveryProgress({ stopped = false } = {}) {
   if (!state.progress) return;
   clearNode(ui.candidate);
@@ -454,6 +550,7 @@ function renderDiscoveryProgress({ stopped = false } = {}) {
   heading.textContent = stopped ? "Recherche interrompue — pistes conservées" : "Recherche en cours — premiers résultats";
   ui.candidate.appendChild(heading);
   appendGuidanceSummary(ui.candidate);
+  appendDiscoveryQuestion(ui.candidate, { searching: !stopped && Boolean(state.controller) });
   appendDiscoveryHints(ui.candidate);
 
   const activity = state.progress.activity ?? [];
@@ -511,6 +608,7 @@ function renderEstablishment() {
           : "");
   ui.candidate.append(title, summary);
   appendGuidanceSummary(ui.candidate);
+  appendDiscoveryQuestion(ui.candidate);
   if (state.candidate) ui.candidate.appendChild(candidateCard(state.candidate));
   else {
     const alternatives = (decision.alternatives ?? []).slice(0, 5);
