@@ -64,6 +64,11 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
     fuzzyTextScore(chosenName, lead.candidate?.raisonSociale) >= 0.68);
   const leads = plausible.length ? plausible : raw;
   const hasCandidates = raw.length > 0;
+  const sourceConflicts = raw.filter(lead => {
+    const observations = lead.candidate?.observations ?? [];
+    const addresses = observations.map(item => String(item?.adresse ?? "").trim()).filter(Boolean);
+    return addresses.length > 1 && addresses.some(value => fuzzyTextScore(value, addresses[0]) < 0.70);
+  });
   const originalLocation = extractLocationFromAddress(reference.Adresse);
   const targetCommune = chosen(guidance, "commune") ||
     reference.Commune || originalLocation.commune || "";
@@ -157,6 +162,13 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
   }
 
   // A source outage alone is not evidence of a wrong user address or name.
+  // Contradictory observations for the same legal identifier demand independent
+  // source verification first; a teacher's recognition cannot settle evidence.
+  if (sourceConflicts.length) {
+    return { blocker: "conflicting-sources", question: null,
+      why: "Des sources décrivent différemment le même établissement. Vérification indépendante nécessaire.",
+      candidateCount: raw.length, failedSourceCount: failedSources.length };
+  }
   const possible = suggestions.filter(item => !ANSWERED.has(item.field) ||
     !chosen(guidance, item.field)).filter(item =>
       !(guidance?.skippedQuestions ?? []).includes(item.id));
