@@ -94,9 +94,10 @@ export function discoveryHints(progress, limit = 5, { excluded = [], reference =
   const candidates = (progress?.candidates ?? []).filter(candidate => !excluded.includes(discoveryHintKey(candidate)));
   // Stable ties preserve original discovery order; the underlying evidence
   // store remains untouched and can still be browsed in full.
-  if (reference) candidates.sort((a, b) =>
-    discoveryRelevance(b, reference, guidance) - discoveryRelevance(a, reference, guidance));
-  return candidates.slice(0, count).map(candidate => ({
+  const ranked = reference ? candidates.map((candidate, index) => ({
+    candidate, index, score: discoveryRelevance(candidate, reference, guidance),
+  })).sort((a, b) => b.score - a.score || a.index - b.index).map(item => item.candidate) : candidates;
+  return ranked.slice(0, count).map(candidate => ({
     key: discoveryHintKey(candidate),
     name: candidate.nomCommercial || candidate.raisonSociale || "Lieu sans nom",
     legalName: candidate.raisonSociale || "",
