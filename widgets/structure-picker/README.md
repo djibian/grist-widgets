@@ -263,3 +263,32 @@ SIRET, aucun géocodage certifié et aucune écriture Grist**.
 
 Tests adversariaux : `tests/discovery-progress.test.mjs`
 (codes postaux seuls, commune confirmée en contradiction avec l'adresse).
+
+### Recherche des établissements d'un gestionnaire — correction API (PR #88)
+
+**Comportement documenté de l'Annuaire** : une requête directe avec `q` composé
+exactement de 9 chiffres (SIREN) ou de 14 chiffres (SIRET) ignore les filtres
+géographiques ; elle ne fournit pas la liste `matching_etablissements` d'une
+recherche textuelle ordinaire. Il est donc erroné d'utiliser une requête directe
+par SIREN pour énumérer les établissements « frères » d'un gestionnaire.
+Références :
+https://recherche-entreprises.api.gouv.fr/docs/ et
+https://forum.data.gouv.fr/t/api-recherche-d-entreprises-peut-on-obtenir-la-liste-des-etablissements-a-partir-du-siren/815
+(réponse officielle du 4 mai 2026).
+
+Lorsqu'un enseignant sélectionne le gestionnaire d'un candidat réel publié
+par l'Annuaire (nom légal exact non modifié, identifiants de ce candidat
+cohérents, piste non écartée), l'approfondissement effectue désormais une
+**recherche textuelle par sa dénomination officielle**, ciblée d'abord sur le
+**code postal du site de stage**, puis étendue aux **départements configurés**
+sans filtre postal. Ces deux requêtes et les variantes ultérieures partagent
+le même mécanisme de dédoublonnage, de quota, d'annulation et de reprise.
+Le SIREN du gestionnaire n'est **jamais** attribué comme SIRET au site ;
+un établissement trouvé reste un candidat soumis au vérificateur juridique
+`decideIdentity`. Le changement ne modifie ni les règles de preuve, ni les
+positions certifiées, ni les écritures/ACL Grist.
+
+Limite : cette recherche peut échouer pour une entité dont la dénomination
+légale n'apparaît pas dans les résultats textuels ou dont les établissements
+sont hors des départements configurés. Aucun gain de rappel@5 indépendant n'est
+encore quantifié.
