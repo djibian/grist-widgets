@@ -205,6 +205,30 @@ test("commune beats a full address when both distinguish the same manager sites"
   assert.equal(result.question?.field, "commune", "asking for a commune is easier than a full site address");
 });
 
+test("a commune inferred from the official address remains selectable and changes the actual search", async () => {
+  const a = site({ city: "Nantes", code: "44000" });
+  const b = site({ city: "Angers", code: "49000", nic: "00020" });
+  delete b.commune;
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const question = diagnoseDiscovery({ reference: row, progress: progress(a, b), guidance }).question;
+  assert.equal(question?.field, "commune");
+  const answer = question.options.find(x => x.label === "Angers");
+  assert.ok(answer, "the commune was extracted from the address");
+  assert.equal(chooseDiscoveryGuidance(guidance, answer.candidate, "commune"), true,
+    "a displayed option must always be actionable");
+  const executed = [];
+  await resolveStructureIdentity({ row, guidance, deepening: true, maxPaginationPages: 0,
+    maxOfficialRequests: 6, geocode: async () => [],
+    fetchOfficial: async req => {
+      executed.push(req);
+      return official([]);
+    },
+  });
+  assert.ok(executed.some(req => req.query?.includes("angers")),
+    "answering an inferred commune must change an actual official request");
+});
+
 test("public aliases reveal genuine homonyms even when legal names differ", () => {
   const a = { ...site({ name: "SARL Groupe Nord" }), aliases: ["Les Petits Loups"] };
   const b = { ...site({ name: "ASSOCIATION Centre Est", city: "Angers", code: "49000", nic: "00020" }),
