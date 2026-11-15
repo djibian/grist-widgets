@@ -461,7 +461,17 @@ function appendDiscoveryQuestion(container, { searching = false } = {}) {
     decision: state.decision, searching,
   });
   const question = diagnosis.question;
-  if (!question) return;
+  if (!question) {
+    // A blocked automatic verification is different from missing Grist data.
+    // Give a useful explanation without asking the teacher to certify it.
+    if (["conflicting-sources", "sources-unavailable", "guided-location-unconfirmed"].includes(diagnosis.blocker)) {
+      const explanation = document.createElement("div");
+      explanation.className = "help discovery-diagnosis-explanation";
+      explanation.textContent = diagnosis.why;
+      container.appendChild(explanation);
+    }
+    return;
+  }
   const panel = document.createElement("section");
   panel.className = "discovery-question";
   const title = document.createElement("strong");
