@@ -314,3 +314,31 @@ test("human operator choice during live search discovers sibling sites without p
     "a shared operator and matching address cannot by themselves certify this different-name site");
   assert.equal(row.SirenSiret, "");
 });
+
+
+test("orchestrator discovers non-siege site via legal name and rejects foreign same-name SIREN", async () => {
+  const row = { NomCommercial: "", Adresse: "17 chemin du Rivage 44000 Nantes", SirenSiret: "11223344500029" };
+  const site = candidate({ nomCommercial: "Entrepôt littoral", raisonSociale: "Ateliers du Littoral",
+    siren: "112233445", siret: "11223344500029", adresse: "99 rue du Port 44000 Nantes",
+    codePostal: "44000", commune: "Nantes" });
+  const foreign = candidate({ ...site, siren: "998877665", siret: "99887766500013" });
+  const calls = [];
+  const result = await resolveStructureIdentity({
+    row, deepening: true, maxOfficialRequests: 6, maxPaginationPages: 0, geocode: async () => [],
+    fetchOfficial: async request => {
+      calls.push(request);
+      if (request.kind === "siret") return official([], {
+        identifierLegalNames: [{ siren: "112233445", legalName: "Ateliers du Littoral" }],
+      });
+      if (request.kind === "text" && request.query === "ateliers du littoral") return official([site, foreign]);
+      return official([]);
+    },
+  });
+  assert.equal(calls[0].kind, "siret");
+  assert.ok(calls.some(req => req.kind === "text" && req.query === "ateliers du littoral" && req.codePostal === "44000"));
+  assert.ok(result.candidates.some(item => item.siret === site.siret));
+  assert.ok(!result.candidates.some(item => item.siret === foreign.siret));
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED,
+    "typed SIRET plus legal-name hint must not certify contradictory site address");
+  assert.equal(row.SirenSiret, "11223344500029");
+});
