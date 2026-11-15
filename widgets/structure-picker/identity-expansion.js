@@ -6,6 +6,20 @@ import {
 } from "./search.js";
 import { identitySearchName, targetNameVariants } from "./identity-resolution.js";
 
+// The public Annuaire API also searches by street address. Keep the street
+// separate from the postal filter; do not turn this lookup into site proof.
+// Broad or postal-only addresses are deliberately not searched as street names.
+export function addressSearchPhrase(value) {
+  const raw = String(value ?? "").trim().slice(0, 240);
+  const { codePostal } = extractLocationFromAddress(raw);
+  const beforePostal = codePostal ? raw.slice(0, raw.lastIndexOf(codePostal)) : raw;
+  const street = normalize(beforePostal);
+  const words = street.split(" ").filter(Boolean);
+  if (street.length < 8 || words.length < 2 || !words.some(word => word.length >= 4 && /[a-z]/.test(word)))
+    return "";
+  return street.slice(0, 120);
+}
+
 // Discovery requests are hypotheses, never confirmation of the establishment.
 // The existing identity decision remains the sole validator.
 export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries = 12, guidance = null } = {}) {
@@ -14,6 +28,9 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
   const hint = field => selected.find(entry => entry.field === field)?.value ?? "";
   const selectedAddress = hint("address");
   const location = extractLocationFromAddress(selectedAddress || row?.Adresse);
+  const addressOptions = [...new Set([selectedAddress, row?.Adresse]
+    .map(value => String(value ?? "").trim()).filter(Boolean))]
+    .map(value => ({ ...extractLocationFromAddress(value), street: addressSearchPhrase(value) }));
   const queries = [];
   const add = (request, reason) => {
     if (!request?.url || used.has(request.url) || queries.length >= maxQueries) return;
@@ -42,8 +59,21 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
     if (location.codePostal)
       add(buildOfficialTextSearchRequest(name, { codePostal: location.codePostal }), "name-postcode");
   }
+  // A street query can discover an unknown trading name or an operator whose
+  // legal name is unrelated to the place. Require a postal filter first to
+  // avoid exhausting the quota on common street names nationwide.
+  for (const address of addressOptions) {
+    if (address.street && address.codePostal)
+      add(buildOfficialTextSearchRequest(address.street, { codePostal: address.codePostal }), "address-postcode");
+  }
   for (const name of names) {
     add(buildOfficialTextSearchRequest(name), "name-department");
+  }
+  // Only after name-based lookups: relax the postal constraint of address
+  // hypotheses. These are discovery requests, never verified site locations.
+  for (const address of addressOptions) {
+    if (address.street)
+      add(buildOfficialTextSearchRequest(address.street), "address-department");
   }
   // Commune-only hints aid discovery, not official site attribution.
   const commune = hint("commune");
