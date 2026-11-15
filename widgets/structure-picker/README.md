@@ -18,6 +18,14 @@ Le bouton **Interrompre la recherche** annule les requêtes en cours et garde le
 **Limites actuelles :** le guidage porte sur des indices textuels et juridiques de découverte ; la confirmation autonome de position exacte, les contacts et les champs de fiche éditables pendant la recherche restent à construire. L’arrêt adaptatif au-delà des budgets fixes, la simplification des résolveurs, l’enrichissement indépendant des contacts et un corpus de validation indépendant d’au moins 50 nouvelles structures restent obligatoires. Voir l’issue #87. Les tests synthétiques de 50 pistes ne constituent pas une mesure de rappel.
 
 
+### Incrément 4 — corrections d'indices, consultation étendue et métriques
+
+Les pistes conservées peuvent désormais être affichées par lots supplémentaires de cinq, jusqu'à la limite explicite de 250. Chaque piste possède un volet « Corriger ou préciser une information » (nom, adresse, commune, gestionnaire, SIREN/SIRET). Les corrections sont des **indices de découverte seulement** : elles n'altèrent ni la fiche Grist, ni l'observation officielle, ni les attestations juridiques et géographiques. Une correction identique n'enclenche pas de nouvelle recherche ; un identifiant incomplet ou invalide est refusé. Les corrections restent en mémoire pour une même fiche pendant les relances, mais sont effacées au changement de fiche.
+
+Un calculateur hors ligne de métriques est disponible dans `validation/score-heldout.mjs` (usage et format documentés dans `validation/heldout-evaluation-protocol.md`). Il exige 50 cas réels au moins, dix secteurs et des captures API publiques identiques pour comparer référence et PR. **Aucun corpus réel indépendant n'a encore été constitué et aucun gain mesuré**. Les tests synthétiques du calculateur ne prouvent pas la performance sur les nouvelles structures.
+
+**Limites :** les corrections servent à la recherche Annuaire approfondie et ne remplacent pas la valeur de la fiche servant de référence au vérificateur ; certaines preuves sectorielles déjà concluantes terminent la recherche avant l'exploration d'un indice corrigé. La recherche/ajout initiale, la validation indépendante des positions/contacts, le budget adaptatif et le chantier de simplification restent à compléter. Ne pas prendre une correction humaine pour une preuve permettant d'appliquer un SIRET.
+
 ## Départements recherchés
 
 Le périmètre géographique du widget est configurable. Par défaut, un document qui n’a encore enregistré aucune option utilise :
