@@ -152,6 +152,8 @@ export async function resolveStructureIdentity({
   let links = [];
   let geocodeCandidates = [];
   let selectedGeocode = null;
+  let discoveryAnchor = null;
+  let activeDiscoveryAddress = null;
 
   const performOfficial = async (request, source, { required = true, paginate = false } = {}) => {
     if (!request || seenUrls.has(request.url)) return [];
@@ -215,10 +217,10 @@ export async function resolveStructureIdentity({
     }
   };
 
-  const performGeocode = async () => {
-    if (!String(row.Adresse ?? "").trim() || typeof geocode !== "function") return [];
+  const performGeocode = async address => {
+    if (!String(address ?? "").trim() || typeof geocode !== "function") return [];
     try {
-      const result = await boundedSource("ign:discovery", sourceSignal => geocode(row.Adresse, { signal: sourceSignal, limit: 3 }),
+      const result = await boundedSource("ign:discovery", sourceSignal => geocode(address, { signal: sourceSignal, limit: 3 }),
         { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.geocodeMs, onEvent });
       coverage.set("ign:discovery", coverageEntry("ign:discovery", "ok", { complete: true }, false));
       return result;
@@ -275,21 +277,40 @@ export async function resolveStructureIdentity({
     // identifiers are still revalidated explicitly when they supply a bridge.
     // A known site address already supports the identity decision. Waiting for
     // an optional street geocode would consume the budget for stronger registry proof.
-    const geocoded = await performGeocode();
-    geocodeCandidates = Array.isArray(geocoded) ? geocoded : [];
-    selectedGeocode = geocodeCandidates[0] ?? null;
-    anchor = locationAnchor(row, selectedGeocode);
+    // A corrected address is a search clue, not an official position or site
+    // attestation. Keep discovery geography separate from certificate geography.
+    const discoveryAddress = () => String(
+      guidance?.selected?.find(item => item.field === "address")?.value || row.Adresse || "",
+    ).trim();
+    const refreshDiscoveryLocation = async () => {
+      const address = discoveryAddress();
+      if (address === activeDiscoveryAddress) return false;
+      activeDiscoveryAddress = address;
+      const guided = normalize(address) !== normalize(row.Adresse);
+      const geocoded = await performGeocode(address);
+      geocodeCandidates = Array.isArray(geocoded) ? geocoded : [];
+      const found = geocodeCandidates[0] ?? null;
+      // Never export a teacher-corrected geocode as the selected official
+      // location: the coordinator also uses selectedGeocode for evidence.
+      selectedGeocode = guided ? null : found;
+      anchor = locationAnchor(row, selectedGeocode);
+      discoveryAnchor = guided
+        ? usableCoordinates(found?.latitude, found?.longitude) || anchor
+        : anchor;
+      return true;
+    };
+    await refreshDiscoveryLocation();
     decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
     checkpoint(decision);
     if (deepening ? decision.status === IDENTITY_STATES.MATCH_VERIFIED : isDecisive(decision)) {
       return { decision, candidates, displayCandidates: decisionCandidates(decision), geocodeCandidates, selectedGeocode, links, coverage: [...coverage.values()], requests, diagnostics };
     }
 
-    if (anchor && officialRequestCount < maxOfficialRequests) {
+    if (discoveryAnchor && officialRequestCount < maxOfficialRequests) {
       const rowCoordinates = usableCoordinates(row.Latitude, row.Longitude);
-      const radius = rowCoordinates ? 0.3 : 0.5;
+      const radius = rowCoordinates && discoveryAnchor === anchor ? 0.3 : 0.5;
       const nearby = await performOfficial(
-        buildOfficialNearbySearchRequest({ latitude: anchor.latitude, longitude: anchor.longitude, radius }),
+        buildOfficialNearbySearchRequest({ latitude: discoveryAnchor.latitude, longitude: discoveryAnchor.longitude, radius }),
         "annuaire:nearby",
         { paginate: true, required: true },
       );
@@ -301,9 +322,9 @@ export async function resolveStructureIdentity({
       }
     }
 
-    if (anchor && typeof findPoiLinks === "function" && (deepening ? decision.status !== IDENTITY_STATES.MATCH_VERIFIED : shouldContinue(decision))) {
+    if (discoveryAnchor && typeof findPoiLinks === "function" && (deepening ? decision.status !== IDENTITY_STATES.MATCH_VERIFIED : shouldContinue(decision))) {
       try {
-        const poiResult = await boundedSource("osm:identity", sourceSignal => findPoiLinks({ row, latitude: anchor.latitude, longitude: anchor.longitude, radius: 500, signal: sourceSignal }),
+        const poiResult = await boundedSource("osm:identity", sourceSignal => findPoiLinks({ row, latitude: discoveryAnchor.latitude, longitude: discoveryAnchor.longitude, radius: 500, signal: sourceSignal }),
           { signal: deadline.signal, timeoutMs: IDENTITY_BUDGET.poiMs, onEvent });
         coverage.set("osm:identity", coverageEntry("osm:identity", "ok", { complete: poiResult?.complete !== false }, false));
         const pois = Array.isArray(poiResult?.candidates) ? poiResult.candidates : [];
@@ -337,6 +358,22 @@ export async function resolveStructureIdentity({
       // teacher during an in-flight request affects the next actual lookup.
       let expansionIndex = 0;
       while (!deadline.signal.aborted && officialRequestCount < maxOfficialRequests) {
+        // An address corrected while HTTP requests were in flight must redirect
+        // the very next geographic lookup without restarting the whole analysis.
+        if (discoveryAddress() !== activeDiscoveryAddress) {
+          await refreshDiscoveryLocation();
+          if (discoveryAnchor && officialRequestCount < maxOfficialRequests) {
+            const redirected = await performOfficial(
+              buildOfficialNearbySearchRequest({
+                latitude: discoveryAnchor.latitude, longitude: discoveryAnchor.longitude, radius: 0.5,
+              }),
+              "annuaire:guided-nearby", { required: false });
+            candidates = mergeCandidates(candidates, redirected);
+          }
+          decision = decideIdentity({ row, candidates, links, coverage: [...coverage.values()], location: anchor });
+          checkpoint(decision);
+          if (decision.status === IDENTITY_STATES.MATCH_VERIFIED) break;
+        }
         const entry = planIdentityExpansion(row, {
           alreadyRequested: [...seenUrls],
           maxQueries: 1,
