@@ -109,3 +109,36 @@ test("explicit commune guidance outranks an obsolete postal code without turning
   assert.equal(new Set([first[0].request.url, ...next.map(entry => entry.request.url)]).size, next.length + 1);
   assert.equal(row.Adresse, "3 rue du Moulin 44000 Nantes");
 });
+
+test("a selected official operator opens a distinct SIREN discovery, not a site proof", () => {
+  const row = { NomCommercial: "Le Verger", Adresse: "4 rue du Jardin 44000 Nantes" };
+  const manager = { nomCommercial: "Le Verger", raisonSociale: "Gestion des Jardins",
+    siren: "112233445", siret: "11223344500018",
+    adresse: "1 place du Siège 75000 Paris" };
+  const guidance = { selected: [{ field: "operator", key: "siret:11223344500018",
+    value: "Gestion des Jardins" }], rejected: [], version: 1 };
+  const plan = planIdentityExpansion(row, { guidance, discoveredCandidates: [manager] });
+  assert.equal(plan[0].reason, "operator-establishments");
+  assert.equal(plan[0].request.kind, "siren");
+  assert.equal(plan[0].request.identifier, "112233445");
+  assert.ok(plan.some(entry => entry.reason === "name-postcode"));
+  assert.equal(row.SirenSiret, undefined, "no identity is written into the reference row");
+  assert.equal(new Set(plan.map(item => item.request.url)).size, plan.length);
+});
+
+test("operator lookups require the exact selected published candidate and respect rejection", () => {
+  const row = { NomCommercial: "Le Verger", Adresse: "4 rue du Jardin 44000 Nantes" };
+  const candidate = { nomCommercial: "Le Verger", raisonSociale: "Gestion des Jardins",
+    siren: "112233445", siret: "11223344500018" };
+  const selection = { field: "operator", key: "siret:11223344500018",
+    value: "Gestion des Jardins" };
+  const plan = options => planIdentityExpansion(row,
+    { discoveredCandidates: [candidate], guidance: { selected: [selection], rejected: [], ...options } });
+  assert.ok(plan({}).some(item => item.reason === "operator-establishments"));
+  assert.ok(!plan({ rejected: [selection.key] }).some(item => item.reason === "operator-establishments"));
+  assert.ok(!plan({ selected: [{ ...selection, corrected: true }] }).some(item => item.reason === "operator-establishments"));
+  assert.ok(!plan({ selected: [{ ...selection, key: "siret:99999999900019" }] }).some(item => item.reason === "operator-establishments"));
+  assert.ok(!plan({ selected: [{ ...selection, value: "Exploitant différent" }] }).some(item => item.reason === "operator-establishments"));
+  assert.ok(!planIdentityExpansion(row, { guidance: { selected: [selection] } })
+    .some(item => item.reason === "operator-establishments"));
+});

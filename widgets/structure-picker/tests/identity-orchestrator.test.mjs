@@ -276,3 +276,34 @@ test("a novel site may be found by address alone but the unrelated legal operato
   assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED, "address-only match cannot prove the site's SIRET");
   assert.equal(new Set(queries.map(request => request.url)).size, queries.length, "no duplicated URL");
 });
+
+test("human operator choice during live search discovers sibling sites without promoting their identity", async () => {
+  const row = { NomCommercial: "Atelier du Littoral", Adresse: "8 rue de l'Etang 44000 Nantes", SirenSiret: "" };
+  const manager = candidate({ nomCommercial: "Atelier du Littoral", aliases: ["Atelier du Littoral"],
+    nomUsuelDistinct: true, raisonSociale: "Gestion du Littoral", siren: "456789012",
+    siret: "45678901200011", adresse: "2 rue du Siège 44000 Nantes", codePostal: "44000", commune: "Nantes" });
+  const sibling = candidate({ nomCommercial: "Entrepôt Atlantique", aliases: ["Entrepôt Atlantique"],
+    nomUsuelDistinct: true, raisonSociale: "Gestion du Littoral", siren: "456789012",
+    siret: "45678901200029", adresse: "8 rue de l'Etang 44000 Nantes", codePostal: "44000", commune: "Nantes" });
+  const guidance = emptyDiscoveryGuidance();
+  const calls = [];
+  const outcome = await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 5, maxPaginationPages: 0,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      calls.push(request);
+      if (request.kind === "siren") return official([manager, sibling]);
+      if (request.kind === "text" && request.codePostal) return official([manager]);
+      return official([]);
+    },
+    onProgress: checkpoint => {
+      if (!guidance.selected.length && checkpoint.candidates.some(c => c.siret === manager.siret))
+        guidance.selected.push({ field: "operator", key: "siret:" + manager.siret, value: manager.raisonSociale });
+    },
+  });
+  assert.ok(calls.some(request => request.kind === "siren" && request.identifier === "456789012"));
+  assert.ok(outcome.candidates.some(c => c.siret === sibling.siret), "sibling site enters discovery");
+  assert.notEqual(outcome.decision.status, IDENTITY_STATES.MATCH_VERIFIED,
+    "a shared operator and matching address cannot by themselves certify this different-name site");
+  assert.equal(row.SirenSiret, "");
+});

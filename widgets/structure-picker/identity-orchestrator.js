@@ -332,6 +332,7 @@ export async function resolveStructureIdentity({
           alreadyRequested: [...seenUrls],
           maxQueries: 1,
           guidance,
+          discoveredCandidates: candidates,
         })[0];
         if (!entry) break;
         expansionIndex += 1;

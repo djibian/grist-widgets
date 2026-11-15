@@ -3,6 +3,7 @@ import {
   buildOfficialTextSearchRequest,
   extractLocationFromAddress,
   normalize,
+  normalizeIdentifier,
 } from "./search.js";
 import { identitySearchName, targetNameVariants } from "./identity-resolution.js";
 
@@ -22,7 +23,7 @@ export function addressSearchPhrase(value) {
 
 // Discovery requests are hypotheses, never confirmation of the establishment.
 // The existing identity decision remains the sole validator.
-export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries = 12, guidance = null } = {}) {
+export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries = 12, guidance = null, discoveredCandidates = [] } = {}) {
   const used = new Set(alreadyRequested.filter(Boolean));
   const selected = guidance?.selected ?? [];
   const hint = field => selected.find(entry => entry.field === field)?.value ?? "";
@@ -43,6 +44,24 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
   for (const identifier of [hint("siret"), row?.SirenSiret]) {
     if (String(identifier ?? "").trim())
       add(buildOfficialIdentifierSearchRequest(identifier), "identifier-hint");
+  }
+
+  // A teacher may recognise a *manager*, not the geographic internship site.
+  // The Annuaire's verified candidate SIREN is then a discovery route to its
+  // other establishments. Require an actual candidate and an exact, unedited
+  // choice of its published legal name; a typed correction is not such a link.
+  // Neither the choice nor any resulting SIREN is a proof of the site's SIRET.
+  for (const selection of selected) {
+    if (selection.field !== "operator" || selection.corrected ||
+        guidance?.rejected?.includes(selection.key)) continue;
+    const manager = discoveredCandidates.find(candidate => {
+      const siret = normalizeIdentifier(candidate?.siret);
+      return siret.length === 14 && selection.key === "siret:" + siret &&
+        normalize(selection.value) === normalize(candidate?.raisonSociale);
+    });
+    const siren = normalizeIdentifier(manager?.siren);
+    if (siren.length === 9)
+      add(buildOfficialIdentifierSearchRequest(siren), "operator-establishments");
   }
 
   const names = [...new Set([
