@@ -651,6 +651,7 @@ export async function resolveIdentityForEnrichment(options = {}) {
                 onEvent: event,
                 onProgress: (result) => update("base", result),
                 deepening: Boolean(options.deepening),
+                guidance: options.guidance,
                 maxOfficialRequests: options.deepening ? 12 : IDENTITY_BUDGET.maxOfficialRequests,
                 maxPaginationPages: options.deepening ? 3 : IDENTITY_BUDGET.maxPaginationPages,
                 deadlineMs: Math.max(
