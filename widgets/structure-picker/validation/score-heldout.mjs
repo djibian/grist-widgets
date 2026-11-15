@@ -21,6 +21,7 @@ function distribution(values) {
     p95: percentile(valid, .95), p99: percentile(valid, .99) };
 }
 function distanceMeters(a, b) {
+  if (a?.lat == null || a?.lon == null || b?.latitude == null || b?.longitude == null) return null;
   const lat1 = Number(a?.lat), lon1 = Number(a?.lon);
   const lat2 = Number(b?.latitude), lon2 = Number(b?.longitude);
   if (![lat1, lon1, lat2, lon2].every(Number.isFinite) ||
