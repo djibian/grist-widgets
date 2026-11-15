@@ -596,6 +596,24 @@ test("Grist shows a single coherent site candidate and preserves the four identi
       t.mock.timers.tick(200);
     }
     await settle();
+    const correction = nodes["establishment-candidate"].querySelector(".discovery-correction");
+    assert.ok(correction, "a displayed candidate must accept corrected search clues");
+    const field = correction.children.find(node => node.tagName === "select");
+    const value = correction.children.find(node => node.tagName === "input");
+    const use = correction.children.find(node => node.className.includes("discovery-correction-apply"));
+    assert.ok(field && value && use);
+    field.value = "address";
+    field.dispatchEvent(new Event("change"));
+    value.value = "17 rue des Champs 49000 Angers";
+    use.dispatchEvent(new Event("click"));
+    await settle();
+    assert.match(nodes["establishment-candidate"].textContent, /17 rue des Champs 49000 Angers/);
+    assert.equal(writes.length, 0, "a correction must never write to Grist");
+    for (let i = 0; i < 80 && nodes["enrich-button"].disabled; i++) {
+      await settle();
+      t.mock.timers.tick(200);
+    }
+    await settle();
     const nextControls = nodes["establishment-candidate"].querySelector(".discovery-guidance-actions");
     assert.ok(nextControls);
     const reject = nextControls.children.find(node => node.textContent === "Écarter");
