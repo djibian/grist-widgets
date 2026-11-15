@@ -27,10 +27,17 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
   const used = new Set(alreadyRequested.filter(Boolean));
   const selected = guidance?.selected ?? [];
   const hint = field => selected.find(entry => entry.field === field)?.value ?? "";
+  const corrected = field => selected.some(entry => entry.field === field && entry.corrected);
   const selectedAddress = hint("address");
-  const location = extractLocationFromAddress(selectedAddress || row?.Adresse);
-  const addressOptions = [...new Set([selectedAddress, row?.Adresse]
-    .map(value => String(value ?? "").trim()).filter(Boolean))]
+  const selectedCommune = normalize(hint("commune"));
+  const suppliedLocation = extractLocationFromAddress(selectedAddress || row?.Adresse);
+  // A correction revokes the old geographic hypothesis for future requests,
+  // but never alters the actual Grist row or the independent identity decision.
+  const location = corrected("commune") && !corrected("address")
+    ? { ...suppliedLocation, codePostal: "" } : suppliedLocation;
+  const addressOptions = [...new Set([selectedAddress, ...(
+    corrected("address") || corrected("commune") ? [] : [row?.Adresse]
+  )].map(value => String(value ?? "").trim()).filter(Boolean))]
     .map(value => ({ ...extractLocationFromAddress(value), street: addressSearchPhrase(value) }));
   const queries = [];
   const add = (request, reason, boundSiren = "") => {
@@ -41,14 +48,14 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
 
   // An entered identifier is searched *independently* from the name.
   // Its results are not treated as corroboration without site evidence.
-  for (const identifier of [hint("siret"), row?.SirenSiret]) {
+  for (const identifier of [hint("siret"), ...(corrected("siret") ? [] : [row?.SirenSiret])]) {
     if (String(identifier ?? "").trim())
       add(buildOfficialIdentifierSearchRequest(identifier), "identifier-hint");
   }
 
   // A direct SIREN/SIRET lookup identifies a legal unit, not the site.
   // Use its published name for new text searches, never as a site proof.
-  const enteredSirens = new Set([hint("siret"), row?.SirenSiret]
+  const enteredSirens = new Set([hint("siret"), ...(corrected("siret") ? [] : [row?.SirenSiret])]
     .map(value => normalizeIdentifier(value).slice(0, 9)).filter(value => value.length === 9));
   for (const unit of identifierLegalNames) {
     const siren = normalizeIdentifier(unit?.siren);
@@ -89,14 +96,12 @@ export function planIdentityExpansion(row, { alreadyRequested = [], maxQueries =
   const names = [...new Set([
     hint("name"),
     hint("operator"),
-    identitySearchName(row),
-    ...targetNameVariants(row),
+    ...(corrected("name") ? [] : [identitySearchName(row), ...targetNameVariants(row)]),
     normalize(row?.RaisonSociale ?? ""),
   ].map(name => normalize(name)).filter(name => name.length >= 3))];
 
   // A teacher-confirmed commune is an independent search clue. Never force
   // the old postal code onto it: the old address may describe another site.
-  const selectedCommune = normalize(hint("commune"));
   if (selectedCommune.length >= 3) {
     for (const name of names)
       add(buildOfficialTextSearchRequest(name + " " + selectedCommune), "name-commune-hint");
