@@ -257,6 +257,7 @@ async function resolveBaseIdentity({
   findPublishedLinks = findPublishedIdentityLinks,
   findSectorLinks = findFinessIdentityLinks,
   resolveFallback = resolveStructureIdentity,
+  identityDeadlineMs = IDENTITY_BUDGET.deadlineMs,
   onProgress,
 } = {}) {
   if (!row) throw new Error("Fiche Grist absente.");
@@ -379,7 +380,7 @@ async function resolveBaseIdentity({
       findSectorLinks,
       deadlineMs: Math.min(
         FINESS_BUDGET.deadlineMs,
-        IDENTITY_BUDGET.deadlineMs - (Date.now() - startedAt) - 300,
+        identityDeadlineMs - (Date.now() - startedAt) - 300,
       ),
     });
   }
@@ -422,6 +423,7 @@ export async function resolveIdentityForEnrichment(options = {}) {
   } = options;
   if (!row) throw new Error("Fiche Grist absente.");
   const started = Date.now();
+  const identityDeadlineMs = options.deepening ? 28000 : IDENTITY_BUDGET.deadlineMs;
   const trace = [];
   const results = new Map();
   const fresh = new Map();
@@ -632,6 +634,7 @@ export async function resolveIdentityForEnrichment(options = {}) {
             ...options,
             signal: sourceSignal,
             fetchOfficial: fetchValidated,
+            identityDeadlineMs,
             onProgress: (result) => update("base", result),
             findPublishedLinks:
               typeof published === "function"
@@ -647,9 +650,12 @@ export async function resolveIdentityForEnrichment(options = {}) {
                 ...args,
                 onEvent: event,
                 onProgress: (result) => update("base", result),
+                deepening: Boolean(options.deepening),
+                maxOfficialRequests: options.deepening ? 12 : IDENTITY_BUDGET.maxOfficialRequests,
+                maxPaginationPages: options.deepening ? 3 : IDENTITY_BUDGET.maxPaginationPages,
                 deadlineMs: Math.max(
                   1,
-                  IDENTITY_BUDGET.deadlineMs - (Date.now() - started) - 300,
+                  identityDeadlineMs - (Date.now() - started) - 300,
                 ),
               }),
           });
@@ -927,7 +933,7 @@ export async function resolveIdentityForEnrichment(options = {}) {
         }
         return combine();
       },
-      { signal, timeoutMs: IDENTITY_BUDGET.deadlineMs - 100, onEvent: event },
+      { signal, timeoutMs: identityDeadlineMs - 100, onEvent: event },
     );
     return { ...completed, trace: [...trace] };
   } catch (error) {
