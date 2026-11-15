@@ -54,7 +54,7 @@ export function recordDiscoverySourceEvent(previous, event) {
 }
 
 export function discoveryHints(progress, limit = 5, { excluded = [] } = {}) {
-  const count = Math.max(0, Math.min(20, Math.floor(Number(limit) || 0)));
+  const count = Math.max(0, Math.min(MAX_DISCOVERY_HINTS, Math.floor(Number(limit) || 0)));
   return (progress?.candidates ?? []).filter(candidate => !excluded.includes(discoveryHintKey(candidate))).slice(0, count).map(candidate => ({
     key: discoveryHintKey(candidate),
     name: candidate.nomCommercial || candidate.raisonSociale || "Lieu sans nom",
