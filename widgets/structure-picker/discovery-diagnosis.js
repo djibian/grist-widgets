@@ -23,6 +23,14 @@ function question(kind, field, message, reason, choices, anchor, rank, discrimin
   return { id: identity, kind, field, message, reason, options: choices.slice(0, 3), anchor,
     rank, freeText: true };
 }
+// Expected fraction of candidates eliminated by asking for a group value.
+// Equivalent to Gini partition gain; deterministic, with no corpus-fitted weights.
+function partitionGain(groups) {
+  const count = groups.reduce((n, group) => n + group.count, 0);
+  if (count <= 1 || groups.length < 2) return 0;
+  return 1 - groups.reduce((sum, group) => sum + (group.count / count) ** 2, 0);
+}
+
 function valueGroups(leads, getValue) {
   const groups = new Map();
   for (const lead of leads) {
@@ -77,7 +85,7 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
         "Plusieurs établissements ressemblent à ce nom. Dans quelle commune se trouve le lieu du stage ?",
         "La commune permettra de cibler les prochaines recherches, sans certifier l’établissement.",
         communes.map(c => option("commune", c.candidate, c.value)),
-        anchor, 100, normalize(chosenName)));
+        anchor, 70 + Math.round(70 * partitionGain(communes)), normalize(chosenName)));
     }
     const siblings = valueGroups(plausible, c => normalizeIdentifier(c?.siren || c?.siret).slice(0, 9))
       .filter(c => c.value.length === 9 && c.count >= 2);
@@ -89,7 +97,7 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
         "Cet organisme possède plusieurs établissements. Lequel accueille l’élève ?",
         "Le lieu choisi sera recherché séparément du siège et du gestionnaire.",
         differentAddresses.map(c => option("address", c.candidate, c.value)),
-        anchor, chosen(guidance, "operator") ? 110 : 75, siblings.map(g => g.value).join(",")));
+        anchor, 65 + Math.round(70 * partitionGain(differentAddresses)) + (chosen(guidance, "operator") ? 35 : 0), siblings.map(g => g.value).join(",")));
     }
   }
 
@@ -104,7 +112,7 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
         "L’adresse enregistrée diffère de celles des établissements possibles. Reconnaissez-vous une adresse ?",
         "Une adresse corrigée permettra une nouvelle recherche géographique.",
         addresses.map(c => option("address", c.candidate, c.value)),
-        anchor, 90, original));
+        anchor, 80 + Math.round(25 * partitionGain(addresses)), original));
     }
   }
 
@@ -137,7 +145,7 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
       suggestions.push(question("missing-location", "commune",
         "Connaissez-vous la commune où l’élève effectue son stage ?",
         "Cette information permet de distinguer les homonymes et d’orienter la recherche.",
-        options, anchor, options.length ? 80 : 65, normalize(chosenName)));
+        options, anchor, options.length ? 55 + Math.round(60 * partitionGain(valueGroups(leads, municipality))) : 65, normalize(chosenName)));
     }
   }
 
