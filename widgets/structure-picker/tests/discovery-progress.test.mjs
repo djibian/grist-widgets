@@ -156,7 +156,7 @@ test("postal hints contribute only their explicit postal score, not a fake stree
   // The address has no street; a postcode must not be parsed as a street.
   assert.equal(discoveryRelevance(local, reference), 1.25);
   assert.equal(discoveryRelevance(foreign, reference), -1.25);
-  assert.equal(discoveryRelevance({ ...local, adresse: "44000 Nantes" }, reference), 1.25);
+  assert.equal(discoveryRelevance({ ...local, adresse: "44000 Nantes" }, reference), 1.9, "the commune contributes 0.65; the street contributes zero");
 });
 
 test("a specifically confirmed commune outranks a stale postcode in display ranking", () => {
