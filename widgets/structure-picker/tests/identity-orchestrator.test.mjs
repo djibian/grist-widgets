@@ -126,3 +126,72 @@ test('an existing legal name can discover the site when its public name is not i
  }});
  assert.equal(r.decision.status,'MATCH_VERIFIED');assert.deepEqual(calls,['garage martin','martin automobiles']);
 });
+
+
+test("optional deeper search discovers a novel local site using a broad name query without trusting the entered SIRET", async () => {
+  const calls = [];
+  const real = candidate({
+    nomCommercial: "Atelier des Saules", aliases: ["Atelier des Saules"], nomUsuelDistinct: true,
+    raisonSociale: "Coopérative des Saules", siren: "112233445", siret: "11223344500027",
+    adresse: "7 rue des Tisserands 44000 Nantes", codePostal: "44000", commune: "Nantes",
+  });
+  const wrong = candidate({
+    nomCommercial: "Autre activité", raisonSociale: "Exploitant étranger",
+    siren: "998877665", siret: "99887766500013",
+    adresse: "99 rue des Saules 44000 Nantes", codePostal: "44000", commune: "Nantes",
+  });
+  const row = { NomCommercial: "Atelier des Saules", Adresse: "7 rue des Tisserands 44000 Nantes", SirenSiret: wrong.siret };
+  const result = await resolveStructureIdentity({
+    row, deepening: true, deadlineMs: 28000, maxOfficialRequests: 12,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      calls.push(request);
+      if (request.kind === "siret") return official([wrong]);
+      if (request.kind === "text" && !request.codePostal) return official([real]);
+      return official([]);
+    },
+  });
+  assert.ok(calls.some(request => request.kind === "siret"), "entered identifier must be explored, not accepted");
+  assert.ok(calls.some(request => request.kind === "text" && !request.codePostal), "broaden the search");
+  assert.equal(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+  assert.equal(result.decision.candidate.siret, real.siret);
+  assert.equal(result.decision.identifierWarning?.entered, wrong.siret);
+  assert.equal(new Set(calls.map(request => request.url)).size, calls.length);
+});
+
+test("explicit deepening extends Annuaire pagination without inventing a SIRET or changing the abstention rule", async () => {
+  const calls = [];
+  const found = candidate({
+    nomCommercial: "Jardin des Aubépines", aliases: ["Jardin des Aubépines"], nomUsuelDistinct: true,
+    raisonSociale: "Exploitation horticole", siren: "223344556", siret: "22334455600031",
+    adresse: "42 route des Jardins 85000 La Roche-sur-Yon", codePostal: "85000", commune: "La Roche-sur-Yon",
+  });
+  const row = { NomCommercial: "Jardin des Aubépines", Adresse: "42 route des Jardins 85000 La Roche-sur-Yon" };
+  const result = await resolveStructureIdentity({
+    row, deepening: true, deadlineMs: 28000, maxOfficialRequests: 12, maxPaginationPages: 3,
+    fetchOfficial: async request => {
+      calls.push(request);
+      return official(request.page === 3 ? [found] : [], {
+        complete: request.page === 3, hasNextPage: request.page !== 3,
+      });
+    },
+  });
+  assert.deepEqual(calls.slice(0, 3).map(request => request.page), [1, 2, 3]);
+  assert.equal(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+  assert.equal(result.decision.candidate.siret, found.siret);
+  assert.equal(result.requests.some(req => req.source.endsWith(":page3")), true);
+});
+
+test("deepening may rank a contradictory address but must never confirm site identity from a matching number alone", async () => {
+  const wrong = candidate({
+    nomCommercial: "Ferme des Érables", aliases: ["Ferme des Érables"], nomUsuelDistinct: true,
+    raisonSociale: "Exploitant", siren: "334455667", siret: "33445566700029",
+    adresse: "22 route des Chênes 44000 Nantes", codePostal: "44000", commune: "Nantes",
+  });
+  const result = await resolveStructureIdentity({
+    row: { NomCommercial: "Ferme des Érables", Adresse: "12 route des Chênes 44000 Nantes", SirenSiret: wrong.siret },
+    deepening: true, deadlineMs: 28000, maxOfficialRequests: 8,
+    fetchOfficial: async () => official([wrong]),
+  });
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+});
