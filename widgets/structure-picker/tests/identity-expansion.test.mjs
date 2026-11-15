@@ -94,3 +94,18 @@ test("address discovery does not consume requests for a vague postal-only value"
   const plan = planIdentityExpansion({ Adresse: "44000 Nantes" });
   assert.deepEqual(plan, []);
 });
+
+
+test("explicit commune guidance outranks an obsolete postal code without turning it into site proof", () => {
+  const row = { NomCommercial: "Atelier du Héron", Adresse: "3 rue du Moulin 44000 Nantes", SirenSiret: "" };
+  const guidance = { selected: [{ field: "commune", value: "Angers", key: "guide" }], version: 1 };
+  const first = planIdentityExpansion(row, { guidance, maxQueries: 1 });
+  assert.equal(first.length, 1);
+  assert.equal(first[0].reason, "name-commune-hint");
+  assert.equal(first[0].request.codePostal, "", "old postal code must not restrict the newly confirmed commune");
+  assert.match(first[0].request.query, /angers/);
+  const next = planIdentityExpansion(row, { guidance, alreadyRequested: [first[0].request.url] });
+  assert.ok(next.some(entry => entry.reason === "name-postcode"), "old postal lookup remains a hypothesis");
+  assert.equal(new Set([first[0].request.url, ...next.map(entry => entry.request.url)]).size, next.length + 1);
+  assert.equal(row.Adresse, "3 rue du Moulin 44000 Nantes");
+});
