@@ -39,8 +39,10 @@ test("A: ambiguous homonyms ask for commune and answer generates an actual new A
   });
   assert.ok(requests.some(req => req.kind === "text" && req.query.includes("angers")),
     "user response must actually change HTTP lookup, not only UI sort");
-  assert.equal(diagnoseDiscovery({ reference: row, progress: progress(nantes, angers), guidance }).question?.field, "address",
-    "after a commune answer, a different uncertainty can become the next question");
+  const after = diagnoseDiscovery({ reference: row, progress: progress(nantes, angers), guidance });
+  assert.equal(after.question, null,
+    "once the commune distinguishes a single site, avoid asking about addresses belonging to other communes");
+  assert.notEqual(after.blocker, "ambiguous-sites");
 });
 
 test("B: contradictory address offers a correction and triggers geographic discovery without site certification", async () => {
@@ -110,8 +112,13 @@ test("D: 'Je ne sais pas' suppresses only the same question and retains other op
   assert.equal(initial.kind, "homonyms");
   assert.equal(skipDiscoveryQuestion(guidance, initial.id), true);
   assert.equal(skipDiscoveryQuestion(guidance, initial.id), false);
-  assert.notEqual(diagnoseDiscovery({ reference: row, progress: p, guidance }).question?.id, initial.id);
+  assert.equal(diagnoseDiscovery({ reference: row, progress: p, guidance }).question, null,
+    "do not re-ask the same commune as a missing-location question");
   assert.deepEqual(guidance.selected, [], "ignorance is not treated as a confirmed choice");
+  const changed = progress(site(), site({ code: "49000", city: "Angers", nic: "00020" }),
+    site({ code: "35000", city: "Rennes", nic: "00030" }));
+  assert.equal(diagnoseDiscovery({ reference: row, progress: changed, guidance }).question, null,
+    "new choices do not justify asking for information the teacher explicitly does not know");
 });
 
 test("E: answer at a live checkpoint changes subsequent official requests", async () => {
@@ -176,4 +183,40 @@ test("conflicting source observations are not mislabeled as a wrong user address
   const diagnosis = diagnoseDiscovery({ reference: row, progress: progress(unstable) });
   assert.equal(diagnosis.blocker, "conflicting-sources");
   assert.equal(diagnosis.question, null, "only independent source validation can resolve contradictory evidence");
+});
+
+test("an address chosen among homonyms avoids unrelated follow-up questions", () => {
+  const a = site({ city: "Nantes", code: "44000" });
+  const b = site({ city: "Angers", code: "49000", nic: "00020", street: "24 rue des Roses" });
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  chooseDiscoveryGuidance(guidance, b, "address");
+  const result = diagnoseDiscovery({ reference: row, progress: progress(a, b), guidance });
+  assert.equal(result.question, null);
+  assert.notEqual(result.blocker, "ambiguous-sites");
+});
+
+test("guided commune absent from returned candidates is reported as unconfirmed, not silently substituted", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  correctDiscoveryGuidance(guidance, site(), "commune", "Rennes");
+  const result = diagnoseDiscovery({
+    reference: row, progress: progress(site(), site({ city: "Angers", code: "49000", nic: "00020" })),
+    guidance, searching: true,
+  });
+  assert.equal(result.blocker, "guided-location-unconfirmed");
+  assert.equal(result.question, null);
+  assert.match(result.why, /recherche continue/i);
+});
+
+test("a genuinely new address contradiction can still be raised after unknown address", () => {
+  const row = { NomCommercial: "Les Petits Loups", Adresse: "4 rue du Lac 44000 Nantes", SirenSiret: "" };
+  const guidance = emptyDiscoveryGuidance();
+  const first = diagnoseDiscovery({ reference: row, progress: progress(site()) }).question;
+  assert.equal(first.field, "address");
+  skipDiscoveryQuestion(guidance, first.id);
+  assert.equal(diagnoseDiscovery({ reference: row, progress: progress(site()), guidance }).question, null);
+  const other = site({ street: "29 rue des Roses", city: "Angers", code: "49000", nic: "00020" });
+  assert.equal(diagnoseDiscovery({ reference: row, progress: progress(other), guidance }).question?.kind,
+    "address-contradiction", "new contradictory evidence warrants rechecking even after a skipped question");
 });
