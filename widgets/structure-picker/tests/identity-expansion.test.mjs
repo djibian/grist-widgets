@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planIdentityExpansion } from "../identity-expansion.js";
+import { planIdentityExpansion, addressSearchPhrase } from "../identity-expansion.js";
 
 test("general expansion searches untrusted identifier independently, then alternate names with and without postal restriction", () => {
   const row = {
@@ -58,4 +58,39 @@ test("guidance cannot bypass quotas or duplicate requests", () => {
   const next = planIdentityExpansion(row, { guidance, maxQueries: 1, alreadyRequested: [first[0].request.url] });
   assert.equal(next.length, 1);
   assert.equal(next[0].request.kind, "text");
+});
+
+test("a street is a distinct, postcode-scoped discovery query even when the establishment name is unknown", () => {
+  const row = { NomCommercial: "", Adresse: "17 rue des Moissons 44000 Nantes", SirenSiret: "" };
+  const plan = planIdentityExpansion(row);
+  assert.ok(plan.some(entry => entry.reason === "address-postcode" &&
+    entry.request.kind === "text" &&
+    entry.request.query === "17 rue des moissons" &&
+    entry.request.codePostal === "44000"));
+  assert.ok(plan.some(entry => entry.reason === "address-department" &&
+    entry.request.query === "17 rue des moissons" && !entry.request.codePostal));
+  assert.equal(new Set(plan.map(entry => entry.request.url)).size, plan.length);
+  assert.equal(addressSearchPhrase("44000 Nantes"), "");
+  assert.equal(addressSearchPhrase("Nantes"), "");
+  assert.equal(addressSearchPhrase(""), "");
+});
+
+test("a corrected address leads the street search; original street is kept as an alternative, never overwritten", () => {
+  const row = { NomCommercial: "Lieu inconnu", Adresse: "4 route du Moulin 44000 Nantes" };
+  const guidance = { selected: [{ field: "address", value: "8 quai des Jardins 49000 Angers" }] };
+  const plan = planIdentityExpansion(row, { guidance });
+  const first = plan.findIndex(entry => entry.reason === "address-postcode");
+  assert.ok(first >= 0);
+  assert.equal(plan[first].request.query, "8 quai des jardins");
+  assert.equal(plan[first].request.codePostal, "49000");
+  assert.ok(plan.some(entry => entry.reason === "address-postcode" &&
+    entry.request.query === "4 route du moulin" && entry.request.codePostal === "44000"));
+  assert.equal(row.Adresse, "4 route du Moulin 44000 Nantes");
+  const next = planIdentityExpansion(row, { guidance, alreadyRequested: plan.map(entry => entry.request.url) });
+  assert.equal(next.length, 0);
+});
+
+test("address discovery does not consume requests for a vague postal-only value", () => {
+  const plan = planIdentityExpansion({ Adresse: "44000 Nantes" });
+  assert.deepEqual(plan, []);
 });
