@@ -4,6 +4,16 @@ Widget Grist unique pour **rechercher, ajouter et compléter** les structures de
 
 L’interface sépare les deux usages principaux dans deux onglets fixes : **Rechercher / ajouter** et **Compléter la sélection**.
 
+
+### Recherche progressive — chantier #87 / PR #88
+
+La recherche de **Compléter la sélection** exploite maintenant les checkpoints \`onProgress\` et les événements \`onEvent\` déjà émis par les résolveurs. Le panneau présente les pistes disponibles avant le verdict final, cinq à la fois, avec les états réellement observés des sources dans « Activité réelle des sources ». La liste est explicitement **non vérifiée** : un nom, un SIRET ou une adresse simplement repéré n’est jamais une preuve juridique ou géographique et ne crée aucune proposition à appliquer dans Grist. Les propositions restent réservées au verdict final.
+
+Le bouton **Interrompre la recherche** annule les requêtes en cours et garde les pistes visibles ; une relance sur la même fiche inchangée garde ces pistes de découverte en mémoire et réutilise, lorsque le client le permet, son cache de réponses. Une modification de sélection ou des informations de la fiche retire ce contexte. Les événements tardifs d’une analyse terminée ne doivent pas réouvrir le panneau de progression.
+
+**Limites de cette première étape :** le moteur de résolution conserve pour le moment ses délais existants (12 s pour l’identité, 24 s au total) et son classement juridique antérieur. Il n’existe pas encore de validation interactive de candidats/champs, de poursuite dynamique des requêtes, ni de corpus de validation indépendant de 50 nouvelles structures. Voir l’issue #87 pour les travaux A–D et les exigences d’évaluation. Les tests synthétiques de conservation de 50 pistes ne constituent pas une mesure de rappel.
+
+
 ## Départements recherchés
 
 Le périmètre géographique du widget est configurable. Par défaut, un document qui n’a encore enregistré aucune option utilise :
