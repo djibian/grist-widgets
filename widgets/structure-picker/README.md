@@ -1,3 +1,7 @@
+### Incrément 12 — Découverte des SIRET de sites non-sièges
+
+Une recherche directe par SIREN/SIRET dans l'Annuaire ne fournit pas toujours la liste des établissements du gestionnaire. En **Approfondir la recherche**, le widget reprend la dénomination légale publiée pour le SIREN interrogé et recherche textuellement les établissements correspondants, d'abord au code postal saisi puis dans les départements configurés. Les résultats homonymes dont le SIREN est différent sont écartés de ce relais. Le SIRET saisi et la dénomination de gestionnaire restent des **indices**, jamais une preuve suffisante du site ; le vérificateur et les écritures Grist ne sont pas modifiés. Les limites API restent en vigueur. Le gain sur 50+ structures réelles inédites reste à évaluer.
+
 # Assistant Structures
 
 Widget Grist unique pour **rechercher, ajouter et compléter** les structures de stage.
