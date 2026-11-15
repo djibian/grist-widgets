@@ -169,4 +169,9 @@ test("operator-text discovery is deduplicated and does not trust corrected or st
     ...options, guidance: { selected: [chosen], rejected: [chosen.key] },
   }).some(x => x.reason === "operator-establishments"), "rejected manager cannot reopen search");
   assert.equal(row.SirenSiret, undefined);
+  assert.ok(!planIdentityExpansion(row, {
+    guidance: { selected: [chosen] },
+    discoveredCandidates: [{ ...manager, siren: "999888777" }],
+  }).some(x => x.reason === "operator-establishments"),
+  "conflicting SIREN and SIRET must not provide a published-manager bridge");
 });
