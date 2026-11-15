@@ -195,3 +195,29 @@ test("deepening may rank a contradictory address but must never confirm site ide
   });
   assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
 });
+
+
+test("feedback at an active checkpoint really reorders later Annuaire lookups without granting legal proof", async () => {
+  const row = { NomCommercial: "Lieu à découvrir", Adresse: "5 rue du Chêne 44000 Nantes", SirenSiret: "" };
+  const guidance = { selected: [], rejected: [], version: 0 };
+  const requests = [];
+  let chosen = false;
+  const result = await resolveStructureIdentity({
+    row, guidance, deepening: true, maxOfficialRequests: 5, maxPaginationPages: 0,
+    geocode: async () => [],
+    fetchOfficial: async request => {
+      requests.push(request);
+      return official([]);
+    },
+    onProgress: () => {
+      if (chosen) return;
+      chosen = true;
+      guidance.selected.push({ field: "name", key: "hint", value: "Atelier de la Source" });
+      guidance.version += 1;
+    },
+  });
+  assert.ok(chosen);
+  assert.ok(requests.some(item => item.kind === "text" && item.query.includes("atelier de la source")));
+  assert.notEqual(result.decision.status, IDENTITY_STATES.MATCH_VERIFIED);
+  assert.equal(row.NomCommercial, "Lieu à découvrir");
+});
