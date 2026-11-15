@@ -24,11 +24,13 @@ import {
   mergeDiscoveryProgress,
   recordDiscoverySourceEvent,
   discoveryHints,
+  discoveryHintKey,
   discoverySourceLabel,
 } from "./discovery-progress.js";
 import {
   emptyDiscoveryGuidance,
   chooseDiscoveryGuidance,
+  correctDiscoveryGuidance,
   isRejectedGuidance,
   guidanceFieldValue,
 } from "./discovery-guidance.js";
@@ -346,6 +348,61 @@ function appendGuidanceControls(container, candidate) {
   });
   actions.appendChild(reject);
   container.appendChild(actions);
+
+  const correction = document.createElement("details");
+  correction.className = "discovery-correction";
+  const summary = document.createElement("summary");
+  summary.textContent = "Corriger ou préciser une information";
+  const selector = document.createElement("select");
+  selector.className = "discovery-correction-field";
+  for (const [field, label] of fields) {
+    const option = document.createElement("option");
+    option.value = field;
+    option.textContent = label;
+    selector.appendChild(option);
+  }
+  selector.value = "name";
+  selector.setAttribute?.("aria-label", "Information à corriger pour la recherche");
+  const entry = document.createElement("input");
+  entry.type = "text";
+  entry.className = "discovery-correction-value";
+  entry.maxLength = 250;
+  entry.setAttribute?.("aria-label", "Valeur corrigée, utilisée uniquement pour rechercher");
+  const candidateKey = discoveryHintKey(candidate);
+  const refreshEntry = () => {
+    entry.value = state.guidance.selected.find(item => item.key === candidateKey && item.field === selector.value)?.value
+      ?? guidanceFieldValue(candidate, selector.value);
+  };
+  selector.addEventListener("change", refreshEntry);
+  refreshEntry();
+  const useCorrection = document.createElement("button");
+  useCorrection.type = "button";
+  useCorrection.className = "button button-secondary discovery-correction-apply";
+  useCorrection.textContent = "Rechercher avec cette correction";
+  useCorrection.addEventListener("click", () => {
+    const row = selectedRow();
+    if (!row || state.progressKey !== [row.id, row.NomCommercial, row.Adresse, row.SirenSiret].join("|")) return;
+    if (!correctDiscoveryGuidance(state.guidance, candidate, selector.value, entry.value)) {
+      setStatus("Correction inchangée ou invalide. Pour le SIRET, saisir 9 ou 14 chiffres.", "error");
+      return;
+    }
+    redirectDiscovery();
+  });
+  const note = document.createElement("div");
+  note.className = "help";
+  note.textContent = "Indice de recherche uniquement : ne certifie pas le SIRET, l’adresse ou le site et n’enregistre rien dans Grist.";
+  correction.append(summary, selector, entry, useCorrection, note);
+  container.appendChild(correction);
+}
+
+function appendGuidanceSummary(container) {
+  const corrections = state.guidance.selected.filter(item => item.corrected);
+  if (!corrections.length) return;
+  const line = document.createElement("div");
+  line.className = "help";
+  line.textContent = "Corrections utilisées pour la recherche (non vérifiées) : " +
+    corrections.map(item => item.field + " : " + item.value).join(" ; ");
+  container.appendChild(line);
 }
 
 function appendDiscoveryHints(container) {
@@ -376,6 +433,7 @@ function renderDiscoveryProgress({ stopped = false } = {}) {
   const heading = document.createElement("h3");
   heading.textContent = stopped ? "Recherche interrompue — pistes conservées" : "Recherche en cours — premiers résultats";
   ui.candidate.appendChild(heading);
+  appendGuidanceSummary(ui.candidate);
   appendDiscoveryHints(ui.candidate);
 
   const activity = state.progress.activity ?? [];
@@ -432,6 +490,7 @@ function renderEstablishment() {
           ? " — Certaines vérifications n’ont pas abouti. Les informations reçues restent disponibles."
           : "");
   ui.candidate.append(title, summary);
+  appendGuidanceSummary(ui.candidate);
   if (state.candidate) ui.candidate.appendChild(candidateCard(state.candidate));
   else {
     const alternatives = (decision.alternatives ?? []).slice(0, 5);
