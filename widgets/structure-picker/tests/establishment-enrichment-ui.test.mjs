@@ -577,6 +577,40 @@ test("Grist shows a single coherent site candidate and preserves the four identi
     assert.equal(nodes["enrich-button"].disabled, false);
     assert.doesNotMatch(nodes["enrich-status"].textContent, /délai maximal/);
   });
+  await t.test("field-level guidance reorients a live Grist analysis while rejection blocks writes", async () => {
+    await select(0);
+    mode = "normal";
+    click();
+    await settle();
+    const controls = nodes["establishment-candidate"].querySelector(".discovery-guidance-actions");
+    assert.ok(controls, "verified candidates must offer voluntary research guidance");
+    const choice = controls.children.find(node => node.textContent === "Nom");
+    assert.ok(choice);
+    const previousRequests = requests.length;
+    choice.dispatchEvent(new Event("click"));
+    await settle();
+    assert.ok(requests.length > previousRequests, "a field choice must actually restart guided discovery");
+    assert.equal(writes.length, 0, "a search hint must never write to Grist");
+    for (let i = 0; i < 80 && nodes["enrich-button"].disabled; i++) {
+      await settle();
+      t.mock.timers.tick(200);
+    }
+    await settle();
+    const nextControls = nodes["establishment-candidate"].querySelector(".discovery-guidance-actions");
+    assert.ok(nextControls);
+    const reject = nextControls.children.find(node => node.textContent === "Écarter");
+    assert.ok(reject);
+    reject.dispatchEvent(new Event("click"));
+    await settle();
+    for (let i = 0; i < 80 && nodes["enrich-button"].disabled; i++) {
+      await settle();
+      t.mock.timers.tick(200);
+    }
+    await settle();
+    assert.equal(nodes["proposal-panel"].querySelector("#identity-apply-proposals"), null);
+    assert.equal(writes.length, 0, "a rejected candidate must not remain writable");
+  });
+
   await t.test("real progress can be interrupted without applying an unverified identity or accepting late replies", async () => {
     await select(0);
     mode = "pending-verification";
