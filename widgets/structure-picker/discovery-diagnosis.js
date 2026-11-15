@@ -1,6 +1,6 @@
 // Active, deterministic diagnosis of what a teacher can usefully clarify.
 // A question is an exploration hypothesis, never an identity/site/position proof.
-import { discoveryHints } from "./discovery-progress.js";
+import { discoveryHints, MAX_DISCOVERY_HINTS } from "./discovery-progress.js";
 import { extractLocationFromAddress, fuzzyTextScore, normalize, normalizeIdentifier } from "./search.js";
 
 const ANSWERED = new Set(["name", "commune", "address", "operator", "siret"]);
@@ -55,7 +55,9 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
     return { blocker: "resolved", question: null, why: "Identité suffisamment établie." };
 
   const failedSources = (progress?.activity ?? []).filter(a => ["timeout", "error"].includes(a.state));
-  const raw = discoveryHints(progress, 12, { reference, guidance, excluded: guidance?.rejected ?? [] });
+  // Diagnose across the complete bounded candidate reservoir. A useful rare
+  // site or commune must not disappear just because it was found late.
+  const raw = discoveryHints(progress, MAX_DISCOVERY_HINTS, { reference, guidance, excluded: guidance?.rejected ?? [] });
   const chosenName = chosen(guidance, "name") || reference.NomCommercial || reference.RaisonSociale || "";
   // A source can return semantically unrelated businesses. Do not ask teachers
   // to arbitrate arbitrary search results as though these were homonyms.
@@ -121,7 +123,7 @@ export function diagnoseDiscovery({ reference = {}, progress = null, guidance = 
         "Cet organisme possède plusieurs établissements. Lequel accueille l’élève ?",
         "Le lieu choisi sera recherché séparément du siège et du gestionnaire.",
         differentAddresses.map(c => option("address", c.candidate, c.value)),
-        anchor, 65 + Math.round(70 * partitionGain(differentAddresses)) + (chosen(guidance, "operator") ? 35 : 0), siblings.map(g => g.value).join(",")));
+        anchor, 65 + Math.round(70 * partitionGain(differentAddresses)), siblings.map(g => g.value).join(",")));
     }
   }
 
