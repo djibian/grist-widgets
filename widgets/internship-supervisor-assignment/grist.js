@@ -687,7 +687,7 @@ export async function applyPlan(plan, mappings) {
       if (!state.capacities.some(row => row.teacherId === assignment.teacherId)) throw new Error("La proposition contient un enseignant non autorisé.");
     }
     for (const capacity of state.capacities) {
-      if (plan.assignments.filter(row => row.periodId === state.periodId && row.teacherId === capacity.teacherId).length !== capacity.remaining) throw new Error("La proposition ne respecte plus les quotas.");
+      if (plan.assignments.filter(row => row.periodId === state.periodId && row.teacherId === capacity.teacherId).length > capacity.remaining) throw new Error("La proposition dépasse un quota.");
     }
   }
   if (!plan.assignments.length) return fresh;

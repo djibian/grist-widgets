@@ -1,10 +1,10 @@
 # Répartition des suivis de stage
 
-Widget Grist pour affecter les stages aux enseignants à partir de quotas exacts définis par enseignant, classe et période.
+Widget Grist pour affecter les stages aux enseignants à partir de quotas maximaux définis par enseignant, classe et période.
 
 ## V2 — proximité géographique
 
-La V2 conserve les invariants de la version stable : quotas exacts, suivis existants préservés, prévisualisation avant écriture et relecture des données avant application. Elle ajoute une optimisation géographique fondée sur des localisations préparées et validées dans Grist.
+La V2 conserve les invariants de la version stable : quotas non dépassés, suivis existants préservés, prévisualisation avant écriture et relecture des données avant application. Elle ajoute une optimisation géographique fondée sur des localisations préparées et validées dans Grist.
 
 ### Source principale : Classe
 
@@ -58,7 +58,7 @@ Les stages **attendus** correspondent à `élèves de la classe × périodes sé
 
 Pour chaque période sélectionnée :
 
-- la somme des quotas doit être exactement égale au nombre de stages déclarés ;
+- la somme des quotas doit couvrir au moins le nombre de stages déclarés ; un excédent est signalé sans bloquer le calcul, un déficit reste bloquant ;
 - les suivis déjà renseignés sur ces stages sont conservés et déduits des quotas restants ;
 - un enseignant déjà au-dessus de son quota ou non autorisé pour la classe bloque le calcul ;
 - les doublons élève × période bloquent le calcul.
@@ -73,7 +73,7 @@ Pour chaque période, le solveur recherche globalement l'affectation de coût mi
 
 Le widget évalue les différents ordres possibles des périodes sélectionnées — au maximum quatre — afin de prendre en compte la diversification entre les périodes d'un même élève. L'historique inclut tous les suivis existants des élèves de la classe dans ses périodes, y compris celles qui ne sont pas sélectionnées et les lignes sans structure portant déjà un suivi. Seuls les stages déclarés sans enseignant des périodes sélectionnées sont modifiables. Les métriques de répétition utilisent ce même historique, même lorsque le critère de diversification est désactivé.
 
-Enfin, une passe de **raffinement inter-périodes** réévalue le score global. Elle cherche d'abord des échanges améliorants entre deux stages d'une même période ; si aucun échange isolé ne suffit, elle peut appliquer deux échanges coordonnés dans deux périodes différentes. Ces mouvements conservent exactement, par construction, le nombre de stages attribué à chaque enseignant dans chaque période : les quotas ne peuvent donc pas être modifiés par le raffinement.
+Enfin, une passe de **raffinement inter-périodes** réévalue le score global. Elle cherche d'abord des échanges améliorants entre deux stages d'une même période ; si aucun échange isolé ne suffit, elle peut appliquer deux échanges coordonnés dans deux périodes différentes. Ces mouvements conservent exactement, par construction, le nombre de stages attribué à chaque enseignant dans chaque période : les capacités disponibles ne peuvent donc pas être dépassées par le raffinement.
 
 Le moteur est ainsi exact pour l'affectation à coût minimal **à l'intérieur de chaque période**, puis amélioré globalement entre périodes par une recherche locale déterministe. Il ne prétend pas résoudre exactement le problème combinatoire multi-périodes complet ; les tournées routières et l'optimisation multi-classes restent des évolutions distinctes.
 
@@ -106,7 +106,7 @@ La prévisualisation affiche notamment :
 - la distance directe de chaque affectation ;
 - la distance totale, moyenne et maximale ;
 - le nombre de répétitions enseignant–élève ;
-- le contrôle des quotas ;
+- le contrôle des quotas et les places encore disponibles par enseignant et période ;
 - l'équivalence entre diversification et distance correspondant aux priorités choisies.
 
 Le plan conserve également des métriques internes de score avant/après raffinement afin de tester que toute modification inter-périodes améliore strictement l'objectif global.
@@ -145,4 +145,4 @@ npm run test:internship-supervisor-assignment
 
 L'ensemble du dépôt peut également être testé avec `npm test`.
 
-La suite relationnelle utilise les types et formules du schéma dev2 observés le 28 octobre 2026, avec des données de test synthétiques : identifiants distincts des numéros, périodes non consécutives, cohérence classe–période, stages attendus/déclarés, quotas exacts, historique hors sélection, conservation des suivis et invalidation avant application. Un oracle exhaustif vérifie la diversification pour de petits cas à une période ; les tests de raffinement multi-périodes existants sont conservés.
+La suite relationnelle utilise les types et formules du schéma dev2 observés le 28 octobre 2026, avec des données de test synthétiques : identifiants distincts des numéros, périodes non consécutives, cohérence classe–période, stages attendus/déclarés, quotas égaux, excédentaires ou insuffisants, historique hors sélection, conservation des suivis et invalidation avant application. Un oracle exhaustif vérifie la diversification pour de petits cas à une période ; les tests de raffinement multi-périodes existants sont conservés.

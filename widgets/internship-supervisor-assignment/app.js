@@ -211,11 +211,15 @@ function renderAnalysis() {
     html += `<ul class="issues">${nonMissingErrors.map(row => `<li>${esc(row.message)}</li>`).join("")}</ul>`;
   }
 
+  if (analysis.warnings?.length) {
+    html += `<ul class="issues" role="status">${analysis.warnings.map(row => `<li>Avertissement : ${esc(row.message)}</li>`).join("")}</ul>`;
+  }
+
   if (!analysis.errors.length) {
     const geographyNote = state.optimization?.geography?.enabled
       ? " Les coordonnées validées seront utilisées pour optimiser la proximité domicile–structure."
       : "";
-    html += `<div class="success-line">✓ Stages présents et quotas cohérents : la répartition peut être calculée.${geographyNote}</div>`;
+    html += `<div class="success-line">✓ Capacités suffisantes : la répartition peut être calculée.${geographyNote}</div>`;
     el.generate.disabled = state.busy;
   }
   el.analysis.className = "analysis";
@@ -263,8 +267,11 @@ function renderPlan(plan) {
   const tradeoffLine = plan.scoring?.geography && plan.scoring?.diversity && Number.isFinite(plan.scoring.repeatEquivalentKm)
     ? `<div class="summary-line">Avec ces priorités, éviter une répétition enseignant–élève pèse autant qu’environ <strong>${esc(formatDistance(plan.scoring.repeatEquivalentKm))}</strong> de distance directe.</div>`
     : "";
+  const unusedCapacity = plan.summary.reduce((sum, row) => sum + row.target - row.total, 0);
   el.proposalSummary.innerHTML = [
-    '<div class="summary-line"><strong>✓ Tous les quotas sélectionnés sont respectés.</strong></div>',
+    unusedCapacity > 0
+      ? `<div class="summary-line"><strong>✓ Aucun quota dépassé ; ${unusedCapacity} place(s) restent disponibles.</strong></div>`
+      : '<div class="summary-line"><strong>✓ Tous les quotas sélectionnés sont respectés.</strong></div>',
     `<div class="summary-line">${plan.metrics.newCount} nouvelle(s) affectation(s), ${plan.metrics.existingCount} déjà existante(s).</div>`,
     `<div class="summary-line">${esc(diversityLine)}${plan.metrics.introducedRepeats ? ` ${plan.metrics.introducedRepeats} répétition(s) dans la proposition.` : ""}</div>`,
     geographyLine,
@@ -276,7 +283,7 @@ function renderPlan(plan) {
   )).join("") || '<tr><td colspan="4">Aucune nouvelle affectation.</td></tr>';
 
   el.quotaDetails.innerHTML = plan.summary.map(row => (
-    `<tr><td>${esc(periodLabel(state.snapshot, row.periodId))}</td><td>${esc(row.teacherLabel)}</td><td>${row.target}</td><td>${row.existing}</td><td>${row.proposed}</td><td><strong>${row.total}</strong></td></tr>`
+    `<tr><td>${esc(periodLabel(state.snapshot, row.periodId))}</td><td>${esc(row.teacherLabel)}</td><td>${row.target}</td><td>${row.existing}</td><td>${row.proposed}</td><td><strong>${row.total}</strong></td><td>${row.target - row.total}</td></tr>`
   )).join("");
 
   updateApplyButton();
