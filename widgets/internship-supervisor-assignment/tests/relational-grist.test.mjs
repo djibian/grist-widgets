@@ -132,12 +132,45 @@ test('missing and undeclared stages neither block declared allocation nor trigge
   assert.deepEqual(doc.writes, []);
 }));
 
-test('quotas must equal declared stages, not class size or placeholder count', async () => withDocument(async doc => {
+test('surplus quotas warn, cover all declared stages and allow application', async () => withDocument(async doc => {
   doc.data.Affectation.find(row => row.id === 33).Stage_a_suivre = 3;
+  const original = structuredClone(doc.data.Stages);
+  const { snapshot, plan } = await proposal();
+  const analysis = analyzeClass(snapshot, 1, [19]);
+  assert.deepEqual(analysis.errors, []);
+  assert.ok(analysis.warnings.some(row => row.code === 'QUOTA_SURPLUS' && row.expectedCount === 2 && row.targetTotal === 4));
+  assert.equal(plan.assignments.length, 2);
+  assert.equal(plan.summary.reduce((sum, row) => sum + row.target - row.total, 0), 2);
+  assert.ok(plan.summary.every(row => row.total <= row.target));
+  await assert.rejects(applyPlan({ ...plan, assignments: plan.assignments.map(row => ({ ...row, teacherId: 22 })) }, snapshot.configuration.mappings), /quota/);
+  assert.deepEqual(doc.writes, []);
+  await applyPlan(plan, snapshot.configuration.mappings);
+  for (const row of original.filter(row => ![42, 43].includes(row.id))) assert.deepEqual(doc.data.Stages.find(item => item.id === row.id), row);
+  assert.equal(doc.writes.flat().length, 2);
+  assert.equal(doc.data.Affectation.find(row => row.id === 33).Stage_a_suivre, 3);
+}));
+
+test('insufficient quotas still block generation and writes', async () => withDocument(async doc => {
+  doc.data.Affectation.find(row => row.id === 33).Stage_a_suivre = 0;
   const snapshot = await fetchSnapshot({});
   const analysis = analyzeClass(snapshot, 1, [19]);
-  assert.ok(analysis.errors.some(row => row.code === 'QUOTA_TOTAL_MISMATCH' && row.expectedCount === 2 && row.targetTotal === 4));
+  assert.ok(analysis.errors.some(row => row.code === 'QUOTA_TOTAL_MISMATCH' && row.expectedCount === 2 && row.targetTotal === 1));
   assert.throws(() => generatePlan(snapshot, { classId: 1, periods: [19] }));
+  assert.deepEqual(doc.writes, []);
+}));
+
+test('surplus on empty declared period needs no geographic teacher coordinates or writes', async () => withDocument(async doc => {
+  doc.data.Stages = doc.data.Stages.filter(row => row.Periode !== 19);
+  const snapshot = await fetchSnapshot({}, { geography: true });
+  const criteria = { geography: { enabled: true } };
+  const analysis = analyzeClass(snapshot, 1, [19], criteria);
+  assert.deepEqual(analysis.errors, []);
+  assert.equal(analysis.geography.requiredTeacherCount, 0);
+  assert.ok(analysis.warnings.some(row => row.code === 'QUOTA_SURPLUS'));
+  const plan = generatePlan(snapshot, { classId: 1, periods: [19], criteria });
+  assert.deepEqual(plan.assignments, []);
+  await applyPlan(plan, snapshot.configuration.mappings);
+  assert.deepEqual(doc.writes, []);
 }));
 
 test('empty declared periods accept zero quotas without creating expected stages', async () => withDocument(async doc => {

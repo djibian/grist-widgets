@@ -122,3 +122,11 @@ test('garde le CSS local centré sur le métier et les états dynamiques', () =>
   assert.match(css, /\.settings-panel/);
   assert.match(css, /\.proposal-details-grid/);
 });
+
+
+test('signale les quotas excédentaires sans les transformer en erreur et affiche les places disponibles', () => {
+  assert.match(app, /analysis\.warnings/);
+  assert.match(app, /Avertissement/);
+  assert.match(app, /unusedCapacity > 0/);
+  assert.match(html, /<th>Disponible<\/th>/);
+});

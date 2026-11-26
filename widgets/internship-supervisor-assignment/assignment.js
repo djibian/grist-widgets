@@ -155,6 +155,7 @@ function geographyPrecheck(errors, periodStates, teachers, snapshot) {
   const reportedStages = new Set();
 
   for (const state of periodStates) {
+    if (!state.unassignedStages.length) continue;
     for (const capacity of state.capacities) {
       if (capacity.remaining <= 0) continue;
       requiredTeacherIds.add(capacity.teacherId);
@@ -217,7 +218,8 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
   const cid = id(classId);
   const coverage = stageCoverage(snapshot, cid, selectedPeriods);
   const errors = [...coverage.errors];
-  if (!coverage.classRow) return { ...coverage, periodStates: [], errors, geography: null };
+  const warnings = [];
+  if (!coverage.classRow) return { ...coverage, periodStates: [], errors, warnings, geography: null };
 
   const cls = coverage.classRow;
   const teachers = new Map(snapshot.teachers.map(row => [row.id, row]));
@@ -247,10 +249,16 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
     const periodQuotas = quotas.filter(row => row.periodId === period);
     const targetTotal = periodQuotas.reduce((sum, row) => sum + (Number.isInteger(row.target) ? row.target : 0), 0);
     const expectedCount = snapshot.periods ? stages.length : coverage.students.length;
-    if (targetTotal !== expectedCount) {
+    if (targetTotal < expectedCount) {
       errors.push(issue(
         "QUOTA_TOTAL_MISMATCH",
         `${cls.label} — ${periodLabel(snapshot, period)} : ${expectedCount} stage(s) ${snapshot.periods ? "déclaré(s)" : "attendu(s)"}, mais ${targetTotal} suivi(s) prévus dans Affectation.`,
+        { periodId: period, expectedCount, targetTotal },
+      ));
+    } else if (targetTotal > expectedCount) {
+      warnings.push(issue(
+        "QUOTA_SURPLUS",
+        `${cls.label} — ${periodLabel(snapshot, period)} : ${expectedCount} stage(s) ${snapshot.periods ? "déclaré(s)" : "attendu(s)"}, ${targetTotal} suivi(s) prévus dans Affectation ; ${targetTotal - expectedCount} place(s) resteront disponibles.`,
         { periodId: period, expectedCount, targetTotal },
       ));
     }
@@ -301,7 +309,7 @@ export function analyzeClass(snapshot, classId, selectedPeriods, criteria = {}) 
   return {
     ...coverage,
     errors,
-    warnings: [],
+    warnings,
     geography,
     classQuotas: quotas,
     periodStates,
@@ -326,7 +334,7 @@ export function solveMinCostPeriod(stages, capacities, costFunction) {
     .sort((a, b) => a.teacherId - b.teacherId);
   const requiredFlow = rows.length;
   const availableCapacity = activeCapacities.reduce((sum, row) => sum + row.remaining, 0);
-  if (availableCapacity !== requiredFlow) {
+  if (availableCapacity < requiredFlow) {
     throw new AssignmentError(`Impossible de satisfaire les quotas : ${requiredFlow} stage(s) à affecter pour ${availableCapacity} place(s).`);
   }
   if (!requiredFlow) return [];
